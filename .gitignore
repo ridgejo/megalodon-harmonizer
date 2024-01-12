@@ -1,0 +1,8 @@
+**/__pycache__/
+wandb/
+.vscode/
+data/
+results*/
+*.out
+slurm_out/
+*.png
