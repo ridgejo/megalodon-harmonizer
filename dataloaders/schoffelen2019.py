@@ -4,7 +4,7 @@ import dataloaders.data_utils as data_utils
 from typing import List, Optional, Union
 from torch.utils.data import Dataset
 
-class Schoeffelen2019(Dataset):
+class Schoffelen2019(Dataset):
     """
     Loads fixed windows from the MEG data in Schoeffelen et al. (2019).
     Source: https://www.nature.com/articles/s41597-019-0020-y
@@ -16,7 +16,7 @@ class Schoeffelen2019(Dataset):
         task: str,
         slice_len: float,
         preproc_config: dict,
-        bids_root: str = data_utils.DATA_PATH / 'schoeffelen2019',
+        bids_root: str = data_utils.DATA_PATH / 'schoffelen2019',
     ):
         """
         Args:
@@ -70,7 +70,7 @@ class Schoeffelen2019(Dataset):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    test_dataset = Schoeffelen2019(
+    test_dataset = Schoffelen2019(
         subject_id="A2002",
         task="auditory",
         slice_len=5,
@@ -90,4 +90,4 @@ if __name__ == "__main__":
         plt.ylabel("Amplitude")
     
     plt.ylim(-6, 6)
-    plt.savefig("schoeffelen.png")
+    plt.savefig("schoffelen.png")

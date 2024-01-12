@@ -39,16 +39,14 @@ class Gwilliams2022(Dataset):
 
         if not preprocessed:
 
-            # Gwilliams MEG channels are named starting with "MEG"
-            meg_channels = [ch_name for ch_name in raw.ch_names if ch_name.startswith("MEG")]
-
-            # All channels are gradiometer channels (I think?)
-            raw.set_channel_types(dict(zip(meg_channels, ['grad' for _ in meg_channels])))
+            # Gwilliams MEG channels are picked using the meg flag.
+            picks = dict(meg=True, eeg=False, stim=False, eog=False, ecg=False, misc=False)
+            raw = raw.pick_types(**picks)
 
             raw = data_utils.preprocess(
                 raw=raw,
                 preproc_config=preproc_config,
-                channels=meg_channels,
+                channels=picks,
                 cache_path=cache_path,
             )
 

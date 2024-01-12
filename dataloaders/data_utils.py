@@ -53,7 +53,10 @@ def preprocess(raw, preproc_config, channels, cache_path):
 
     print(f"Preprocessing data with configuration {preproc_config}")
 
-    raw = raw.pick(channels) # Pick only relevant MEG channels
+    if isinstance(channels, list):
+        raw = raw.pick(channels) # Pick only relevant MEG channels
+    else:
+        channels = [ch_name for ch_name in raw.ch_names]
 
     if preproc_config["filtering"]:
         raw.load_data()
