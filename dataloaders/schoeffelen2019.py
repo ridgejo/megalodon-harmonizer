@@ -61,14 +61,10 @@ class Schoeffelen2019(Dataset):
 
     def __getitem__(self, idx):
 
-        data_slice, times = self.raw[
-            : , self.samples_per_slice * idx : self.samples_per_slice * (idx + 1)
-        ]
+        data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice)
+        data_slice = data_utils.normalize(data_slice, self.mean, self.p5, self.p95)
 
-        data_slice = 2 * (((data_slice) - self.p5) / (self.p95 - self.p5)) - 1
-        data_slice -= self.mean
-
-        return data_slice, times
+        return data_slice, times, self.__class__.__name__
 
 
 if __name__ == "__main__":
@@ -87,10 +83,11 @@ if __name__ == "__main__":
         }
     )
 
-    data, times = test_dataset[0] # 35-40s
+    data, times, dataset = test_dataset[0]
     for channel in data:
         plt.plot(times, channel)
         plt.xlabel("Time (s)")
         plt.ylabel("Amplitude")
     
+    plt.ylim(-6, 6)
     plt.savefig("schoeffelen.png")

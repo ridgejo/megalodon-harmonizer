@@ -87,6 +87,16 @@ def get_norm_stats(raw):
 
     return mean, p5, p95
 
+def normalize(data_slice, mean, p5, p95):
+    data_slice = 2 * (((data_slice) - p5) / (p95 - p5)) - 1
+    data_slice -= mean
+    return data_slice
+
+def get_slice(raw, idx, samples_per_slice):
+    return raw[
+        : , samples_per_slice * idx : samples_per_slice * (idx + 1)
+    ]
+
 def get_slice_stats(raw, slice_len):
     duration = raw.times[-1] - raw.times[0]
     num_slices = int(duration / slice_len)
