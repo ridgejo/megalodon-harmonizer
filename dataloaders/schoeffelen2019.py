@@ -1,30 +1,29 @@
-"""10-hour dataset dataloader"""
+"""MOUS dataset dataloader."""
 
 import dataloaders.data_utils as data_utils
 from typing import List, Optional, Union
 from torch.utils.data import Dataset
 
-class Armeni2022(Dataset):
+class Schoeffelen2019(Dataset):
     """
-    Loads fixed windows from the MEG data in Armeni et al. (2022).
-    Source: https://www.nature.com/articles/s41597-022-01382-7
+    Loads fixed windows from the MEG data in Schoeffelen et al. (2019).
+    Source: https://www.nature.com/articles/s41597-019-0020-y
     """
 
     def __init__(
         self,
         subject_id: str,
         task: str,
-        session: str,
         slice_len: float,
         preproc_config: dict,
-        bids_root: str = data_utils.DATA_PATH / 'armeni2022',
+        bids_root: str = data_utils.DATA_PATH / 'schoeffelen2019',
     ):
         """
         Args:
             bids_root: Directory of dataset.
-            subject_id: Subject (1-3).
-            session: Recording session (1-10).
-            task: Recording task ('compr'/'emptyroom').
+            subject_id: Subject.
+            session: Recording session.
+            task: Recording task.
             slice_len: Length (in seconds) of items returned by getter.
             preproc_config: Dictionary with preprocessing settings.
         """
@@ -33,13 +32,13 @@ class Armeni2022(Dataset):
             bids_root=bids_root,
             subject_id=subject_id,
             task=task,
-            session=session,
+            session=None,
             preproc_config=preproc_config,
         )
 
         if not preprocessed:
 
-            # Armeni MEG channels are named starting with an "M"
+            # Schoeffelen MEG channels are named starting with an "M"
             meg_channels = [ch_name for ch_name in raw.ch_names if ch_name.startswith("M")]
 
             # All channels are gradiometer channels (I think?)
@@ -75,10 +74,9 @@ class Armeni2022(Dataset):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    test_dataset = Armeni2022(
-        subject_id="001",
-        session="001",
-        task="compr",
+    test_dataset = Schoeffelen2019(
+        subject_id="A2002",
+        task="auditory",
         slice_len=5,
         preproc_config={
             "filtering": True,
@@ -89,10 +87,10 @@ if __name__ == "__main__":
         }
     )
 
-    data, times = test_dataset[7] # 35-40s
+    data, times = test_dataset[0] # 35-40s
     for channel in data:
         plt.plot(times, channel)
         plt.xlabel("Time (s)")
         plt.ylabel("Amplitude")
     
-    plt.savefig("armeni.png")
+    plt.savefig("schoeffelen.png")
