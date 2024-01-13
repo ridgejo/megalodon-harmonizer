@@ -1,8 +1,11 @@
 """Gwilliams dataset dataloader."""
 
-import dataloaders.data_utils as data_utils
-from typing import List, Optional, Union
+import gc
+
 from torch.utils.data import Dataset
+
+import dataloaders.data_utils as data_utils
+
 
 class Gwilliams2022(Dataset):
     """
@@ -17,7 +20,7 @@ class Gwilliams2022(Dataset):
         session: str,
         slice_len: float,
         preproc_config: dict,
-        bids_root: str = data_utils.DATA_PATH / 'gwilliams2022',
+        bids_root: str = data_utils.DATA_PATH / "gwilliams2022",
     ):
         """
         Args:
@@ -29,6 +32,8 @@ class Gwilliams2022(Dataset):
             preproc_config: Dictionary with preprocessing settings.
         """
 
+        self.subject_id = subject_id
+
         raw, preprocessed, cache_path = data_utils.load_dataset(
             bids_root=bids_root,
             subject_id=subject_id,
@@ -38,9 +43,10 @@ class Gwilliams2022(Dataset):
         )
 
         if not preprocessed:
-
             # Gwilliams MEG channels are picked using the meg flag.
-            picks = dict(meg=True, eeg=False, stim=False, eog=False, ecg=False, misc=False)
+            picks = dict(
+                meg=True, eeg=False, stim=False, eog=False, ecg=False, misc=False
+            )
             raw = raw.pick_types(**picks)
 
             raw = data_utils.preprocess(
@@ -50,20 +56,31 @@ class Gwilliams2022(Dataset):
                 cache_path=cache_path,
             )
 
+            del raw
+            gc.collect()
+            # Lazy read after preprocessing
+            raw, _, _ = data_utils.load_dataset(
+                bids_root=None,
+                subject_id=None,
+                task=None,
+                session=None,
+                preproc_config=None,
+                cache_path=cache_path,
+            )
+
         self.raw = raw
-        
-        self.mean, self.p5, self.p95 = data_utils.get_norm_stats(raw)
-        self.num_slices, self.samples_per_slice = data_utils.get_slice_stats(raw, slice_len)
+
+        self.num_slices, self.samples_per_slice = data_utils.get_slice_stats(
+            raw, slice_len
+        )
 
     def __len__(self):
         return self.num_slices
 
     def __getitem__(self, idx):
-
         data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice)
-        data_slice = data_utils.normalize(data_slice, self.mean, self.p5, self.p95)
 
-        return data_slice, times, self.__class__.__name__
+        return data_slice, times, self.__class__.__name__, self.subject_id
 
 
 if __name__ == "__main__":
@@ -80,7 +97,7 @@ if __name__ == "__main__":
             "notch_freqs": [50, 100, 150],
             "bandpass_lo": 0.1,
             "bandpass_hi": 150,
-        }
+        },
     )
 
     data, times, dataset = test_dataset[0]
@@ -88,6 +105,6 @@ if __name__ == "__main__":
         plt.plot(times, channel)
         plt.xlabel("Time (s)")
         plt.ylabel("Amplitude")
-    
+
     plt.ylim(-6, 6)
     plt.savefig("gwilliams.png")

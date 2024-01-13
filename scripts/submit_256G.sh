@@ -9,7 +9,7 @@
 #SBATCH --output=slurm_out/%j.out
 
 source ~/.init_conda.sh
-conda activate megalodon
+conda activate MEGalodon
 
 export WANDB_CACHE_DIR=$DATA/wandb_cache
 

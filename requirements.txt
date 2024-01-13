@@ -13,6 +13,7 @@ wandb
 matplotlib
 nltk
 rouge_score
+ruff
 sox
 soundfile
 scikit-learn

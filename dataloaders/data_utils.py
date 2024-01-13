@@ -1,36 +1,40 @@
+import hashlib
 import os
 import warnings
-import hashlib
+from pathlib import Path
+
+import mne
 import numpy as np
+import torch
 from mne_bids import (
     BIDSPath,
     read_raw_bids,
 )
-from pathlib import Path
-import pickle
 
-DATA_PATH = Path('/data/engs-pnpl/lina4368')
+DATA_PATH = Path("/data/engs-pnpl/lina4368")
+
 
 def _string_hash(text):
-    return int(hashlib.md5(text.encode('utf-8')).hexdigest(), 16)
+    return int(hashlib.md5(text.encode("utf-8")).hexdigest(), 16)
 
-def load_dataset(bids_root, subject_id, task, session, preproc_config):
-    """"Loads a dataset. First checks if a preprocessed version already exists in cache and loads it."""
 
-    # Generate a hash to describe this dataset and its processing configuration
-    identifier = str(_string_hash(
-        f"{bids_root}_{subject_id}_{session}_{task}_{preproc_config}")
-    )
-    cache_path = DATA_PATH / f"dataset_cache/{identifier}.pkl"
-    (DATA_PATH / "dataset_cache").mkdir(parents=True, exist_ok=True)
+def load_dataset(bids_root, subject_id, task, session, preproc_config, cache_path=None):
+    """Loads a dataset. First checks if a preprocessed version already exists in cache and loads it."""
 
-    print(f"Computed dataset cache hash: {identifier}")
+    if not cache_path:
+        # Generate a hash to describe this dataset and its processing configuration
+        identifier = str(
+            _string_hash(f"{bids_root}_{subject_id}_{session}_{task}_{preproc_config}")
+        )
+        cache_path = DATA_PATH / f"dataset_cache/{identifier}_raw.fif"
+        (DATA_PATH / "dataset_cache").mkdir(parents=True, exist_ok=True)
+
+        print(f"Computed dataset cache hash: {identifier}")
 
     # Load cached dataset if it exists, otherwise load BIDS dataset and preprocess
     if os.path.exists(cache_path):
         print("Cache found. Loading cached dataset.")
-        with open(cache_path, 'rb') as f:
-            raw = pickle.load(f)
+        raw = mne.io.read_raw_fif(cache_path, preload=False)  # Ensures lazy loading
         return raw, True, cache_path
     else:
         print("Cache not found. Loading dataset.")
@@ -48,29 +52,33 @@ def load_dataset(bids_root, subject_id, task, session, preproc_config):
             )
             raw = read_raw_bids(bids_path)
         return raw, False, cache_path
-        
-def preprocess(raw, preproc_config, channels, cache_path):
 
+
+def preprocess(raw, preproc_config, channels, cache_path):
     print(f"Preprocessing data with configuration {preproc_config}")
 
     if isinstance(channels, list):
-        raw = raw.pick(channels) # Pick only relevant MEG channels
+        raw = raw.pick(channels)  # Pick only relevant MEG channels
     else:
         channels = [ch_name for ch_name in raw.ch_names]
 
     if preproc_config["filtering"]:
-        raw.load_data()
+        raw.load_data()  # Warning: this loads all data into memory.
         raw.notch_filter(freqs=preproc_config["notch_freqs"], picks=channels)
-        raw.filter(l_freq=preproc_config["bandpass_lo"], h_freq=preproc_config["bandpass_hi"], picks=channels)
-    
+        raw.filter(
+            l_freq=preproc_config["bandpass_lo"],
+            h_freq=preproc_config["bandpass_hi"],
+            picks=channels,
+        )
+
     if preproc_config["resample"]:
         raw = raw.resample(sfreq=preproc_config["resample"])
 
-    # Cache newly preprocessed data for faster loading next time.
-    with open(cache_path, 'wb') as f:
-        pickle.dump(raw, f, protocol=pickle.HIGHEST_PROTOCOL)
-    
+    # Cache processed data as a fif
+    raw.save(cache_path, overwrite=True)
+
     return raw
+
 
 def get_norm_stats(raw):
     # What kind of normalization should we apply for cross-subject + cross-dataset studies?
@@ -80,28 +88,99 @@ def get_norm_stats(raw):
 
     print("Computing data normalization statistics")
 
-    data = raw.get_data() # Warning: I think this loads all data into memory.
-    
-    p5 = np.percentile(data.flatten(), 0.05)
-    p95 = np.percentile(data.flatten(), 0.95)
-    mean = (2 * (((data) - p5) / (p95 - p5)) - 1).mean()
+    data = raw.get_data()  # Warning: this loads all data into memory.
+
+    baseline_correction = data[:, :1000].mean(
+        axis=1
+    )  # Channel-wise mean from first 1000 samples
+
+    data = (data.T - baseline_correction).T
+
+    lq = np.percentile(data.flatten(), 0.25)
+    uq = np.percentile(data.flatten(), 0.75)
+    data = 2 * (((data) - lq) / (uq - lq)) - 1
+    median = np.median(data.flatten())
+    data -= median
+    std = np.std(data.flatten())
 
     # Don't hold onto data to avoid keeping it in memory. Just pass the normalization statistics.
+    del data
 
-    return mean, p5, p95
+    return {
+        "baseline_correction": baseline_correction,
+        "median": median,
+        "lower_q": lq,
+        "upper_q": uq,
+        "std": std,
+    }
 
-def normalize(data_slice, mean, p5, p95):
-    data_slice = 2 * (((data_slice) - p5) / (p95 - p5)) - 1
-    data_slice -= mean
+
+def normalize(data_slice, norm_stats):
+    data_slice = (data_slice.T - norm_stats["baseline_correction"]).T
+    data_slice = (
+        2
+        * (
+            ((data_slice) - norm_stats["lower_q"])
+            / (norm_stats["upper_q"] - norm_stats["lower_q"])
+        )
+        - 1
+    )
+    data_slice -= norm_stats["median"]
+    data_slice = np.clip(
+        data_slice, a_min=-20 * norm_stats["std"], a_max=20 * norm_stats["std"]
+    )
     return data_slice
 
+
 def get_slice(raw, idx, samples_per_slice):
-    return raw[
-        : , samples_per_slice * idx : samples_per_slice * (idx + 1)
-    ]
+    return raw[:, samples_per_slice * idx : samples_per_slice * (idx + 1)]
+
 
 def get_slice_stats(raw, slice_len):
     duration = raw.times[-1] - raw.times[0]
     num_slices = int(duration / slice_len)
     samples_per_slice = int(int(raw.info["sfreq"]) * slice_len)
     return num_slices, samples_per_slice
+
+
+class BatchScaler:
+    """Applies scaling based on Defossez et al. 2023"""
+
+    def __init__(self, correction_samples, n_sample_batches):
+        self.correction_samples = correction_samples
+        self.n_sample_batches = n_sample_batches
+
+    def fit(self, dataloader):
+        sample_batches = []
+        for i, batch in enumerate(dataloader):
+            sample_batches.append(batch[0])  # Keep only data
+            if i >= self.n_sample_batches:
+                break
+
+        data = torch.cat(sample_batches)
+
+        data = data.permute(0, 2, 1).flatten(start_dim=0, end_dim=1).permute(1, 0)
+
+        self.baseline_correction = data[:, : self.correction_samples].mean(dim=1)
+        data = (data.T - self.baseline_correction).T
+
+        data = data.flatten()
+
+        self.lower_q, self.median, self.upper_q = torch.quantile(
+            data,
+            q=torch.tensor([0.25, 0.5, 0.75], dtype=data.dtype),
+        )
+
+        data -= self.median
+        self.lower_q = self.lower_q - self.median
+        self.upper_q = self.upper_q - self.median
+        data = 2 * ((data - self.lower_q) / (self.upper_q - self.lower_q)) - 1
+
+        self.std = torch.std(data)
+
+    def transform(self, batch):
+        batch = batch - self.baseline_correction[None, :, None]
+        batch -= self.median
+        batch = 2 * ((batch - self.lower_q) / (self.upper_q - self.lower_q)) - 1
+        batch = torch.clamp(batch, min=20 * -self.std, max=20 * self.std)
+        return batch
