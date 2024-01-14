@@ -141,7 +141,8 @@ def _load_gwilliams_2022(slice_len, preproc_config):
 
                 subject_datasets.append(data)
 
-        datasets.append(ConcatDataset(subject_datasets))
+        if len(subject_datasets) > 0:
+            datasets.append(ConcatDataset(subject_datasets))
 
     print(
         f"Loaded approximately {seconds // 3600} hours of data from Gwilliams et al. 2022"
@@ -180,7 +181,8 @@ def _load_schoffelen_2019(slice_len, preproc_config):
 
             subject_datasets.append(data)
 
-        datasets.append(ConcatDataset(subject_datasets))
+        if len(subject_datasets) > 0:
+            datasets.append(ConcatDataset(subject_datasets))
 
     print(
         f"Loaded approximately {seconds // 3600} hours of data from Schoffelen et al. 2019"
@@ -222,7 +224,8 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
 
             subject_datasets.append(data)
 
-        datasets.append(ConcatDataset(subject_datasets))
+        if len(subject_datasets) > 0:
+            datasets.append(ConcatDataset(subject_datasets))
 
     print(
         f"Loaded approximately {seconds // 3600} hours of data from Armeni et al. 2022"
@@ -252,7 +255,7 @@ if __name__ == "__main__":
         batch_size=8,
         baseline_correction_samples=1000,
         n_sample_batches=2,  # PyTorch errors if given more than 8 * 32 * 0.5 = 128 seconds of 269-channel data
-        debug=True,  # TODO: change as required
+        debug=False,  # TODO: change as required
     )
 
     i = 0
