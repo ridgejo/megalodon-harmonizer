@@ -6,6 +6,7 @@ from pathlib import Path
 import mne
 import numpy as np
 import torch
+import torch.nn as nn
 from mne_bids import (
     BIDSPath,
     read_raw_bids,
@@ -143,17 +144,18 @@ def get_slice_stats(raw, slice_len):
     return num_slices, samples_per_slice
 
 
-class BatchScaler:
+class BatchScaler(nn.Module):
     """Applies scaling based on Defossez et al. 2023"""
 
     def __init__(self, correction_samples, n_sample_batches):
+        super(BatchScaler, self).__init__()
         self.correction_samples = correction_samples
         self.n_sample_batches = n_sample_batches
 
     def fit(self, dataloader):
         sample_batches = []
         for i, batch in enumerate(dataloader):
-            sample_batches.append(batch[0])  # Keep only data
+            sample_batches.append(batch[0].cuda())  # Keep only data
             if i >= self.n_sample_batches:
                 break
 
@@ -161,14 +163,14 @@ class BatchScaler:
 
         data = data.permute(0, 2, 1).flatten(start_dim=0, end_dim=1).permute(1, 0)
 
-        self.baseline_correction = data[:, : self.correction_samples].mean(dim=1)
+        self.baseline_correction = data.mean(dim=1)
         data = (data.T - self.baseline_correction).T
 
         data = data.flatten()
 
         self.lower_q, self.median, self.upper_q = torch.quantile(
             data,
-            q=torch.tensor([0.25, 0.5, 0.75], dtype=data.dtype),
+            q=torch.tensor([0.25, 0.5, 0.75], dtype=data.dtype, device=data.device),
         )
 
         data -= self.median
@@ -178,7 +180,7 @@ class BatchScaler:
 
         self.std = torch.std(data)
 
-    def transform(self, batch):
+    def forward(self, batch):
         batch = batch - self.baseline_correction[None, :, None]
         batch -= self.median
         batch = 2 * ((batch - self.lower_q) / (self.upper_q - self.lower_q)) - 1
