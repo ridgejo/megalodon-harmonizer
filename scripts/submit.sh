@@ -3,7 +3,7 @@
 #SBATCH --mem=64G
 #SBATCH --clusters=htc
 #SBATCH --job-name=megalodon
-#SBATCH --time=11:30:00
+#SBATCH --time=11:59:00
 #SBATCH --gres=gpu:1
 #SBATCH --partition=short
 #SBATCH --output=slurm_out/%j.out

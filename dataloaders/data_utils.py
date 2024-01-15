@@ -161,10 +161,11 @@ class BatchScaler(nn.Module):
 
         data = torch.cat(sample_batches)
 
-        data = data.permute(0, 2, 1).flatten(start_dim=0, end_dim=1).permute(1, 0)
+        self.baseline_correction = data.mean(dim=[0, 2])
+        data = data - self.baseline_correction[None, :, None]
 
-        self.baseline_correction = data.mean(dim=1)
-        data = (data.T - self.baseline_correction).T
+        self.std = torch.std(data)
+        data = torch.clamp(data, min=20 * -self.std, max=20 * self.std)
 
         data = data.flatten()
 
@@ -176,13 +177,10 @@ class BatchScaler(nn.Module):
         data -= self.median
         self.lower_q = self.lower_q - self.median
         self.upper_q = self.upper_q - self.median
-        data = 2 * ((data - self.lower_q) / (self.upper_q - self.lower_q)) - 1
-
-        self.std = torch.std(data)
 
     def forward(self, batch):
         batch = batch - self.baseline_correction[None, :, None]
+        batch = torch.clamp(batch, min=20 * -self.std, max=20 * self.std)
         batch -= self.median
         batch = 2 * ((batch - self.lower_q) / (self.upper_q - self.lower_q)) - 1
-        batch = torch.clamp(batch, min=20 * -self.std, max=20 * self.std)
         return batch

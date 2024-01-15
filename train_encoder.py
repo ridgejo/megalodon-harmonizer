@@ -63,22 +63,14 @@ train_sampler, test_sampler, scalers = load_pretraining_data(
 
 print(f"Loaded train : test ({len(train_sampler)}, {len(test_sampler)})")
 
-subjects = [
-    os.path.basename(path).replace("sub-", "")
-    for path in glob.glob(str(data_utils.DATA_PATH) + "/schoffelen2019/sub-*")
-]
-subjects.extend(
-    [
-        os.path.basename(path).replace("sub-", "")
-        for path in glob.glob(str(data_utils.DATA_PATH) + "/gwilliams2022/sub-*")
-    ]
-)
-subjects.extend(
-    [
-        os.path.basename(path).replace("sub-", "")
-        for path in glob.glob(str(data_utils.DATA_PATH) + "/armeni2022/sub-*")
-    ]
-)
+subjects = []
+for k in config["data"]["preproc_config"].keys():
+    subjects.extend(
+        [
+            os.path.basename(path).replace("sub-", "")
+            for path in glob.glob(str(data_utils.DATA_PATH) + f"/{k}/sub-*")
+        ]
+    )
 
 if "short" in config["model"]:
     model = _make_short_vqvae(
@@ -98,6 +90,7 @@ iter_update_freq = config["stats"]["iter_update_freq"]
 iteration = 0
 start = time.perf_counter()
 train_losses = Counter()
+train_examples = {}
 for epoch in range(num_epochs):
     for i, batch in enumerate(train_sampler):
         optimizer.zero_grad()
@@ -116,8 +109,8 @@ for epoch in range(num_epochs):
         loss["loss"].backward()
         optimizer.step()
 
-        if i == 0:
-            first_batch = (x, x_hat, times)
+        if dataset_id not in train_examples:
+            train_examples[dataset_id] = (x, x_hat, times)
 
         train_losses.update(loss)
 
@@ -129,6 +122,7 @@ for epoch in range(num_epochs):
             with torch.no_grad():
                 train_fig, test_fig = None, None
                 test_losses = Counter()
+                test_examples = {}
                 for i, batch in enumerate(test_sampler):
                     x, times, dataset_id, subject_id = (
                         batch[0].cuda(),
@@ -140,8 +134,8 @@ for epoch in range(num_epochs):
                     x_hat, test_loss = model(x, dataset_id, subject_id)
                     test_losses.update(test_loss)
 
-                    if i == 0:
-                        test_first_batch = (x, x_hat, times)
+                    if dataset_id not in test_examples:
+                        test_examples[dataset_id] = (x, x_hat, times)
 
                 for k in test_losses:
                     test_losses[k] /= len(test_sampler)
@@ -149,17 +143,18 @@ for epoch in range(num_epochs):
                 test_losses = {f"test_{k}": v for k, v in test_losses.items()}
 
                 if (not args.debug) or (args.debug and ((epoch + 1) % 500 == 0)):
-                    x, x_hat, times = test_first_batch
-                    test_fig, test_axes = plt.subplots(
-                        nrows=2, ncols=4, figsize=(4 * 5, 10)
-                    )
-                    # Draw samples from first batch
-                    x, x_hat = x[:4].cpu(), x_hat[:4].cpu()
-                    times = times[:4].cpu()
 
-                    for j, (x_sample, x_hat_sample, t) in enumerate(
-                        zip(x, x_hat, times)
-                    ):
+                    ncols = len(test_examples.keys())
+                    test_fig, test_axes = plt.subplots(
+                        nrows=2, ncols=ncols, figsize=(4 * 5, 10)
+                    )
+
+                    for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):
+
+                        x_sample = x[0].cpu()
+                        x_hat_sample = x_hat[0].cpu()
+                        t = times[0].cpu()
+
                         for ch_x, ch_x_hat in zip(x_sample, x_hat_sample):
                             test_axes[0, j].plot(t, ch_x)
                             test_axes[1, j].plot(t, ch_x_hat)
@@ -167,19 +162,21 @@ for epoch in range(num_epochs):
                             test_axes[0, j].set_ylabel("Amplitude")
                             test_axes[0, j].set_ylim(-5, 5)
                             test_axes[1, j].set_ylim(-5, 5)
+                        
+                        test_axes[0, j].set_title(dataset_id)
 
                     # Also draw train set
-                    x, x_hat, times = first_batch
+                    ncols = len(train_examples.keys())
                     train_fig, train_axes = plt.subplots(
-                        nrows=2, ncols=4, figsize=(4 * 5, 10)
+                        nrows=2, ncols=ncols, figsize=(4 * 5, 10)
                     )
-                    # Draw samples from first batch
-                    x, x_hat = x[:4].cpu(), x_hat[:4].cpu()
-                    times = times[:4].cpu()
 
-                    for j, (x_sample, x_hat_sample, t) in enumerate(
-                        zip(x, x_hat, times)
-                    ):
+                    for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):
+
+                        x_sample = x[0].cpu()
+                        x_hat_sample = x_hat[0].cpu()
+                        t = times[0].cpu()
+
                         for ch_x, ch_x_hat in zip(x_sample, x_hat_sample):
                             train_axes[0, j].plot(t, ch_x)
                             train_axes[1, j].plot(t, ch_x_hat)
@@ -188,9 +185,11 @@ for epoch in range(num_epochs):
                             train_axes[0, j].set_ylim(-5, 5)
                             train_axes[1, j].set_ylim(-5, 5)
 
+                        train_axes[0, j].set_title(dataset_id)
+
             print()
             print(
-                f"Epoch {round(iteration / len(train_sampler), 2)} Iter {iteration}/{num_epochs * len(train_sampler)})"
+                f"Epoch {round(iteration / len(train_sampler), 2)} Iter {iteration}/{num_epochs * len(train_sampler)}"
             )
             print(train_losses)
             print(test_losses)
@@ -210,6 +209,7 @@ for epoch in range(num_epochs):
                 }
             )
 
+            train_examples = {}
             train_losses = Counter()
             start = time.perf_counter()
 

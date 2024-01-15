@@ -67,8 +67,9 @@ def load_pretraining_data(
     }
 
     if debug:
-        datasets = _load_armeni_2022(
-            slice_len, preproc_config["armeni2022"], debug=debug
+        ds_name = next(iter(preproc_config.keys()))
+        datasets = loaders[ds_name](
+            slice_len, preproc_config[ds_name], debug=debug
         )
     else:
         datasets = []
@@ -124,21 +125,30 @@ def load_pretraining_data(
     return train_sampler, test_sampler, scalers
 
 
-def _load_gwilliams_2022(slice_len, preproc_config):
+def _load_gwilliams_2022(slice_len, preproc_config, debug=False):
     seconds = 0
     datasets = []
 
+    if not debug:
+        n_subjects = 27
+        n_sessions = 1
+        n_tasks = 3
+    else:
+        n_subjects = 1
+        n_sessions = 0
+        n_tasks = 0
+
     # Loop over subjects
-    for subj_no in range(1, 27 + 1):
+    for subj_no in range(1, n_subjects + 1):
         subject = "{:02d}".format(subj_no)  # 01, 02, etc.
 
         subject_datasets = []
 
         # Loop over sessions
-        for sess_no in range(0, 1 + 1):
+        for sess_no in range(0, n_sessions + 1):
             session = str(sess_no)
 
-            for task in range(0, 3 + 1):
+            for task in range(0, n_tasks + 1):
                 task = str(task)
 
                 try:
@@ -166,22 +176,28 @@ def _load_gwilliams_2022(slice_len, preproc_config):
     return datasets
 
 
-def _load_schoffelen_2019(slice_len, preproc_config):
+def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
     seconds = 0
     datasets = []
 
     # Note: "V" subjects read the stimuli, while "A" subjects heard it
-    subjects = [
+    subjects = sorted([
         os.path.basename(path).replace("sub-", "")
         for path in glob.glob(str(data_utils.DATA_PATH) + "/schoffelen2019/sub-*")
-    ]
+    ])
+
+    if debug:
+        subjects = [subjects[0]]
+        tasks = ["rest"]
+    else:
+        tasks = ["auditory", "rest"]
 
     # Loop over subjects
     for subject in subjects:
         subject_datasets = []
 
         # Loop over sessions
-        for task in ["auditory", "rest"]:
+        for task in tasks:
             try:
                 data = Schoffelen2019(
                     subject_id=subject,
@@ -250,6 +266,7 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
     preproc_config = {
         "filtering": True,
         "resample": 300,
@@ -273,23 +290,16 @@ if __name__ == "__main__":
         debug=False,  # TODO: change as required
     )
 
-    # i = 0
-    # for batch in train_sampler:
-    #     data, subject, dataset = batch[0], batch[-1][0], batch[-2][0]
+    for batch in train_sampler:
+        data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
+        data = data.cuda()
+        scaled_batch = scalers[dataset][subject](data)
 
-    #     data = data.cuda()
+        for channel in scaled_batch[0]:
+            plt.plot(times[0].cpu(), channel.cpu())
+            plt.xlabel("Time (s)")
+            plt.ylabel("Amplitude")
 
-    #     scaled_batch = scalers[dataset][subject](data)
-
-    #     i += 1
-    #     print(i)
-
-    # times = batch[1][0]
-    # for channel in scaled_batch[0]:
-    #     plt.plot(times.cpu(), channel.cpu())
-    #     plt.xlabel("Time (s)")
-    #     plt.ylabel("Amplitude")
-
-    # plt.ylim(-6, 6)
-    # plt.savefig("scaled.png")
-    # break
+        plt.ylim(-6, 6)
+        plt.savefig("scaled.png")
+        break
