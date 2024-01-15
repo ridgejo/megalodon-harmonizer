@@ -43,9 +43,9 @@ class Schoffelen2019(Dataset):
 
         if not preprocessed:
             # Schoeffelen MEG channels are named starting with an "M"
-            meg_channels = [
-                ch_name for ch_name in raw.ch_names if ch_name.startswith("M")
-            ]
+            meg_channels = sorted(
+                [ch_name for ch_name in raw.ch_names if ch_name.startswith("M")]
+            )[:273]  # issue: hopefully this doesn't change channel order in data
 
             # All channels are gradiometer channels (I think?)
             raw.set_channel_types(

@@ -170,7 +170,7 @@ class BatchScaler(nn.Module):
 
         self.lower_q, self.median, self.upper_q = torch.quantile(
             data,
-            q=torch.tensor([0.25, 0.5, 0.75], dtype=data.dtype, device=data.device),
+            q=torch.tensor([0.05, 0.5, 0.95], dtype=data.dtype, device=data.device),
         )
 
         data -= self.median

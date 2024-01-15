@@ -60,21 +60,36 @@ def load_pretraining_data(
     Since we load data from different MEG datasets, we require a dataset-conditional transform for each dataset so that we can transform all data into the same space. Moreover, we will utilise subject-conditional layers to account for differences in each patient. For maximum GPU efficiency, each batch should contain data from only one dataset and subject so a batch can be processed in parallel. To enable this, the BatchInvariantSampler is used to randomly return batches from dataloaders for each dataset and subject.
     """
 
-    datasets = _load_armeni_2022(slice_len, preproc_config["armeni2022"], debug=debug)
-    if not debug:
-        datasets.extend(
-            _load_gwilliams_2022(slice_len, preproc_config["gwilliams2022"])
+    loaders = {
+        "armeni2022": _load_armeni_2022,
+        "gwilliams2022": _load_gwilliams_2022,
+        "schoffelen2019": _load_schoffelen_2019,
+    }
+
+    if debug:
+        datasets = _load_armeni_2022(
+            slice_len, preproc_config["armeni2022"], debug=debug
         )
-        datasets.extend(
-            _load_schoffelen_2019(slice_len, preproc_config["schoffelen2019"])
-        )
+    else:
+        datasets = []
+        for k in preproc_config.keys():
+            datasets.extend(loaders[k](slice_len, preproc_config[k]))
 
     train_datasets, test_datasets = [], []
 
     for dataset in datasets:
-        train_size = int(len(dataset) * train_ratio)
-        test_size = len(dataset) - train_size
-        train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+        if debug:
+            # Use only a single batch when debugging
+            train_size = batch_size
+            test_size = batch_size
+            rest = len(dataset) - train_size - test_size
+            train_dataset, test_dataset, _ = random_split(
+                dataset, [train_size, test_size, rest]
+            )
+        else:
+            train_size = int(len(dataset) * train_ratio)
+            test_size = len(dataset) - train_size
+            train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
         train_datasets.append(train_dataset)
         test_datasets.append(test_dataset)
 
@@ -92,7 +107,7 @@ def load_pretraining_data(
     for train_dataloader in train_dataloaders:
         scaler = data_utils.BatchScaler(
             correction_samples=baseline_correction_samples,
-            n_sample_batches=n_sample_batches,
+            n_sample_batches=n_sample_batches if not debug else 1,
         ).cuda()
         scaler.fit(train_dataloader)
 
@@ -196,7 +211,7 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
     datasets = []
 
     if debug:
-        n_subjects = 2
+        n_subjects = 1
         n_sessions = 1
     else:
         n_subjects = 3
@@ -258,23 +273,23 @@ if __name__ == "__main__":
         debug=False,  # TODO: change as required
     )
 
-    i = 0
-    for batch in train_sampler:
-        data, subject, dataset = batch[0], batch[-1][0], batch[-2][0]
+    # i = 0
+    # for batch in train_sampler:
+    #     data, subject, dataset = batch[0], batch[-1][0], batch[-2][0]
 
-        data = data.cuda()
+    #     data = data.cuda()
 
-        scaled_batch = scalers[dataset][subject](data)
+    #     scaled_batch = scalers[dataset][subject](data)
 
-        i += 1
-        print(i)
+    #     i += 1
+    #     print(i)
 
-        # times = batch[1][0]
-        # for channel in scaled_batch[0]:
-        #     plt.plot(times.cpu(), channel.cpu())
-        #     plt.xlabel("Time (s)")
-        #     plt.ylabel("Amplitude")
+    # times = batch[1][0]
+    # for channel in scaled_batch[0]:
+    #     plt.plot(times.cpu(), channel.cpu())
+    #     plt.xlabel("Time (s)")
+    #     plt.ylabel("Amplitude")
 
-        # plt.ylim(-6, 6)
-        # plt.savefig("scaled.png")
-        # break
+    # plt.ylim(-6, 6)
+    # plt.savefig("scaled.png")
+    # break

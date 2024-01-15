@@ -20,6 +20,7 @@ conda activate megalodon
 - `dataloaders/` Contains all dataloaders, split into dataloaders for self-supervised training and dataloaders for downstream training
 - `models/` Contains all models for encoders, classifiers, etc.
 - `scripts/` Slurm submission scripts for ARC cluster.
+- `configs/` Configuration files for training.
 
 ### Code standards
-Be sensible (add comments where necessary) and use ruff for linting all files and organising imports. Try and decouple code where possible.
+Use ruff for linting, formatting, and organising imports.

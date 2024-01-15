@@ -1,0 +1,34 @@
+experiment:
+  seed: 42
+  epochs: 1000
+  lr: 0.0003
+
+stats:
+  iter_update_freq: 200
+
+data:
+
+  slice_len: 0.5
+  train_ratio: 0.95
+  batch_size: 32
+  n_sample_batches: 2
+
+  dataset_sizes:
+    Armeni2022: 269
+    Schoffelen2019: 273
+    Gwilliams2022: 208
+  
+  preproc_config:
+    armeni2022:
+      filtering: True
+      resample: 300
+      notch_freqs: [50, 100, 150]
+      bandpass_lo: 0.1
+      bandpass_hi: 150
+
+model:
+  short:
+    vq_dim: 64
+    codebook_size: 1024
+    shared_dim: 300
+    hidden_dim: 512

@@ -1,6 +1,7 @@
 """10-hour dataset dataloader"""
 
 import gc
+import typing as tp
 
 from torch.utils.data import Dataset
 
@@ -21,6 +22,7 @@ class Armeni2022(Dataset):
         slice_len: float,
         preproc_config: dict,
         bids_root: str = data_utils.DATA_PATH / "armeni2022",
+        truncate: tp.Optional[int] = None,
     ):
         """
         Args:
@@ -77,6 +79,9 @@ class Armeni2022(Dataset):
         self.num_slices, self.samples_per_slice = data_utils.get_slice_stats(
             raw, slice_len
         )
+
+        if truncate:
+            self.num_slices = min(truncate, self.num_slices)
 
     def __len__(self):
         return self.num_slices
