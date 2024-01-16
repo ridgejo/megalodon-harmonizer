@@ -1,6 +1,6 @@
 experiment:
   seed: 42
-  epochs: 1000
+  epochs: 10000
   lr: 0.0003
 
 stats:
@@ -8,10 +8,10 @@ stats:
 
 data:
 
-  slice_len: 0.5
+  slice_len: 3.0
   train_ratio: 0.95
   batch_size: 32
-  n_sample_batches: 2
+  n_sample_batches: 1
 
   dataset_sizes:
     Armeni2022: 269
@@ -23,7 +23,7 @@ data:
       filtering: True
       resample: 300
       notch_freqs: [50, 100, 150]
-      bandpass_lo: 0.1
+      bandpass_lo: 0.5
       bandpass_hi: 150
 
 model:

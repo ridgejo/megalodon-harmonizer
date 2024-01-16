@@ -45,9 +45,13 @@ class Armeni2022(Dataset):
         )
 
         if not preprocessed:
+
+            # Subject 3 suffers from unstable channels... remove during preprocessing
+            bad_channels = ["MRC23", "MLO22", "MRP5", "MLC23"]
+
             # Armeni MEG channels are named starting with an "M"
             meg_channels = [
-                ch_name for ch_name in raw.ch_names if ch_name.startswith("M")
+                ch_name for ch_name in raw.ch_names if ch_name.startswith("M") and ch_name not in bad_channels
             ]
 
             # All channels are gradiometer channels (I think?)
@@ -96,8 +100,8 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     test_dataset = Armeni2022(
-        subject_id="001",
-        session="001",
+        subject_id="003",
+        session="004",
         task="compr",
         slice_len=5,
         preproc_config={
@@ -109,7 +113,7 @@ if __name__ == "__main__":
         },
     )
 
-    data, times, dataset = test_dataset[7]  # 35-40s
+    data, times, dataset, subject = test_dataset[7]  # 35-40s
     for channel in data:
         plt.plot(times, channel)
         plt.xlabel("Time (s)")

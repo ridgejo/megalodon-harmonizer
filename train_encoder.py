@@ -142,11 +142,11 @@ for epoch in range(num_epochs):
 
                 test_losses = {f"test_{k}": v for k, v in test_losses.items()}
 
-                if (not args.debug) or (args.debug and ((epoch + 1) % 500 == 0)):
+                if (not args.debug) or (args.debug and (epoch % (iter_update_freq * 5) == 0)):
 
                     ncols = len(test_examples.keys())
                     test_fig, test_axes = plt.subplots(
-                        nrows=2, ncols=ncols, figsize=(4 * 5, 10)
+                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False
                     )
 
                     for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):
@@ -168,7 +168,7 @@ for epoch in range(num_epochs):
                     # Also draw train set
                     ncols = len(train_examples.keys())
                     train_fig, train_axes = plt.subplots(
-                        nrows=2, ncols=ncols, figsize=(4 * 5, 10)
+                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False
                     )
 
                     for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):

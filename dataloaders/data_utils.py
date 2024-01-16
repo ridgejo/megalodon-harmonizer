@@ -12,6 +12,9 @@ from mne_bids import (
     read_raw_bids,
 )
 
+from sklearn.preprocessing import RobustScaler 
+
+
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
 
 
@@ -80,59 +83,6 @@ def preprocess(raw, preproc_config, channels, cache_path):
 
     return raw
 
-
-def get_norm_stats(raw):
-    # What kind of normalization should we apply for cross-subject + cross-dataset studies?
-    # We should preserve: relative differences between channels
-    # Simple solution: mean-center across channels + unit variance across channels
-    # Account for outliers by min-max normalizing with 5th and 95th percentiles and mean-centering after this.
-
-    print("Computing data normalization statistics")
-
-    data = raw.get_data()  # Warning: this loads all data into memory.
-
-    baseline_correction = data[:, :1000].mean(
-        axis=1
-    )  # Channel-wise mean from first 1000 samples
-
-    data = (data.T - baseline_correction).T
-
-    lq = np.percentile(data.flatten(), 0.25)
-    uq = np.percentile(data.flatten(), 0.75)
-    data = 2 * (((data) - lq) / (uq - lq)) - 1
-    median = np.median(data.flatten())
-    data -= median
-    std = np.std(data.flatten())
-
-    # Don't hold onto data to avoid keeping it in memory. Just pass the normalization statistics.
-    del data
-
-    return {
-        "baseline_correction": baseline_correction,
-        "median": median,
-        "lower_q": lq,
-        "upper_q": uq,
-        "std": std,
-    }
-
-
-def normalize(data_slice, norm_stats):
-    data_slice = (data_slice.T - norm_stats["baseline_correction"]).T
-    data_slice = (
-        2
-        * (
-            ((data_slice) - norm_stats["lower_q"])
-            / (norm_stats["upper_q"] - norm_stats["lower_q"])
-        )
-        - 1
-    )
-    data_slice -= norm_stats["median"]
-    data_slice = np.clip(
-        data_slice, a_min=-20 * norm_stats["std"], a_max=20 * norm_stats["std"]
-    )
-    return data_slice
-
-
 def get_slice(raw, idx, samples_per_slice):
     return raw[:, samples_per_slice * idx : samples_per_slice * (idx + 1)]
 
@@ -151,36 +101,51 @@ class BatchScaler(nn.Module):
         super(BatchScaler, self).__init__()
         self.correction_samples = correction_samples
         self.n_sample_batches = n_sample_batches
+        self.robust_scaler = RobustScaler(quantile_range=(0.25, 0.75))
 
     def fit(self, dataloader):
         sample_batches = []
         for i, batch in enumerate(dataloader):
-            sample_batches.append(batch[0].cuda())  # Keep only data
+            sample_batches.append(batch[0])  # Keep only data
             if i >= self.n_sample_batches:
                 break
 
         data = torch.cat(sample_batches)
 
-        self.baseline_correction = data.mean(dim=[0, 2])
-        data = data - self.baseline_correction[None, :, None]
+        data = data.view(-1, 1)
 
-        self.std = torch.std(data)
-        data = torch.clamp(data, min=20 * -self.std, max=20 * self.std)
+        transformed = self.robust_scaler.fit_transform(data)
+        self.std = transformed.std()
 
-        data = data.flatten()
+        # self.base_scale = 1.0 / abs(data.max() - data.min())
+        # data *= self.base_scale
 
-        self.lower_q, self.median, self.upper_q = torch.quantile(
-            data,
-            q=torch.tensor([0.05, 0.5, 0.95], dtype=data.dtype, device=data.device),
-        )
+        # self.baseline_correction = data.mean(dim=[0, 2])
+        # data = data - self.baseline_correction[None, :, None]
 
-        data -= self.median
-        self.lower_q = self.lower_q - self.median
-        self.upper_q = self.upper_q - self.median
+        # self.std = torch.std(data)
+        # data = torch.clamp(data, min=20 * -self.std, max=20 * self.std)
+
+        # data = data.flatten()
+
+        # self.lower_q, self.median, self.upper_q = torch.quantile(
+        #     data,
+        #     q=torch.tensor([0.05, 0.5, 0.95], dtype=data.dtype, device=data.device),
+        # )
+
+        # data -= self.median
+        # self.lower_q = self.lower_q - self.median
+        # self.upper_q = self.upper_q - self.median
 
     def forward(self, batch):
-        batch = batch - self.baseline_correction[None, :, None]
-        batch = torch.clamp(batch, min=20 * -self.std, max=20 * self.std)
-        batch -= self.median
-        batch = 2 * ((batch - self.lower_q) / (self.upper_q - self.lower_q)) - 1
-        return batch
+        shape = batch.shape
+        batch = self.robust_scaler.transform(batch.view(-1, 1))
+        batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
+        return batch.reshape(*shape)
+
+        # batch *= self.base_scale
+        # batch = batch - self.baseline_correction[None, :, None]
+        # batch = torch.clamp(batch, min=20 * -self.std, max=20 * self.std)
+        # batch -= self.median
+        # batch = 2 * ((batch - self.lower_q) / (self.upper_q - self.lower_q)) - 1
+        # return batch

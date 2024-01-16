@@ -11,7 +11,6 @@ from dataloaders.armeni2022 import Armeni2022
 from dataloaders.gwilliams2022 import Gwilliams2022
 from dataloaders.schoffelen2019 import Schoffelen2019
 
-
 class BatchInvariantSampler:
     """Takes a list of dataloaders and iterates by randomly selecting batches from the dataloaders."""
 
@@ -271,7 +270,7 @@ if __name__ == "__main__":
         "filtering": True,
         "resample": 300,
         "notch_freqs": [50, 100, 150],
-        "bandpass_lo": 0.1,
+        "bandpass_lo": 0.5, # Minimum 0.5 to suppress slow-drift artifacts in Armeni et al. 2022
         "bandpass_hi": 150,
     }
 
@@ -282,24 +281,34 @@ if __name__ == "__main__":
             "gwilliams2022": preproc_config,
             "schoffelen2019": preproc_config,
         },
-        slice_len=0.5,
+        slice_len=3.0,
         train_ratio=0.95,
-        batch_size=8,
+        batch_size=32,
         baseline_correction_samples=1000,
-        n_sample_batches=2,  # PyTorch errors if given more than 8 * 32 * 0.5 = 128 seconds of 269-channel data
+        n_sample_batches=1,  # torch.quantile() errors if given more than 16M samples in 1D tensor
         debug=False,  # TODO: change as required
     )
 
+    subject_ids = {}
     for batch in train_sampler:
         data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
-        data = data.cuda()
         scaled_batch = scalers[dataset][subject](data)
 
-        for channel in scaled_batch[0]:
-            plt.plot(times[0].cpu(), channel.cpu())
-            plt.xlabel("Time (s)")
-            plt.ylabel("Amplitude")
+        if subject not in subject_ids:
+            subject_ids[subject] = scaled_batch
 
-        plt.ylim(-6, 6)
-        plt.savefig("scaled.png")
-        break
+            for channel in scaled_batch[0]:
+                plt.plot(times[0], channel)
+                plt.xlabel("Time (s)")
+                plt.ylabel("Amplitude")
+
+            plt.ylim(-6, 6)
+            plt.savefig(f"{subject}.png")
+
+            plt.cla()
+            plt.clf()
+
+        if len(subject_ids) >= 3:
+            print(subject_ids.keys())
+            breakpoint()
+            subject_ids = {}
