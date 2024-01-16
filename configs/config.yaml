@@ -14,7 +14,7 @@ data:
   n_sample_batches: 1
 
   dataset_sizes:
-    Armeni2022: 269
+    Armeni2022: 266
     Schoffelen2019: 273
     Gwilliams2022: 208
   
