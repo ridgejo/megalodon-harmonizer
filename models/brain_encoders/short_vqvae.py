@@ -242,6 +242,16 @@ class ShortVQVAE(nn.Module):
             "loss": recon_loss + commit_loss,
             "commit_loss": commit_loss,
             "recon_loss": recon_loss,
+
+            f"D_{dataset_id}": 1,
+            f"D_{dataset_id}_loss": recon_loss + commit_loss,
+            f"D_{dataset_id}_commit_loss": commit_loss,
+            f"D_{dataset_id}_recon_loss": recon_loss,
+
+            f"S_{dataset_id}_{subject_id}": 1,
+            f"S_{dataset_id}_{subject_id}_loss": recon_loss + commit_loss,
+            f"S_{dataset_id}_{subject_id}_commit_loss": commit_loss,
+            f"S_{dataset_id}_{subject_id}_recon_loss": recon_loss,
         }
 
         return x_hat, loss

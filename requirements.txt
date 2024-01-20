@@ -1,6 +1,7 @@
 bert_score
 datasets
 evaluate
+flatten-dict
 jiwer
 plotly
 torch

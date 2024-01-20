@@ -7,6 +7,7 @@ import random
 import time
 from collections import Counter
 from pathlib import Path
+from flatten_dict import flatten
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -49,6 +50,9 @@ exp_folder_name = "exp_" + timestr + "_" + experiment_name
 exp_folder = data_utils.DATA_PATH / f"experiments/{exp_folder_name}"
 exp_folder.mkdir(parents=True, exist_ok=True)
 
+if args.name:
+    run.name = run.name + "+" + args.name
+
 # load data
 batch_size = config["data"]["batch_size"]
 train_sampler, test_sampler, scalers = load_pretraining_data(
@@ -56,8 +60,7 @@ train_sampler, test_sampler, scalers = load_pretraining_data(
     slice_len=config["data"]["slice_len"],
     train_ratio=config["data"]["train_ratio"],
     batch_size=batch_size,
-    baseline_correction_samples=1000,
-    n_sample_batches=config["data"]["n_sample_batches"],
+    norm_config=config["data"]["norm"],
     debug=args.debug,
 )
 
@@ -96,13 +99,14 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
 
         x, times, dataset_id, subject_id = (
-            batch[0].cuda(),
+            batch[0],
             batch[1],
             batch[2][0],
             batch[3][0],
         )
 
-        x = scalers[dataset_id][subject_id](x).float()
+        x = scalers[dataset_id][subject_id](x)
+        x = torch.from_numpy(x).cuda().float()
 
         x_hat, loss = model(x, dataset_id, subject_id)
 
@@ -110,14 +114,29 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         if dataset_id not in train_examples:
-            train_examples[dataset_id] = (x, x_hat, times)
+            train_examples[dataset_id] = {
+                subject_id: (x, x_hat, times)
+            }
+        elif subject_id not in train_examples[dataset_id] and len(train_examples[dataset_id]) < 3:
+            train_examples[dataset_id][subject_id] = (x, x_hat, times)
 
         train_losses.update(loss)
 
         # Log data in iterations due to huge amount of data in use.
         if iteration != 0 and iteration % iter_update_freq == 0:
+
             for k in train_losses:
-                train_losses[k] /= iter_update_freq
+                if k.startswith('D_'):
+                    if "loss" in k:
+                        ds_id = k.split('_')[1]
+                        train_losses[k] /= train_losses[f'D_{ds_id}']
+                elif k.startswith('S_'):
+                    if "loss" in k:
+                        ks = k.split('_')
+                        ds_id, sj_id = ks[1], ks[2]
+                        train_losses[k] /= train_losses[f'S_{ds_id}_{sj_id}']
+                else:
+                    train_losses[k] /= iter_update_freq
 
             with torch.no_grad():
                 train_fig, test_fig = None, None
@@ -125,28 +144,45 @@ for epoch in range(num_epochs):
                 test_examples = {}
                 for i, batch in enumerate(test_sampler):
                     x, times, dataset_id, subject_id = (
-                        batch[0].cuda(),
+                        batch[0],
                         batch[1],
                         batch[2][0],
                         batch[3][0],
                     )
-                    x = scalers[dataset_id][subject_id](x).float()
+                    x = scalers[dataset_id][subject_id](x)
+                    x = torch.from_numpy(x).cuda().float()
                     x_hat, test_loss = model(x, dataset_id, subject_id)
                     test_losses.update(test_loss)
 
                     if dataset_id not in test_examples:
-                        test_examples[dataset_id] = (x, x_hat, times)
+                        test_examples[dataset_id] = {
+                            subject_id: (x, x_hat, times)
+                        }
+                    elif subject_id not in test_examples[dataset_id] and len(test_examples[dataset_id]) < 3:
+                        test_examples[dataset_id][subject_id] = (x, x_hat, times)
 
                 for k in test_losses:
-                    test_losses[k] /= len(test_sampler)
+                    if k.startswith('D_'):
+                        if "loss" in k:
+                            ds_id = k.split('_')[1]
+                            test_losses[k] /= test_losses[f'D_{ds_id}']
+                    elif k.startswith('S_'):
+                        if "loss" in k:
+                            ks = k.split('_')
+                            ds_id, sj_id = ks[1], ks[2]
+                            test_losses[k] /= test_losses[f'S_{ds_id}_{sj_id}']
+                    else:
+                        test_losses[k] /= len(test_sampler)
 
                 test_losses = {f"test_{k}": v for k, v in test_losses.items()}
 
                 if (not args.debug) or (args.debug and (epoch % (iter_update_freq * 5) == 0)):
 
+                    test_examples = flatten(test_examples, reducer='underscore')
                     ncols = len(test_examples.keys())
                     test_fig, test_axes = plt.subplots(
-                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False
+                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False,
+                        num=1, clear=True,
                     )
 
                     for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):
@@ -166,9 +202,11 @@ for epoch in range(num_epochs):
                         test_axes[0, j].set_title(dataset_id)
 
                     # Also draw train set
+                    train_examples = flatten(train_examples, reducer='underscore')
                     ncols = len(train_examples.keys())
                     train_fig, train_axes = plt.subplots(
-                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False
+                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False,
+                        num=2, clear=True,
                     )
 
                     for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):

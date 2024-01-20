@@ -12,7 +12,7 @@ from mne_bids import (
     read_raw_bids,
 )
 
-from sklearn.preprocessing import RobustScaler 
+from sklearn.preprocessing import RobustScaler, QuantileTransformer, StandardScaler
 
 
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
@@ -97,11 +97,19 @@ def get_slice_stats(raw, slice_len):
 class BatchScaler(nn.Module):
     """Applies scaling based on Defossez et al. 2023"""
 
-    def __init__(self, correction_samples, n_sample_batches):
+    def __init__(self, n_sample_batches, per_channel, scaler_conf):
         super(BatchScaler, self).__init__()
-        self.correction_samples = correction_samples
         self.n_sample_batches = n_sample_batches
-        self.robust_scaler = RobustScaler(quantile_range=(0.25, 0.75))
+        if "quantile_transformer" in scaler_conf:
+            self.scaler = QuantileTransformer(output_distribution='normal')
+        elif "robust_scaler" in scaler_conf:
+            self.scaler = RobustScaler(quantile_range=(scaler_conf["lo_q"], scaler_conf["hi_q"]))
+        elif "standard_scaler" in scaler_conf:
+            self.scaler = StandardScaler()
+        else:
+            raise ValueError("Invalid scaler type")
+
+        self.per_channel = per_channel
 
     def fit(self, dataloader):
         sample_batches = []
@@ -112,40 +120,26 @@ class BatchScaler(nn.Module):
 
         data = torch.cat(sample_batches)
 
-        data = data.view(-1, 1)
-
-        transformed = self.robust_scaler.fit_transform(data)
-        self.std = transformed.std()
-
-        # self.base_scale = 1.0 / abs(data.max() - data.min())
-        # data *= self.base_scale
-
-        # self.baseline_correction = data.mean(dim=[0, 2])
-        # data = data - self.baseline_correction[None, :, None]
-
-        # self.std = torch.std(data)
-        # data = torch.clamp(data, min=20 * -self.std, max=20 * self.std)
-
-        # data = data.flatten()
-
-        # self.lower_q, self.median, self.upper_q = torch.quantile(
-        #     data,
-        #     q=torch.tensor([0.05, 0.5, 0.95], dtype=data.dtype, device=data.device),
-        # )
-
-        # data -= self.median
-        # self.lower_q = self.lower_q - self.median
-        # self.upper_q = self.upper_q - self.median
+        if self.per_channel:
+            data = data.permute(0, 2, 1).flatten(start_dim=0, end_dim=1)
+            transformed = self.scaler.fit_transform(data)
+            self.std = transformed.std(axis=0)
+        else:
+            data = data.view(-1, 1)
+            transformed = self.scaler.fit_transform(data)
+            self.std = transformed.std()
 
     def forward(self, batch):
-        shape = batch.shape
-        batch = self.robust_scaler.transform(batch.view(-1, 1))
-        batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
-        return batch.reshape(*shape)
 
-        # batch *= self.base_scale
-        # batch = batch - self.baseline_correction[None, :, None]
-        # batch = torch.clamp(batch, min=20 * -self.std, max=20 * self.std)
-        # batch -= self.median
-        # batch = 2 * ((batch - self.lower_q) / (self.upper_q - self.lower_q)) - 1
-        # return batch
+        if self.per_channel:
+            batch = batch.permute(0, 2, 1)
+            shape = batch.shape
+            batch = batch.flatten(start_dim=0, end_dim=1)
+            batch = self.scaler.transform(batch)
+            batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
+            return batch.reshape(*shape).transpose(0, 2, 1)
+        else:
+            shape = batch.shape
+            batch = self.scaler.transform(batch.view(-1, 1))
+            batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
+            return batch.reshape(*shape)

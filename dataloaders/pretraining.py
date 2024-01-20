@@ -50,8 +50,7 @@ def load_pretraining_data(
     preproc_config,
     train_ratio,
     batch_size,
-    baseline_correction_samples,
-    n_sample_batches,
+    norm_config,
     debug=False,
 ):
     """Loads all pretraining data.
@@ -106,8 +105,9 @@ def load_pretraining_data(
     scalers = {}
     for train_dataloader in train_dataloaders:
         scaler = data_utils.BatchScaler(
-            correction_samples=baseline_correction_samples,
-            n_sample_batches=n_sample_batches if not debug else 1,
+            n_sample_batches=norm_config["n_sample_batches"] if not debug else 1,
+            per_channel=norm_config["per_channel"],
+            scaler_conf=norm_config["scaler_conf"],
         ).cuda()
         scaler.fit(train_dataloader)
 
@@ -158,7 +158,8 @@ def _load_gwilliams_2022(slice_len, preproc_config, debug=False):
                         slice_len=slice_len,
                         preproc_config=preproc_config,
                     )
-                except Exception:
+                except Exception as e:
+                    print("Skipping: ", e)
                     continue  # Subject may not have completed task or session
 
                 seconds += len(data) * slice_len
@@ -189,7 +190,7 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
         subjects = [subjects[0]]
         tasks = ["rest"]
     else:
-        tasks = ["auditory", "rest"]
+        tasks = ["auditory", "rest", "visual"]
 
     # Loop over subjects
     for subject in subjects:
@@ -197,6 +198,12 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
 
         # Loop over sessions
         for task in tasks:
+
+            if subject.startswith('V') and task == "auditory":
+                continue
+            elif subject.startswith('A') and task == 'visual':
+                continue
+
             try:
                 data = Schoffelen2019(
                     subject_id=subject,
@@ -204,7 +211,8 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
                     slice_len=slice_len,
                     preproc_config=preproc_config,
                 )
-            except Exception:
+            except Exception as e:
+                print("Skipping: ", e)
                 continue  # Not all subjects have recordings for both tasks
 
             seconds += len(data) * slice_len
@@ -225,6 +233,12 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
     seconds = 0
     datasets = []
 
+    bad_sessions = {
+        "001": [],
+        "002": ["009"],
+        "003": ["003", "004", "005", "006", "008"],
+    }
+
     if debug:
         n_subjects = 1
         n_sessions = 1
@@ -241,6 +255,9 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
         # Loop over sessions
         for sess_no in range(1, n_sessions + 1):
             session = "{:03d}".format(sess_no)
+
+            if session in bad_sessions[subject]:
+                continue
 
             data = Armeni2022(
                 subject_id=subject,
@@ -266,6 +283,8 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    import numpy as np
+    import pprint
     preproc_config = {
         "filtering": True,
         "resample": 300,
@@ -277,24 +296,64 @@ if __name__ == "__main__":
     # Even worth running on its own as preprocessing work is cached for next time! 😉
     train_sampler, test_sampler, scalers = load_pretraining_data(
         preproc_config={
-            "armeni2022": preproc_config,
+            # "armeni2022": preproc_config,
             "gwilliams2022": preproc_config,
-            "schoffelen2019": preproc_config,
+            # "schoffelen2019": preproc_config,
         },
         slice_len=3.0,
         train_ratio=0.95,
         batch_size=32,
-        baseline_correction_samples=1000,
-        n_sample_batches=1,  # torch.quantile() errors if given more than 16M samples in 1D tensor
+        norm_config={
+            "n_sample_batches": 8,
+            "per_channel": True,
+            "scaler_conf": {
+                "standard_scaler": None,
+            },
+        },
         debug=False,  # TODO: change as required
     )
+
+    # Analyse dataset statistics by subject
+    print("Analysing dataset statistics")
+    subject_data = {}
+    sample_batches = 3
+    for i, batch in enumerate(train_sampler):
+
+        data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
+        scaled_batch = scalers[dataset][subject](data)
+
+        if subject not in subject_data:
+            subject_data[subject] = [scaled_batch]
+        elif len(subject_data[subject]) < sample_batches:
+            subject_data[subject].append(scaled_batch)
+        
+        # Issue: only collects 3 subjects
+        if all([len(v) >= sample_batches for v in subject_data.values()]) and len(subject_data) >= 3:
+            break
+    
+    subject_data = {
+        k: np.concatenate(v) for k, v in subject_data.items()
+    }
+    stats = {
+        k: {
+            "mean": v.mean(),
+            "std": v.std(),
+            "max": v.max(),
+            "min": v.min(),
+            "0.25": np.quantile(v, 0.25),
+            "0.50": np.quantile(v, 0.5),
+            "0.75": np.quantile(v, 0.75),
+        } for k, v in subject_data.items()
+    }
+    pprint.pprint(stats)
+    # ---
 
     subject_ids = {}
     for batch in train_sampler:
         data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
-        scaled_batch = scalers[dataset][subject](data)
 
         if subject not in subject_ids:
+            scaled_batch = scalers[dataset][subject](data)
             subject_ids[subject] = scaled_batch
 
             for channel in scaled_batch[0]:

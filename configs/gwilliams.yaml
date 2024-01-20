@@ -16,29 +16,16 @@ data:
     n_sample_batches: 8
     per_channel: True
     scaler_conf:
+      # standard_scaler:
       robust_scaler:
         lo_q: 0.25
         hi_q: 0.75
 
   dataset_sizes:
-    Armeni2022: 266
-    Schoffelen2019: 273
     Gwilliams2022: 208
   
   preproc_config:
-    armeni2022:
-      filtering: True
-      resample: 300
-      notch_freqs: [50, 100, 150]
-      bandpass_lo: 0.5
-      bandpass_hi: 150
     gwilliams2022:
-      filtering: True
-      resample: 300
-      notch_freqs: [50, 100, 150]
-      bandpass_lo: 0.5
-      bandpass_hi: 150
-    schoffelen2019:
       filtering: True
       resample: 300
       notch_freqs: [50, 100, 150]
