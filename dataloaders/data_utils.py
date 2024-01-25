@@ -103,7 +103,10 @@ class BatchScaler(nn.Module):
         if "quantile_transformer" in scaler_conf:
             self.scaler = QuantileTransformer(output_distribution='normal')
         elif "robust_scaler" in scaler_conf:
-            self.scaler = RobustScaler(quantile_range=(scaler_conf["lo_q"], scaler_conf["hi_q"]))
+            self.scaler = RobustScaler(
+                quantile_range=(scaler_conf["robust_scaler"]["lo_q"], scaler_conf["robust_scaler"]["hi_q"]),
+                unit_variance=True,
+            )
         elif "standard_scaler" in scaler_conf:
             self.scaler = StandardScaler()
         else:
@@ -118,13 +121,24 @@ class BatchScaler(nn.Module):
             if i >= self.n_sample_batches:
                 break
 
-        data = torch.cat(sample_batches)
+        data = torch.cat(sample_batches)        
 
         if self.per_channel:
             data = data.permute(0, 2, 1).flatten(start_dim=0, end_dim=1)
+
+            # Clip anything outside reasonable percentile before fitting (good for StandardScaler)
+            self.low, self.high = np.quantile(data, [0.0001, 0.9999], axis=0)
+            # std = data.std(axis=0)
+            # mean = data.mean(axis=0)
+            # self.low = mean - std * 10.0
+            # self.high = mean + std * 10.0
+            data = np.clip(data, a_min=self.low, a_max=self.high)
+
             transformed = self.scaler.fit_transform(data)
             self.std = transformed.std(axis=0)
         else:
+            self.mean = data.mean(axis=[0, 2])
+            data -= self.mean[None, :, None] # baseline correction
             data = data.view(-1, 1)
             transformed = self.scaler.fit_transform(data)
             self.std = transformed.std()
@@ -135,10 +149,12 @@ class BatchScaler(nn.Module):
             batch = batch.permute(0, 2, 1)
             shape = batch.shape
             batch = batch.flatten(start_dim=0, end_dim=1)
+            batch = np.clip(batch, a_min=self.low, a_max=self.high) # Clip before transform
             batch = self.scaler.transform(batch)
-            batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
+            # batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
             return batch.reshape(*shape).transpose(0, 2, 1)
         else:
+            batch -= self.mean[None, :, None] # baseline correction
             shape = batch.shape
             batch = self.scaler.transform(batch.view(-1, 1))
             batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)

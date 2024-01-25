@@ -14,11 +14,9 @@ data:
 
   norm:
     n_sample_batches: 8
-    per_channel: False
+    per_channel: True
     scaler_conf:
-      robust_scaler:
-        lo_q: 0.25
-        hi_q: 0.75
+      standard_scaler:
 
   dataset_sizes:
     Armeni2022: 266
@@ -32,6 +30,18 @@ data:
       notch_freqs: [50, 100, 150]
       bandpass_lo: 0.5
       bandpass_hi: 150
+    gwilliams2022:
+      filtering: True
+      resample: 300
+      notch_freqs: [50, 100, 150]
+      bandpass_lo: 0.5
+      bandpass_hi: 150
+    schoffelen2019:
+      filtering: True
+      resample: 300
+      notch_freqs: [50, 100, 150]
+      bandpass_lo: 0.5
+      bandpass_hi: 150
 
 model:
   short:
@@ -39,5 +49,4 @@ model:
     codebook_size: 1024
     shared_dim: 300
     hidden_dim: 512
-    sub_block:
     data_block:

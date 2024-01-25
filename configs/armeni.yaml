@@ -16,10 +16,10 @@ data:
     n_sample_batches: 8
     per_channel: True
     scaler_conf:
-      # standard_scaler:
-      robust_scaler:
-        lo_q: 0.25
-        hi_q: 0.75
+      standard_scaler:
+      # robust_scaler:
+      #   lo_q: 0.16
+      #   hi_q: 0.84
 
   dataset_sizes:
     Armeni2022: 266
@@ -40,3 +40,5 @@ model:
     codebook_size: 1024
     shared_dim: 300
     hidden_dim: 512
+    sub_block:
+    data_block:

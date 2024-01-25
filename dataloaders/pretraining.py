@@ -14,14 +14,21 @@ from dataloaders.schoffelen2019 import Schoffelen2019
 class BatchInvariantSampler:
     """Takes a list of dataloaders and iterates by randomly selecting batches from the dataloaders."""
 
-    def __init__(self, dataloaders):
+    def __init__(self, dataloaders, shuffle=True):
         self.dataloaders = dataloaders
         self.data_sizes = [len(dataloader) for dataloader in dataloaders]
         self.dataloader_iters = [iter(dataloader) for dataloader in dataloaders]
         self.batch_order = []
 
+        if not shuffle:
+            self._reset()
+            self.fixed_batch_order = self.batch_order.copy()
+
     def __iter__(self):
-        self._reset()
+        if shuffle:
+            self._reset()
+        else:
+            self.batch_order = self.fixed_batch_order.copy()
         return self
 
     def __next__(self):
@@ -118,8 +125,8 @@ def load_pretraining_data(
         else:
             scalers[dataset_name] = {subject_name: scaler}
 
-    train_sampler = BatchInvariantSampler(train_dataloaders)
-    test_sampler = BatchInvariantSampler(test_dataloaders)
+    train_sampler = BatchInvariantSampler(train_dataloaders, shuffle=True)
+    test_sampler = BatchInvariantSampler(test_dataloaders, shuffle=False)
 
     return train_sampler, test_sampler, scalers
 
@@ -127,6 +134,13 @@ def load_pretraining_data(
 def _load_gwilliams_2022(slice_len, preproc_config, debug=False):
     seconds = 0
     datasets = []
+
+    # Determined via std. rejection
+    bad_subjects = [
+        # "05", "15", "21", "14", "4"
+        "05", "19", "17"
+    ]
+    # Generally: watch out for bad channels
 
     if not debug:
         n_subjects = 27
@@ -140,6 +154,9 @@ def _load_gwilliams_2022(slice_len, preproc_config, debug=False):
     # Loop over subjects
     for subj_no in range(1, n_subjects + 1):
         subject = "{:02d}".format(subj_no)  # 01, 02, etc.
+
+        if subject in bad_subjects:
+            continue
 
         subject_datasets = []
 
@@ -180,6 +197,18 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
     seconds = 0
     datasets = []
 
+    # Reject the same subjects as Defossez et al. 2023
+    bad_nums = [2011, 2036, 2062, 2063, 2076, 2084, 1006, 1014, 1090, 1115]
+    no_subject = [1014, 1018, 1021, 1023, 1041, 1043, 1047, 1051, 1056]
+    no_subject += [1060, 1067, 1082, 1091, 1096, 1112]
+    no_subject += [2012, 2018, 2022, 2023, 2026, 2043, 2044, 2045, 2048]
+    no_subject += [2054, 2060, 2074, 2081, 2082, 2087, 2093, 2100, 2107]
+    no_subject += [2112, 2115, 2118, 2123]
+
+    # Determined via std. dev. rejection
+    # reject = ['A2035', 'V1084', 'V1081', 'A2097', 'A2047', 'V1104', 'A2070', 'V1113', 'A2071', 'A2020', 'A2090', 'A2098', 'A2104', 'A2096', 'A2099', 'A2108', 'A2068', 'V1086', 'A2013', 'A2077', 'V1076', 'A2042', 'A2040', 'V1097', 'A2009', 'A2095', 'A2038', 'A2052', 'A2016']
+    reject = []
+
     # Note: "V" subjects read the stimuli, while "A" subjects heard it
     subjects = sorted([
         os.path.basename(path).replace("sub-", "")
@@ -195,6 +224,11 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
     # Loop over subjects
     for subject in subjects:
         subject_datasets = []
+
+        if int(subject[1:]) in (bad_nums + no_subject):
+            continue # ignore incomplete subject data
+        elif subject in reject:
+            continue
 
         # Loop over sessions
         for task in tasks:
@@ -297,8 +331,8 @@ if __name__ == "__main__":
     train_sampler, test_sampler, scalers = load_pretraining_data(
         preproc_config={
             # "armeni2022": preproc_config,
-            "gwilliams2022": preproc_config,
-            # "schoffelen2019": preproc_config,
+            # "gwilliams2022": preproc_config,
+            "schoffelen2019": preproc_config,
         },
         slice_len=3.0,
         train_ratio=0.95,
@@ -307,6 +341,10 @@ if __name__ == "__main__":
             "n_sample_batches": 8,
             "per_channel": True,
             "scaler_conf": {
+                # "robust_scaler": {
+                #     "lo_q": 0.25,
+                #     "hi_q": 0.75,
+                # }
                 "standard_scaler": None,
             },
         },
@@ -316,7 +354,8 @@ if __name__ == "__main__":
     # Analyse dataset statistics by subject
     print("Analysing dataset statistics")
     subject_data = {}
-    sample_batches = 3
+    sample_batches = 8
+    sample_subjects = 204 # TODO: change for different datasets
     for i, batch in enumerate(train_sampler):
 
         data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
@@ -346,6 +385,8 @@ if __name__ == "__main__":
         } for k, v in subject_data.items()
     }
     pprint.pprint(stats)
+    bad_subjects = [k for k in stats.keys() if stats[k]["std"] < 0.9 or stats[k]["std"] > 1.1]
+    print("Bad subjects", bad_subjects)
     # ---
 
     subject_ids = {}
@@ -367,7 +408,8 @@ if __name__ == "__main__":
             plt.cla()
             plt.clf()
 
-        if len(subject_ids) >= 3:
+        if len(subject_ids) >= sample_subjects:
             print(subject_ids.keys())
+            exit(0)
             breakpoint()
             subject_ids = {}

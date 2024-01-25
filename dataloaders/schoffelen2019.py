@@ -1,6 +1,7 @@
 """MOUS dataset dataloader."""
 
 import gc
+import mne
 
 from torch.utils.data import Dataset
 
@@ -43,6 +44,7 @@ class Schoffelen2019(Dataset):
         )
 
         if not preprocessed:
+
             meg_channels = MEG_CHANNELS
 
             # All channels are gradiometer channels (I think?)
@@ -90,12 +92,12 @@ if __name__ == "__main__":
     test_dataset = Schoffelen2019(
         subject_id="A2002",
         task="auditory",
-        slice_len=5,
+        slice_len=3,
         preproc_config={
             "filtering": True,
             "resample": 300,
             "notch_freqs": [50, 100, 150],
-            "bandpass_lo": 0.1,
+            "bandpass_lo": 0.5,
             "bandpass_hi": 150,
         },
     )

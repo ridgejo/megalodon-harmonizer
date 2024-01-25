@@ -9,7 +9,8 @@ from models.subject_block import SubjectBlock
 
 
 def _make_short_vqvae(
-    vq_dim, codebook_size, shared_dim, hidden_dim, dataset_sizes, subject_ids
+    vq_dim, codebook_size, shared_dim, hidden_dim, dataset_sizes, subject_ids,
+    use_sub_block, use_data_block,
 ):
     encoder = ShortEncoder(
         vq_dim=vq_dim,
@@ -61,12 +62,17 @@ def _make_short_vqvae(
     #     kmeans_iters = 10     # number of kmeans iterations to calculate the centroids for the codebook on init
     # )
 
-    dataset_layer = DatasetLayer(dataset_sizes=dataset_sizes, shared_dim=shared_dim)
+    dataset_layer = DatasetLayer(
+        dataset_sizes=dataset_sizes,
+        shared_dim=shared_dim,
+        use_data_block=use_data_block,
+    )
 
     subject_block = SubjectBlock(
         subject_ids=subject_ids,
         in_channels=shared_dim,
         out_channels=shared_dim,
+        use_sub_block=use_sub_block,
     )
 
     return ShortVQVAE(

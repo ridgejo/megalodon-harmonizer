@@ -83,6 +83,8 @@ if "short" in config["model"]:
         hidden_dim=config["model"]["short"]["hidden_dim"],
         dataset_sizes=config["data"]["dataset_sizes"],
         subject_ids=subjects,
+        use_sub_block="sub_block" in config["model"]["short"],
+        use_data_block="data_block" in config["model"]["short"],
     ).cuda()
 
 # load optimizer
