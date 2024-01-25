@@ -11,7 +11,9 @@ class SubjectBlock(nn.Module):
     TODO: subject layer should be prefixed by a shared spatial attention and shared 1x1 convolution.
     """
 
-    def __init__(self, subject_ids: tp.List[str], in_channels, out_channels, use_sub_block):
+    def __init__(
+        self, subject_ids: tp.List[str], in_channels, out_channels, use_sub_block
+    ):
         """
         Args:
             subject_ids: A list of all subject IDs from all datasets
@@ -25,7 +27,9 @@ class SubjectBlock(nn.Module):
             {
                 k: nn.Conv1d(
                     in_channels=in_channels, out_channels=out_channels, kernel_size=1
-                ) if use_sub_block else nn.Identity()
+                )
+                if use_sub_block
+                else nn.Identity()
                 for k in subject_ids
             }
         )
@@ -34,7 +38,9 @@ class SubjectBlock(nn.Module):
             {
                 k: nn.Conv1d(
                     in_channels=out_channels, out_channels=in_channels, kernel_size=1
-                ) if use_sub_block else nn.Identity()
+                )
+                if use_sub_block
+                else nn.Identity()
                 for k in subject_ids
             }
         )

@@ -7,13 +7,13 @@ import random
 import time
 from collections import Counter
 from pathlib import Path
-from flatten_dict import flatten
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import wandb
 import yaml
+from flatten_dict import flatten
 
 import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
@@ -116,27 +116,27 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         if dataset_id not in train_examples:
-            train_examples[dataset_id] = {
-                subject_id: (x, x_hat, times)
-            }
-        elif subject_id not in train_examples[dataset_id] and len(train_examples[dataset_id]) < 3:
+            train_examples[dataset_id] = {subject_id: (x, x_hat, times)}
+        elif (
+            subject_id not in train_examples[dataset_id]
+            and len(train_examples[dataset_id]) < 3
+        ):
             train_examples[dataset_id][subject_id] = (x, x_hat, times)
 
         train_losses.update(loss)
 
         # Log data in iterations due to huge amount of data in use.
         if iteration != 0 and iteration % iter_update_freq == 0:
-
             for k in train_losses:
-                if k.startswith('D_'):
+                if k.startswith("D_"):
                     if "loss" in k:
-                        ds_id = k.split('_')[1]
-                        train_losses[k] /= train_losses[f'D_{ds_id}']
-                elif k.startswith('S_'):
+                        ds_id = k.split("_")[1]
+                        train_losses[k] /= train_losses[f"D_{ds_id}"]
+                elif k.startswith("S_"):
                     if "loss" in k:
-                        ks = k.split('_')
+                        ks = k.split("_")
                         ds_id, sj_id = ks[1], ks[2]
-                        train_losses[k] /= train_losses[f'S_{ds_id}_{sj_id}']
+                        train_losses[k] /= train_losses[f"S_{ds_id}_{sj_id}"]
                 else:
                     train_losses[k] /= iter_update_freq
 
@@ -157,38 +157,45 @@ for epoch in range(num_epochs):
                     test_losses.update(test_loss)
 
                     if dataset_id not in test_examples:
-                        test_examples[dataset_id] = {
-                            subject_id: (x, x_hat, times)
-                        }
-                    elif subject_id not in test_examples[dataset_id] and len(test_examples[dataset_id]) < 3:
+                        test_examples[dataset_id] = {subject_id: (x, x_hat, times)}
+                    elif (
+                        subject_id not in test_examples[dataset_id]
+                        and len(test_examples[dataset_id]) < 3
+                    ):
                         test_examples[dataset_id][subject_id] = (x, x_hat, times)
 
                 for k in test_losses:
-                    if k.startswith('D_'):
+                    if k.startswith("D_"):
                         if "loss" in k:
-                            ds_id = k.split('_')[1]
-                            test_losses[k] /= test_losses[f'D_{ds_id}']
-                    elif k.startswith('S_'):
+                            ds_id = k.split("_")[1]
+                            test_losses[k] /= test_losses[f"D_{ds_id}"]
+                    elif k.startswith("S_"):
                         if "loss" in k:
-                            ks = k.split('_')
+                            ks = k.split("_")
                             ds_id, sj_id = ks[1], ks[2]
-                            test_losses[k] /= test_losses[f'S_{ds_id}_{sj_id}']
+                            test_losses[k] /= test_losses[f"S_{ds_id}_{sj_id}"]
                     else:
                         test_losses[k] /= len(test_sampler)
 
                 test_losses = {f"test_{k}": v for k, v in test_losses.items()}
 
-                if (not args.debug) or (args.debug and (epoch % (iter_update_freq * 5) == 0)):
-
-                    test_examples = flatten(test_examples, reducer='underscore')
+                if (not args.debug) or (
+                    args.debug and (epoch % (iter_update_freq * 5) == 0)
+                ):
+                    test_examples = flatten(test_examples, reducer="underscore")
                     ncols = len(test_examples.keys())
                     test_fig, test_axes = plt.subplots(
-                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False,
-                        num=1, clear=True,
+                        nrows=2,
+                        ncols=ncols,
+                        figsize=(ncols * 5, 10),
+                        squeeze=False,
+                        num=1,
+                        clear=True,
                     )
 
-                    for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):
-
+                    for j, (dataset_id, (x, x_hat, times)) in enumerate(
+                        test_examples.items()
+                    ):
                         x_sample = x[0].cpu()
                         x_hat_sample = x_hat[0].cpu()
                         t = times[0].cpu()
@@ -200,19 +207,24 @@ for epoch in range(num_epochs):
                             test_axes[0, j].set_ylabel("Amplitude")
                             test_axes[0, j].set_ylim(-5, 5)
                             test_axes[1, j].set_ylim(-5, 5)
-                        
+
                         test_axes[0, j].set_title(dataset_id)
 
                     # Also draw train set
-                    train_examples = flatten(train_examples, reducer='underscore')
+                    train_examples = flatten(train_examples, reducer="underscore")
                     ncols = len(train_examples.keys())
                     train_fig, train_axes = plt.subplots(
-                        nrows=2, ncols=ncols, figsize=(ncols * 5, 10), squeeze=False,
-                        num=2, clear=True,
+                        nrows=2,
+                        ncols=ncols,
+                        figsize=(ncols * 5, 10),
+                        squeeze=False,
+                        num=2,
+                        clear=True,
                     )
 
-                    for j, (dataset_id, (x, x_hat, times)) in enumerate(test_examples.items()):
-
+                    for j, (dataset_id, (x, x_hat, times)) in enumerate(
+                        test_examples.items()
+                    ):
                         x_sample = x[0].cpu()
                         x_hat_sample = x_hat[0].cpu()
                         t = times[0].cpu()

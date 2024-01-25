@@ -9,8 +9,14 @@ from models.subject_block import SubjectBlock
 
 
 def _make_short_vqvae(
-    vq_dim, codebook_size, shared_dim, hidden_dim, dataset_sizes, subject_ids,
-    use_sub_block, use_data_block,
+    vq_dim,
+    codebook_size,
+    shared_dim,
+    hidden_dim,
+    dataset_sizes,
+    subject_ids,
+    use_sub_block,
+    use_data_block,
 ):
     encoder = ShortEncoder(
         vq_dim=vq_dim,
@@ -248,12 +254,10 @@ class ShortVQVAE(nn.Module):
             "loss": recon_loss + commit_loss,
             "commit_loss": commit_loss,
             "recon_loss": recon_loss,
-
             f"D_{dataset_id}": 1,
             f"D_{dataset_id}_loss": recon_loss + commit_loss,
             f"D_{dataset_id}_commit_loss": commit_loss,
             f"D_{dataset_id}_recon_loss": recon_loss,
-
             f"S_{dataset_id}_{subject_id}": 1,
             f"S_{dataset_id}_{subject_id}_loss": recon_loss + commit_loss,
             f"S_{dataset_id}_{subject_id}_commit_loss": commit_loss,

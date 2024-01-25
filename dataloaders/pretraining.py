@@ -11,6 +11,7 @@ from dataloaders.armeni2022 import Armeni2022
 from dataloaders.gwilliams2022 import Gwilliams2022
 from dataloaders.schoffelen2019 import Schoffelen2019
 
+
 class BatchInvariantSampler:
     """Takes a list of dataloaders and iterates by randomly selecting batches from the dataloaders."""
 
@@ -73,9 +74,7 @@ def load_pretraining_data(
 
     if debug:
         ds_name = next(iter(preproc_config.keys()))
-        datasets = loaders[ds_name](
-            slice_len, preproc_config[ds_name], debug=debug
-        )
+        datasets = loaders[ds_name](slice_len, preproc_config[ds_name], debug=debug)
     else:
         datasets = []
         for k in preproc_config.keys():
@@ -138,7 +137,9 @@ def _load_gwilliams_2022(slice_len, preproc_config, debug=False):
     # Determined via std. rejection
     bad_subjects = [
         # "05", "15", "21", "14", "4"
-        "05", "19", "17"
+        "05",
+        "19",
+        "17",
     ]
     # Generally: watch out for bad channels
 
@@ -210,10 +211,12 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
     reject = []
 
     # Note: "V" subjects read the stimuli, while "A" subjects heard it
-    subjects = sorted([
-        os.path.basename(path).replace("sub-", "")
-        for path in glob.glob(str(data_utils.DATA_PATH) + "/schoffelen2019/sub-*")
-    ])
+    subjects = sorted(
+        [
+            os.path.basename(path).replace("sub-", "")
+            for path in glob.glob(str(data_utils.DATA_PATH) + "/schoffelen2019/sub-*")
+        ]
+    )
 
     if debug:
         subjects = [subjects[0]]
@@ -226,16 +229,15 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
         subject_datasets = []
 
         if int(subject[1:]) in (bad_nums + no_subject):
-            continue # ignore incomplete subject data
+            continue  # ignore incomplete subject data
         elif subject in reject:
             continue
 
         # Loop over sessions
         for task in tasks:
-
-            if subject.startswith('V') and task == "auditory":
+            if subject.startswith("V") and task == "auditory":
                 continue
-            elif subject.startswith('A') and task == 'visual':
+            elif subject.startswith("A") and task == "visual":
                 continue
 
             try:
@@ -316,14 +318,16 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
 
 
 if __name__ == "__main__":
+    import pprint
+
     import matplotlib.pyplot as plt
     import numpy as np
-    import pprint
+
     preproc_config = {
         "filtering": True,
         "resample": 300,
         "notch_freqs": [50, 100, 150],
-        "bandpass_lo": 0.5, # Minimum 0.5 to suppress slow-drift artifacts in Armeni et al. 2022
+        "bandpass_lo": 0.5,  # Minimum 0.5 to suppress slow-drift artifacts in Armeni et al. 2022
         "bandpass_hi": 150,
     }
 
@@ -355,9 +359,8 @@ if __name__ == "__main__":
     print("Analysing dataset statistics")
     subject_data = {}
     sample_batches = 8
-    sample_subjects = 204 # TODO: change for different datasets
+    sample_subjects = 204  # TODO: change for different datasets
     for i, batch in enumerate(train_sampler):
-
         data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
         scaled_batch = scalers[dataset][subject](data)
 
@@ -365,14 +368,15 @@ if __name__ == "__main__":
             subject_data[subject] = [scaled_batch]
         elif len(subject_data[subject]) < sample_batches:
             subject_data[subject].append(scaled_batch)
-        
+
         # Issue: only collects 3 subjects
-        if all([len(v) >= sample_batches for v in subject_data.values()]) and len(subject_data) >= 3:
+        if (
+            all([len(v) >= sample_batches for v in subject_data.values()])
+            and len(subject_data) >= 3
+        ):
             break
-    
-    subject_data = {
-        k: np.concatenate(v) for k, v in subject_data.items()
-    }
+
+    subject_data = {k: np.concatenate(v) for k, v in subject_data.items()}
     stats = {
         k: {
             "mean": v.mean(),
@@ -382,10 +386,13 @@ if __name__ == "__main__":
             "0.25": np.quantile(v, 0.25),
             "0.50": np.quantile(v, 0.5),
             "0.75": np.quantile(v, 0.75),
-        } for k, v in subject_data.items()
+        }
+        for k, v in subject_data.items()
     }
     pprint.pprint(stats)
-    bad_subjects = [k for k in stats.keys() if stats[k]["std"] < 0.9 or stats[k]["std"] > 1.1]
+    bad_subjects = [
+        k for k in stats.keys() if stats[k]["std"] < 0.9 or stats[k]["std"] > 1.1
+    ]
     print("Bad subjects", bad_subjects)
     # ---
 

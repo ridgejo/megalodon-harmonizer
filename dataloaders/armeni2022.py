@@ -45,13 +45,14 @@ class Armeni2022(Dataset):
         )
 
         if not preprocessed:
-
             # Subject 3 suffers from unstable channels... remove during preprocessing
             bad_channels = ["MRC23", "MLO22", "MRP5", "MLC23"]
 
             # Armeni MEG channels are named starting with an "M"
             meg_channels = [
-                ch_name for ch_name in raw.ch_names if ch_name.startswith("M") and ch_name not in bad_channels
+                ch_name
+                for ch_name in raw.ch_names
+                if ch_name.startswith("M") and ch_name not in bad_channels
             ]
 
             # All channels are gradiometer channels (I think?)
