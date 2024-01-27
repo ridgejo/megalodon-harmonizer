@@ -8,6 +8,7 @@ from torch.utils.data import ConcatDataset, DataLoader, random_split
 
 import dataloaders.data_utils as data_utils
 from dataloaders.armeni2022 import Armeni2022
+from dataloaders.armeni2022_labelled import Armeni2022Labelled
 from dataloaders.gwilliams2022 import Gwilliams2022
 from dataloaders.schoffelen2019 import Schoffelen2019
 
@@ -60,6 +61,8 @@ def load_pretraining_data(
     batch_size,
     norm_config,
     debug=False,
+    labels=None,
+    exclude_subjects=None,
 ):
     """Loads all pretraining data.
 
@@ -74,11 +77,24 @@ def load_pretraining_data(
 
     if debug:
         ds_name = next(iter(preproc_config.keys()))
-        datasets = loaders[ds_name](slice_len, preproc_config[ds_name], debug=debug)
+        datasets = loaders[ds_name](
+            slice_len,
+            preproc_config[ds_name],
+            debug=debug,
+            labels=labels,
+            exclude_subjects=exclude_subjects,
+        )
     else:
         datasets = []
         for k in preproc_config.keys():
-            datasets.extend(loaders[k](slice_len, preproc_config[k]))
+            datasets.extend(
+                loaders[k](
+                    slice_len,
+                    preproc_config[k],
+                    labels=labels,
+                    exclude_subjects=exclude_subjects,
+                )
+            )
 
     train_datasets, test_datasets = [], []
 
@@ -130,7 +146,9 @@ def load_pretraining_data(
     return train_sampler, test_sampler, scalers
 
 
-def _load_gwilliams_2022(slice_len, preproc_config, debug=False):
+def _load_gwilliams_2022(
+    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=None
+):
     seconds = 0
     datasets = []
 
@@ -194,7 +212,9 @@ def _load_gwilliams_2022(slice_len, preproc_config, debug=False):
     return datasets
 
 
-def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
+def _load_schoffelen_2019(
+    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=None
+):
     seconds = 0
     datasets = []
 
@@ -265,9 +285,16 @@ def _load_schoffelen_2019(slice_len, preproc_config, debug=False):
     return datasets
 
 
-def _load_armeni_2022(slice_len, preproc_config, debug=False):
+def _load_armeni_2022(
+    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=None
+):
     seconds = 0
     datasets = []
+
+    if exclude_subjects:
+        bad_subjects = exclude_subjects
+    else:
+        bad_subjects = []
 
     bad_sessions = {
         "001": [],
@@ -286,6 +313,9 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
     for subj_no in range(1, n_subjects + 1):
         subject = "{:03d}".format(subj_no)  # 001, 002, and 003
 
+        if subject in bad_subjects:
+            continue
+
         subject_datasets = []
 
         # Loop over sessions
@@ -295,13 +325,23 @@ def _load_armeni_2022(slice_len, preproc_config, debug=False):
             if session in bad_sessions[subject]:
                 continue
 
-            data = Armeni2022(
-                subject_id=subject,
-                session=session,
-                task="compr",  # There is only one relevant task (compr), the emptyroom task is irrelevant.
-                slice_len=slice_len,
-                preproc_config=preproc_config,
-            )
+            if labels:
+                data = Armeni2022Labelled(
+                    subject_id=subject,
+                    session=session,
+                    task="compr",
+                    slice_len=slice_len,
+                    preproc_config=preproc_config,
+                    label_type=labels,
+                )
+            else:
+                data = Armeni2022(
+                    subject_id=subject,
+                    session=session,
+                    task="compr",  # There is only one relevant task (compr), the emptyroom task is irrelevant.
+                    slice_len=slice_len,
+                    preproc_config=preproc_config,
+                )
 
             seconds += len(data) * slice_len
 
