@@ -122,11 +122,11 @@ for epoch in range(num_epochs):
         if iteration != 0 and iteration % iter_update_freq == 0:
             for k in train_losses:
                 if k.startswith("D_"):
-                    if "loss" in k:
+                    if "loss" in k or "score" in k or "acc" in k:
                         ds_id = k.split("_")[1]
                         train_losses[k] /= train_losses[f"D_{ds_id}"]
                 elif k.startswith("S_"):
-                    if "loss" in k:
+                    if "loss" in k or "score" in k or "acc" in k:
                         ks = k.split("_")
                         ds_id, sj_id = ks[1], ks[2]
                         train_losses[k] /= train_losses[f"S_{ds_id}_{sj_id}"]
@@ -153,11 +153,11 @@ for epoch in range(num_epochs):
 
                 for k in test_losses:
                     if k.startswith("D_"):
-                        if "loss" in k:
+                        if "loss" in k or "score" in k or "acc" in k:
                             ds_id = k.split("_")[1]
                             test_losses[k] /= test_losses[f"D_{ds_id}"]
                     elif k.startswith("S_"):
-                        if "loss" in k:
+                        if "loss" in k or "score" in k or "acc" in k:
                             ks = k.split("_")
                             ds_id, sj_id = ks[1], ks[2]
                             test_losses[k] /= test_losses[f"S_{ds_id}_{sj_id}"]
