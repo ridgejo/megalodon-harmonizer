@@ -18,6 +18,7 @@ from flatten_dict import flatten
 import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
 from models.brain_encoders.short_vqvae import _make_short_vqvae
+from models.brain_encoders.temp_spatial_vqvae import _make_temp_spatial_vqvae
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-encoder",
@@ -85,6 +86,14 @@ if "short" in config["model"]:
         subject_ids=subjects,
         use_sub_block="sub_block" in config["model"]["short"],
         use_data_block="data_block" in config["model"]["short"],
+    ).cuda()
+elif "temp_spatial" in config["model"]:
+    first_ds = next(iter(config["data"]["preproc_config"].keys()))
+    model = _make_temp_spatial_vqvae(
+        sampling_rate=config["data"]["preproc_config"][first_ds]["resample"],
+        vq_dim=config["model"]["temp_spatial"]["vq_dim"],
+        codebook_size=config["model"]["temp_spatial"]["codebook_size"],
+        shared_dim=config["model"]["temp_spatial"]["shared_dim"],
     ).cuda()
 
 # load optimizer
