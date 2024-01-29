@@ -171,7 +171,7 @@ class TempSpatialVQVAE(nn.Module):
             f"S_{dataset_id}_{subject_id}_recon_loss": recon_loss,
         }
 
-        return output_embeds
+        return output_embeds, loss
 
 if __name__ == "__main__":
 

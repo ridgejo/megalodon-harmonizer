@@ -1,5 +1,6 @@
 bert_score
 datasets
+encodec @ git+https://git@github.com/facebookresearch/encodec#egg=encodec
 evaluate
 flatten-dict
 jiwer

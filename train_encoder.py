@@ -19,6 +19,7 @@ import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
 from models.brain_encoders.short_vqvae import _make_short_vqvae
 from models.brain_encoders.temp_spatial_vqvae import _make_temp_spatial_vqvae
+from models.brain_encoders.attention_vqvae import _make_attention_vqvae
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-encoder",
@@ -95,6 +96,17 @@ elif "temp_spatial" in config["model"]:
         codebook_size=config["model"]["temp_spatial"]["codebook_size"],
         shared_dim=config["model"]["temp_spatial"]["shared_dim"],
     ).cuda()
+elif "attention" in config["model"]:
+    first_ds = next(iter(config["data"]["preproc_config"].keys()))
+    model = _make_attention_vqvae(
+        sampling_rate=config["data"]["preproc_config"][first_ds]["resample"],
+        vq_dim=config["model"]["attention"]["vq_dim"],
+        codebook_size=config["model"]["attention"]["codebook_size"],
+        shared_dim=config["model"]["attention"]["shared_dim"],
+        temporal_dim=config["model"]["attention"]["temporal_dim"],
+        transformer_dim=config["model"]["attention"]["transformer_dim"],
+    ).cuda()
+
 
 # load optimizer
 optimizer = torch.optim.AdamW(params=model.parameters(), lr=config["experiment"]["lr"])
