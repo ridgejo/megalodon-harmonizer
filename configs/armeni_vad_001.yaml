@@ -8,9 +8,11 @@ stats:
 
 data:
 
-  slice_len: 3.0
+  slice_len: 2.0 # Same as Moses et al.
   train_ratio: 0.95
-  batch_size: 8
+  batch_size: 32
+  label_type: "vad"
+  exclude_subjects: ["002", "003"]
 
   norm:
     n_sample_batches: 8
@@ -20,8 +22,6 @@ data:
 
   dataset_sizes:
     Armeni2022: 266
-    Schoffelen2019: 273
-    Gwilliams2022: 208
   
   preproc_config:
     armeni2022:
@@ -32,9 +32,9 @@ data:
       bandpass_hi: 150
 
 model:
-  attention:
-    vq_dim: 64
-    codebook_size: 1024
-    shared_dim: 266
-    temporal_dim: 128
-    transformer_dim: 512
+  lstm:
+    feature_dim: 266
+    hidden_dim: 128
+    num_layers: 2
+    output_classes: 2
+    sub_block:

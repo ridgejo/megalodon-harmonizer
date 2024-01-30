@@ -16,10 +16,11 @@ import yaml
 import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
 from models.lstm_classifier import _make_lstm_classifier
+from models.lstm_seq import _make_lstm_seq
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-phonemes",
-    description="Train a classifier on phoneme labels.",
+    description="Train a classifier on phoneme labels or VAD labels.",
 )
 parser.add_argument("--config", help="Path to config file (yaml)", required=True)
 parser.add_argument("--name", help="Name for run", default=None)
@@ -75,16 +76,30 @@ for k in config["data"]["preproc_config"].keys():
             for path in glob.glob(str(data_utils.DATA_PATH) + f"/{k}/sub-*")
         ]
     )
-model = _make_lstm_classifier(
-    dataset_sizes=config["data"]["dataset_sizes"],
-    use_data_block="data_block" in config["model"]["lstm"],
-    subject_ids=subjects,
-    use_sub_block="sub_block" in config["model"]["lstm"],
-    feature_dim=config["model"]["lstm"]["feature_dim"],
-    hidden_dim=config["model"]["lstm"]["hidden_dim"],
-    num_layers=config["model"]["lstm"]["num_layers"],
-    output_classes=config["model"]["lstm"]["output_classes"],
-).cuda()
+
+if config["data"]["label_type"] in ["voiced"]:
+    model = _make_lstm_classifier(
+        dataset_sizes=config["data"]["dataset_sizes"],
+        use_data_block="data_block" in config["model"]["lstm"],
+        subject_ids=subjects,
+        use_sub_block="sub_block" in config["model"]["lstm"],
+        feature_dim=config["model"]["lstm"]["feature_dim"],
+        hidden_dim=config["model"]["lstm"]["hidden_dim"],
+        num_layers=config["model"]["lstm"]["num_layers"],
+        output_classes=config["model"]["lstm"]["output_classes"],
+    ).cuda()
+elif config["data"]["label_type"] in ["vad"]:
+    model = _make_lstm_seq(
+        dataset_sizes=config["data"]["dataset_sizes"],
+        use_data_block="data_block" in config["model"]["lstm"],
+        subject_ids=subjects,
+        use_sub_block="sub_block" in config["model"]["lstm"],
+        feature_dim=config["model"]["lstm"]["feature_dim"],
+        hidden_dim=config["model"]["lstm"]["hidden_dim"],
+        num_layers=config["model"]["lstm"]["num_layers"],
+        output_classes=config["model"]["lstm"]["output_classes"],
+    ).cuda()
+
 
 # load optimizer
 optimizer = torch.optim.AdamW(params=model.parameters(), lr=config["experiment"]["lr"])

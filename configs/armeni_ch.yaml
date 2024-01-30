@@ -4,13 +4,14 @@ experiment:
   lr: 0.0003
 
 stats:
-  iter_update_freq: 200
+  iter_update_freq: 20
 
 data:
 
   slice_len: 3.0
   train_ratio: 0.95
   batch_size: 8
+  exclude_subjects: ["002", "003"]
 
   norm:
     n_sample_batches: 8
@@ -32,9 +33,8 @@ data:
       bandpass_hi: 150
 
 model:
-  attention:
+  ch:
     vq_dim: 64
     codebook_size: 1024
     shared_dim: 266
     temporal_dim: 128
-    transformer_dim: 512

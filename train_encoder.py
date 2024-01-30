@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import wandb
 import yaml
+from tqdm import tqdm
 from flatten_dict import flatten
 
 import dataloaders.data_utils as data_utils
@@ -20,6 +21,7 @@ from dataloaders.pretraining import load_pretraining_data
 from models.brain_encoders.short_vqvae import _make_short_vqvae
 from models.brain_encoders.temp_spatial_vqvae import _make_temp_spatial_vqvae
 from models.brain_encoders.attention_vqvae import _make_attention_vqvae
+from models.brain_encoders.ch_vqvae import _make_ch_vqvae
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-encoder",
@@ -106,6 +108,15 @@ elif "attention" in config["model"]:
         temporal_dim=config["model"]["attention"]["temporal_dim"],
         transformer_dim=config["model"]["attention"]["transformer_dim"],
     ).cuda()
+elif "ch" in config["model"]:
+    first_ds = next(iter(config["data"]["preproc_config"].keys()))
+    model = _make_ch_vqvae(
+        sampling_rate=config["data"]["preproc_config"][first_ds]["resample"],
+        vq_dim=config["model"]["ch"]["vq_dim"],
+        codebook_size=config["model"]["ch"]["codebook_size"],
+        shared_dim=config["model"]["ch"]["shared_dim"],
+        temporal_dim=config["model"]["ch"]["temporal_dim"],
+    ).cuda()
 
 
 # load optimizer
@@ -117,6 +128,7 @@ iteration = 0
 start = time.perf_counter()
 train_losses = Counter()
 train_examples = {}
+pbar = tqdm(total=iter_update_freq)
 for epoch in range(num_epochs):
     for i, batch in enumerate(train_sampler):
         optimizer.zero_grad()
@@ -145,6 +157,8 @@ for epoch in range(num_epochs):
             train_examples[dataset_id][subject_id] = (x, x_hat, times)
 
         train_losses.update(loss)
+
+        pbar.update(1)
 
         # Log data in iterations due to huge amount of data in use.
         if iteration != 0 and iteration % iter_update_freq == 0:
@@ -282,6 +296,8 @@ for epoch in range(num_epochs):
                 }
             )
 
+            pbar.close()
+            pbar = tqdm(total=iter_update_freq)
             train_examples = {}
             train_losses = Counter()
             start = time.perf_counter()
