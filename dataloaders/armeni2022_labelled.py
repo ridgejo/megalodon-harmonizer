@@ -54,6 +54,11 @@ class Armeni2022Labelled(Dataset):
             session=session,
             task=task,
         )
+        
+        textgrid, brain_start = label_utils.read_textgrid(
+            bids_root=bids_root,
+            session=session,
+        )
 
         if not preprocessed:
             # Subject 3 suffers from unstable channels... remove during preprocessing
@@ -95,7 +100,7 @@ class Armeni2022Labelled(Dataset):
         )
 
         if label_type == "vad":
-            self.labels = label_utils.get_vad_labels(events, raw)
+            self.labels = label_utils.get_vad_labels_from_textgrid(textgrid, brain_start, raw)
         elif label_type == "voiced":
             self.phoneme_onsets, self.labels = label_utils.get_voiced_labels(
                 events, raw
@@ -137,7 +142,7 @@ if __name__ == "__main__":
         subject_id="001",
         session="001",
         task="compr",
-        slice_len=0.3,  # 5
+        slice_len=100,#0.3,  # 5
         preproc_config={
             "filtering": True,
             "resample": 300,
@@ -145,7 +150,7 @@ if __name__ == "__main__":
             "bandpass_lo": 0.5,
             "bandpass_hi": 150,
         },
-        label_type="voiced",
+        label_type="vad",
     )
 
     # # Plot distribution of voiced labels
@@ -161,7 +166,7 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(nrows=2, ncols=1)
     for channel in data:
         axes[0].plot(times, channel)
-    # axes[1].plot(times, labels)
+    axes[1].plot(times, labels)
     plt.xlabel("Time (s)")
     plt.ylabel("Amplitude")
 

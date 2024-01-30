@@ -19,5 +19,6 @@ ruff
 sox
 soundfile
 scikit-learn
+textgrid
 transformers
 vector-quantize-pytorch

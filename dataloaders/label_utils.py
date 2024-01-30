@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import textgrid
 
 ARPABET = [
     "AA",
@@ -64,6 +65,38 @@ def read_events_file(bids_root, subject_id, session, task):
         / f"sub-{subject_id}/ses-{session}/meg/sub-{subject_id}_ses-{session}_task-{task}_events.tsv",
         sep="\t",
     )
+
+def read_textgrid(bids_root, session):
+    grid = textgrid.TextGrid.fromFile(
+        bids_root / f"adventuresofsherlockholmes_{session[1:]}_doyle_64kb.TextGrid"
+    )
+
+    # Manual alignment of text grid to recording that was played to subject
+    if session == "001":
+        start = 13 # "The adventures of ..."
+        end = -4 # "... she is always the woman."
+        true_start = 38.8636433648694 # "The adventures of..." in brain recording
+
+    return grid[0][start : end + 1], true_start # Return intervals in tier zero
+
+def get_vad_labels_from_textgrid(tier, brain_start, raw, offset=0.0):
+
+    sample_freq = raw.info["sfreq"]
+    offset_samples = int(sample_freq * offset)
+    grid_start = tier[0].minTime
+
+    labels = np.zeros(len(raw))
+    for event in tier:
+        onset = float(event.minTime) - grid_start + brain_start
+        offset = float(event.maxTime) - grid_start + brain_start
+
+        t_start = int(onset * sample_freq + offset_samples)
+        t_end = int(offset * sample_freq + offset_samples)
+
+        if event.mark != '':
+            labels[t_start : t_end + 1] = 1.0
+    
+    return labels
 
 
 def get_vad_labels(events, raw, offset=0.0):
