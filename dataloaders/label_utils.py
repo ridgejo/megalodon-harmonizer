@@ -66,16 +66,59 @@ def read_events_file(bids_root, subject_id, session, task):
         sep="\t",
     )
 
-def read_textgrid(bids_root, session):
+def read_textgrid(bids_root, subject_id, session, events):
     grid = textgrid.TextGrid.fromFile(
         bids_root / f"adventuresofsherlockholmes_{session[1:]}_doyle_64kb.TextGrid"
     )
 
-    # Manual alignment of text grid to recording that was played to subject
-    if session == "001":
-        start = 13 # "The adventures of ..."
-        end = -4 # "... she is always the woman."
-        true_start = 38.8636433648694 # "The adventures of..." in brain recording
+    # warning: Sessions 003-009 have not been checked.
+    session_timing = {
+        "001": {
+            "start": 13,
+            "end": -4,
+        },
+        "002": {
+            "start": 7,
+            "end": -4,
+        },
+        "003": {
+            "start": 7,
+            "end": -4,
+        },
+        "004": {
+            "start": 7,
+            "end": -4,
+        },
+        "005": {
+            "start": 7,
+            "end": -4,
+        },
+        "006": {
+            "start": 7,
+            "end": -4,
+        },
+        "007": {
+            "start": 7,
+            "end": -4,
+        },
+        "008": {
+            "start": 7,
+            "end": -4,
+        },
+        "009": {
+            "start": 7,
+            "end": -4,
+        },
+        "010": {
+            "start": 7,
+            "end": -4,
+        },
+    }
+
+    true_start = events[["word_onset" in c for c in list(events["type"])]]
+    true_start = true_start[[v != "sp" for v in list(true_start["value"])]]
+    true_start = float(true_start.iloc[0]["onset"])
+    start, end = session_timing[session]["start"], session_timing[session]["end"]
 
     return grid[0][start : end + 1], true_start # Return intervals in tier zero
 

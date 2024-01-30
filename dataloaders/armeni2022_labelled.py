@@ -57,7 +57,9 @@ class Armeni2022Labelled(Dataset):
         
         textgrid, brain_start = label_utils.read_textgrid(
             bids_root=bids_root,
+            subject_id=subject_id,
             session=session,
+            events=events,
         )
 
         if not preprocessed:
