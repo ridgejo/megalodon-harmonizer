@@ -15,6 +15,8 @@ from sklearn.preprocessing import QuantileTransformer, RobustScaler, StandardSca
 
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
 
+def get_scaler_hash(batch):
+    return str([batch[-1][k][0] for k in batch[-1].keys()])
 
 def _string_hash(text):
     return int(hashlib.md5(text.encode("utf-8")).hexdigest(), 16)

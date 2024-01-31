@@ -32,6 +32,9 @@ parser.add_argument("--name", help="Name for run", default=None)
 parser.add_argument(
     "--debug", help="Faster debug mode", action="store_true", default=False
 )
+parser.add_argument(
+    "--device", default="cuda"
+)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -89,7 +92,7 @@ if "short" in config["model"]:
         subject_ids=subjects,
         use_sub_block="sub_block" in config["model"]["short"],
         use_data_block="data_block" in config["model"]["short"],
-    ).cuda()
+    ).to(args.device)
 elif "temp_spatial" in config["model"]:
     first_ds = next(iter(config["data"]["preproc_config"].keys()))
     model = _make_temp_spatial_vqvae(
@@ -97,7 +100,7 @@ elif "temp_spatial" in config["model"]:
         vq_dim=config["model"]["temp_spatial"]["vq_dim"],
         codebook_size=config["model"]["temp_spatial"]["codebook_size"],
         shared_dim=config["model"]["temp_spatial"]["shared_dim"],
-    ).cuda()
+    ).to(args.device)
 elif "attention" in config["model"]:
     first_ds = next(iter(config["data"]["preproc_config"].keys()))
     model = _make_attention_vqvae(
@@ -107,7 +110,7 @@ elif "attention" in config["model"]:
         shared_dim=config["model"]["attention"]["shared_dim"],
         temporal_dim=config["model"]["attention"]["temporal_dim"],
         transformer_dim=config["model"]["attention"]["transformer_dim"],
-    ).cuda()
+    ).to(args.device)
 elif "ch" in config["model"]:
     first_ds = next(iter(config["data"]["preproc_config"].keys()))
     model = _make_ch_vqvae(
@@ -116,7 +119,7 @@ elif "ch" in config["model"]:
         codebook_size=config["model"]["ch"]["codebook_size"],
         shared_dim=config["model"]["ch"]["shared_dim"],
         temporal_dim=config["model"]["ch"]["temporal_dim"],
-    ).cuda()
+    ).to(args.device)
 
 
 # load optimizer
@@ -136,12 +139,12 @@ for epoch in range(num_epochs):
         x, times, dataset_id, subject_id = (
             batch[0],
             batch[1],
-            batch[2][0],
-            batch[3][0],
+            batch[-1]["dataset"][0],
+            batch[-1]["subject"][0],
         )
 
-        x = scalers[dataset_id][subject_id](x)
-        x = torch.from_numpy(x).cuda().float()
+        x = scalers[data_utils.get_scaler_hash(batch)](x)
+        x = torch.from_numpy(x).to(args.device).float()
 
         x_hat, loss = model(x, dataset_id, subject_id)
 
@@ -183,11 +186,11 @@ for epoch in range(num_epochs):
                     x, times, dataset_id, subject_id = (
                         batch[0],
                         batch[1],
-                        batch[2][0],
-                        batch[3][0],
+                        batch[-1]["dataset"][0],
+                        batch[-1]["subject"][0],
                     )
-                    x = scalers[dataset_id][subject_id](x)
-                    x = torch.from_numpy(x).cuda().float()
+                    x = scalers[data_utils.get_scaler_hash(batch)](x)
+                    x = torch.from_numpy(x).to(args.device).float()
                     x_hat, test_loss = model(x, dataset_id, subject_id)
                     test_losses.update(test_loss)
 

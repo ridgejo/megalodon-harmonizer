@@ -134,11 +134,8 @@ def load_pretraining_data(
         scaler.fit(train_dataloader)
 
         first_batch = next(iter(train_dataloader))
-        subject_name, dataset_name = first_batch[-1][0], first_batch[-2][0]
-        if dataset_name in scalers:
-            scalers[dataset_name][subject_name] = scaler
-        else:
-            scalers[dataset_name] = {subject_name: scaler}
+        identifiers = [first_batch[-1][k][0] for k in first_batch[-1].keys()]
+        scalers[str(identifiers)] = scaler
 
     train_sampler = BatchInvariantSampler(train_dataloaders, shuffle=True)
     test_sampler = BatchInvariantSampler(test_dataloaders, shuffle=False)
@@ -177,8 +174,6 @@ def _load_gwilliams_2022(
         if subject in bad_subjects:
             continue
 
-        subject_datasets = []
-
         # Loop over sessions
         for sess_no in range(0, n_sessions + 1):
             session = str(sess_no)
@@ -200,10 +195,7 @@ def _load_gwilliams_2022(
 
                 seconds += len(data) * slice_len
 
-                subject_datasets.append(data)
-
-        if len(subject_datasets) > 0:
-            datasets.append(ConcatDataset(subject_datasets))
+                datasets.append(data)
 
     print(
         f"Loaded approximately {seconds // 3600} hours of data from Gwilliams et al. 2022"
@@ -245,7 +237,6 @@ def _load_schoffelen_2019(
 
     # Loop over subjects
     for subject in subjects:
-        subject_datasets = []
 
         if int(subject[1:]) in (bad_nums + no_subject):
             continue  # ignore incomplete subject data
@@ -272,10 +263,7 @@ def _load_schoffelen_2019(
 
             seconds += len(data) * slice_len
 
-            subject_datasets.append(data)
-
-        if len(subject_datasets) > 0:
-            datasets.append(ConcatDataset(subject_datasets))
+            datasets.append(data)
 
     print(
         f"Loaded approximately {seconds // 3600} hours of data from Schoffelen et al. 2019"
@@ -315,8 +303,6 @@ def _load_armeni_2022(
         if subject in bad_subjects:
             continue
 
-        subject_datasets = []
-
         # Loop over sessions
         for sess_no in range(1, n_sessions + 1):
             session = "{:03d}".format(sess_no)
@@ -344,10 +330,7 @@ def _load_armeni_2022(
 
             seconds += len(data) * slice_len
 
-            subject_datasets.append(data)
-
-        if len(subject_datasets) > 0:
-            datasets.append(ConcatDataset(subject_datasets))
+            datasets.append(data)
 
     print(
         f"Loaded approximately {seconds // 3600} hours of data from Armeni et al. 2022"
@@ -373,9 +356,9 @@ if __name__ == "__main__":
     # Even worth running on its own as preprocessing work is cached for next time! 😉
     train_sampler, test_sampler, scalers = load_pretraining_data(
         preproc_config={
-            # "armeni2022": preproc_config,
+            "armeni2022": preproc_config,
             # "gwilliams2022": preproc_config,
-            "schoffelen2019": preproc_config,
+            # "schoffelen2019": preproc_config,
         },
         slice_len=3.0,
         train_ratio=0.95,
@@ -398,10 +381,11 @@ if __name__ == "__main__":
     print("Analysing dataset statistics")
     subject_data = {}
     sample_batches = 8
-    sample_subjects = 204  # TODO: change for different datasets
+    sample_subjects = 3  # TODO: change for different datasets
     for i, batch in enumerate(train_sampler):
-        data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
-        scaled_batch = scalers[dataset][subject](data)
+        data, times, subject, dataset = batch[0], batch[1], batch[-1]["subject"][0], batch[-1]["dataset"][0]
+
+        scaled_batch = scalers[data_utils.get_scaler_hash(batch)](data)
 
         if subject not in subject_data:
             subject_data[subject] = [scaled_batch]
@@ -437,10 +421,10 @@ if __name__ == "__main__":
 
     subject_ids = {}
     for batch in train_sampler:
-        data, times, subject, dataset = batch[0], batch[1], batch[-1][0], batch[-2][0]
+        data, times, subject, dataset = batch[0], batch[1], batch[-1]["subject"][0], batch[-1]["dataset"][0]
 
         if subject not in subject_ids:
-            scaled_batch = scalers[dataset][subject](data)
+            scaled_batch = scalers[data_utils.get_scaler_hash(batch)](data)
             subject_ids[subject] = scaled_batch
 
             for channel in scaled_batch[0]:

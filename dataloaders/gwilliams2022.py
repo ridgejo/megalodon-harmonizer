@@ -32,6 +32,7 @@ class Gwilliams2022(Dataset):
             preproc_config: Dictionary with preprocessing settings.
         """
 
+        self.session = session
         self.subject_id = subject_id
 
         raw, preprocessed, cache_path = data_utils.load_dataset(
@@ -80,7 +81,13 @@ class Gwilliams2022(Dataset):
     def __getitem__(self, idx):
         data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice)
 
-        return data_slice, times, self.__class__.__name__, self.subject_id
+        identifiers = {
+            "dataset": self.__class__.__name__,
+            "subject": self.subject_id,
+            "session": self.session,
+        }
+
+        return data_slice, times, identifiers
 
 
 if __name__ == "__main__":

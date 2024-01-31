@@ -38,6 +38,7 @@ class Armeni2022Labelled(Dataset):
         """
 
         self.subject_id = subject_id
+        self.session = session
         self.label_type = label_type
 
         raw, preprocessed, cache_path = data_utils.load_dataset(
@@ -126,15 +127,18 @@ class Armeni2022Labelled(Dataset):
             )
         elif self.label_type == "voiced":
             start = self.phoneme_onsets[idx]
-            # try:
             data_slice, times = self.raw[:, start : start + self.samples_per_slice]
-            # except Exception as e:
-            # breakpoint()
             label_slice = self.labels[
                 idx
             ]  # Warning: not actually a slice, just a single label.
 
-        return data_slice, label_slice, times, "Armeni2022", self.subject_id
+        identifiers = {
+            "dataset": "Armeni2022",
+            "subject": self.subject_id,
+            "session": self.session,
+        }
+
+        return data_slice, label_slice, times, identifiers
 
 
 if __name__ == "__main__":

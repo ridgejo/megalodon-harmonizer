@@ -17,6 +17,7 @@ import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
 from models.lstm_classifier import _make_lstm_classifier
 from models.lstm_seq import _make_lstm_seq
+from models.full_epoch_classifier import _make_full_epoch_classifier
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-phonemes",
@@ -78,16 +79,29 @@ for k in config["data"]["preproc_config"].keys():
     )
 
 if config["data"]["label_type"] in ["voiced"]:
-    model = _make_lstm_classifier(
-        dataset_sizes=config["data"]["dataset_sizes"],
-        use_data_block="data_block" in config["model"]["lstm"],
-        subject_ids=subjects,
-        use_sub_block="sub_block" in config["model"]["lstm"],
-        feature_dim=config["model"]["lstm"]["feature_dim"],
-        hidden_dim=config["model"]["lstm"]["hidden_dim"],
-        num_layers=config["model"]["lstm"]["num_layers"],
-        output_classes=config["model"]["lstm"]["output_classes"],
-    ).cuda()
+
+    if "lstm" in config["model"]:
+        model = _make_lstm_classifier(
+            dataset_sizes=config["data"]["dataset_sizes"],
+            use_data_block="data_block" in config["model"]["lstm"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["lstm"],
+            feature_dim=config["model"]["lstm"]["feature_dim"],
+            hidden_dim=config["model"]["lstm"]["hidden_dim"],
+            num_layers=config["model"]["lstm"]["num_layers"],
+            output_classes=config["model"]["lstm"]["output_classes"],
+        ).cuda()
+    elif "full_epoch" in config["model"]:
+        model = _make_full_epoch_classifier(
+            dataset_sizes=config["data"]["dataset_sizes"],
+            use_data_block="data_block" in config["model"]["full_epoch"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["full_epoch"],
+            feature_dim=config["model"]["full_epoch"]["feature_dim"],
+            time=config["model"]["full_epoch"]["time"],
+            output_classes=config["model"]["full_epoch"]["output_classes"],
+        ).cuda()
+
 elif config["data"]["label_type"] in ["vad"]:
     model = _make_lstm_seq(
         dataset_sizes=config["data"]["dataset_sizes"],
@@ -118,11 +132,11 @@ for epoch in range(num_epochs):
             batch[0],
             batch[1],
             batch[2],
-            batch[3][0],
-            batch[4][0],
+            batch[-1]["dataset"][0],
+            batch[-1]["subject"][0],
         )
 
-        x = scalers[dataset_id][subject_id](x)
+        x = scalers[data_utils.get_scaler_hash(batch)](x)
         x = torch.from_numpy(x).cuda().float()
         label = label.cuda()
 
@@ -157,10 +171,10 @@ for epoch in range(num_epochs):
                         batch[0],
                         batch[1],
                         batch[2],
-                        batch[3][0],
-                        batch[4][0],
+                        batch[-1]["dataset"][0],
+                        batch[-1]["subject"][0],
                     )
-                    x = scalers[dataset_id][subject_id](x)
+                    x = scalers[data_utils.get_scaler_hash(batch)](x)
                     x = torch.from_numpy(x).cuda().float()
                     label = label.cuda()
                     y_hat, test_loss = model(x, label, dataset_id, subject_id)
