@@ -3,14 +3,16 @@ import os
 import warnings
 from pathlib import Path
 
-import mne
+# import mne
 import numpy as np
 import torch
 import torch.nn as nn
-from mne_bids import (
-    BIDSPath,
-    read_raw_bids,
-)
+import mne
+# from mne_bids import (
+#     BIDSPath,
+#     read_raw_bids,
+# )
+from osl import preprocessing, utils
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, StandardScaler
 
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
@@ -56,7 +58,6 @@ def load_dataset(bids_root, subject_id, task, session, preproc_config, cache_pat
             )
             raw = read_raw_bids(bids_path)
         return raw, False, cache_path
-
 
 def preprocess(raw, preproc_config, channels, cache_path):
     print(f"Preprocessing data with configuration {preproc_config}")
@@ -164,3 +165,15 @@ class BatchScaler(nn.Module):
             batch = self.scaler.transform(batch.view(-1, 1))
             batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
             return batch.reshape(*shape)
+
+if __name__ == "__main__":
+
+    # Test preprocessed file.
+
+    import mne
+    raw = mne.io.read_raw_fif("/data/engs-pnpl/lina4368/armeni2022/preproc/sub-001/sub-001_ses-001_task-compr_meg/sub-001_ses-001_task-compr_meg_preproc_raw.fif", preload=False)
+    raw = raw.pick_types(meg=True, ref_meg=False, exclude=["MRC23-4304", "MLO22-4304", "MRP5-4304", "MLC23-4304"])
+
+    breakpoint()
+
+    # batch_preprocess()

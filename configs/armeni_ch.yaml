@@ -10,7 +10,7 @@ data:
 
   slice_len: 3.0
   train_ratio: 0.95
-  batch_size: 8
+  batch_size: 2
   exclude_subjects: ["002", "003"]
 
   norm:

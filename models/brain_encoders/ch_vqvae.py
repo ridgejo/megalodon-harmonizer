@@ -193,6 +193,8 @@ class ChVQVAE(nn.Module):
             kernel_size=1,
         )
 
+        self.act = nn.ELU(alpha=1.0)
+
 
     def forward(self, x, dataset_id, subject_id):
 
@@ -217,14 +219,21 @@ class ChVQVAE(nn.Module):
         contextual_embeddings = self.spatial_pooling(contextual_embeddings) # [B, 1, T * E]
         contextual_embeddings = contextual_embeddings.unflatten(2, (T, E)).squeeze(1) # [B, T, E]
 
-        # Project embeddings down to VQ dimension
-        codex_embedding = self.pre_vq(contextual_embeddings.permute(0, 2, 1)).permute(0, 2, 1)
+        # contextual_embeddings = self.act(contextual_embeddings)
 
-        # Quantize embeddings
-        quantized, codes, commit_loss = self.quantizer(codex_embedding)
+        # # Project embeddings down to VQ dimension
+        # codex_embedding = self.pre_vq(contextual_embeddings.permute(0, 2, 1)).permute(0, 2, 1)
+        # codex_embedding = self.act(codex_embedding)
 
-        # Project quantized embeddings up to transformer dimension
-        z = self.post_vq(quantized.permute(0, 2, 1)).permute(0, 2, 1)
+        # # Quantize embeddings
+        # quantized, codes, commit_loss = self.quantizer(codex_embedding)
+
+        # # Project quantized embeddings up to transformer dimension
+        # z = self.post_vq(quantized.permute(0, 2, 1)).permute(0, 2, 1)
+
+        # z = self.act(z)
+
+        z = contextual_embeddings
 
         # Unpool in spatial dimension
         z = z.unsqueeze(1) # [B, 1, T, E]
@@ -232,6 +241,9 @@ class ChVQVAE(nn.Module):
         z = z.flatten(start_dim=2, end_dim=3) # [B, 1, T * E]
         z = self.spatial_unpooling(z) # [B, C, T * E]
         z = z.unflatten(2, (T, E)) # [B, C, T, E]
+
+        # z = self.act(z)
+
 
         # Split channel dimension into segments of size x to avoid memory errors
         sections = z.split(split_size=8, dim=1)
@@ -248,6 +260,7 @@ class ChVQVAE(nn.Module):
         output_waves = torch.cat(segments, dim=1)
 
         # Compute losses
+        commit_loss = 0.0
         recon_loss = F.mse_loss(original_x, output_waves)
         loss = {
             "loss": recon_loss + commit_loss,

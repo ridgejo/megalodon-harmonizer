@@ -4,6 +4,8 @@ encodec @ git+https://git@github.com/facebookresearch/encodec#egg=encodec
 evaluate
 flatten-dict
 jiwer
+jupyter-server-proxy
+osl
 plotly
 torch
 torchaudio
