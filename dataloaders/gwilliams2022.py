@@ -43,43 +43,16 @@ class Gwilliams2022(Dataset):
             preproc_config=preproc_config,
         )
 
-        if not preprocessed:
-            # Gwilliams MEG channels are picked using the meg flag.
-            picks = dict(
-                meg=True, eeg=False, stim=False, eog=False, ecg=False, misc=False
-            )
-            raw = raw.pick_types(**picks)
-
-            raw = data_utils.preprocess(
-                raw=raw,
-                preproc_config=preproc_config,
-                channels=picks,
-                cache_path=cache_path,
-            )
-
-            del raw
-            gc.collect()
-            # Lazy read after preprocessing
-            raw, _, _ = data_utils.load_dataset(
-                bids_root=None,
-                subject_id=None,
-                task=None,
-                session=None,
-                preproc_config=None,
-                cache_path=cache_path,
-            )
+        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(raw, slice_len)
+        self.num_slices = len(self.valid_indices)
 
         self.raw = raw
-
-        self.num_slices, self.samples_per_slice = data_utils.get_slice_stats(
-            raw, slice_len
-        )
 
     def __len__(self):
         return self.num_slices
 
     def __getitem__(self, idx):
-        data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice)
+        data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
 
         identifiers = {
             "dataset": self.__class__.__name__,

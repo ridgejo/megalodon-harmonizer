@@ -45,46 +45,10 @@ class Armeni2022(Dataset):
             preproc_config=preproc_config,
         )
 
-        if not preprocessed:
-            # Subject 3 suffers from unstable channels... remove during preprocessing
-            bad_channels = ["MRC23", "MLO22", "MRP5", "MLC23"]
-
-            # Armeni MEG channels are named starting with an "M"
-            meg_channels = [
-                ch_name
-                for ch_name in raw.ch_names
-                if ch_name.startswith("M") and ch_name not in bad_channels
-            ]
-
-            # All channels are gradiometer channels (I think?)
-            raw.set_channel_types(
-                dict(zip(meg_channels, ["grad" for _ in meg_channels]))
-            )
-
-            raw = data_utils.preprocess(
-                raw=raw,
-                preproc_config=preproc_config,
-                channels=meg_channels,
-                cache_path=cache_path,
-            )
-
-            del raw
-            gc.collect()
-            # Lazy read after preprocessing
-            raw, _, _ = data_utils.load_dataset(
-                bids_root=None,
-                subject_id=None,
-                task=None,
-                session=None,
-                preproc_config=None,
-                cache_path=cache_path,
-            )
+        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(raw, slice_len)
+        self.num_slices = len(self.valid_indices)
 
         self.raw = raw
-
-        self.num_slices, self.samples_per_slice = data_utils.get_slice_stats(
-            raw, slice_len
-        )
 
         if truncate:
             self.num_slices = min(truncate, self.num_slices)
@@ -93,7 +57,7 @@ class Armeni2022(Dataset):
         return self.num_slices
 
     def __getitem__(self, idx):
-        data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice)
+        data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
 
         identifiers = {
             "dataset": self.__class__.__name__,
@@ -121,7 +85,7 @@ if __name__ == "__main__":
         },
     )
 
-    data, times, dataset, subject = test_dataset[7]  # 35-40s
+    data, times, identifiers = test_dataset[7]  # 35-40s
     for channel in data:
         plt.plot(times, channel)
         plt.xlabel("Time (s)")

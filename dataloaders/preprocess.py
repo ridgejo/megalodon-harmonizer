@@ -123,6 +123,6 @@ def preproc_armeni2022():
 
 if __name__ == "__main__":
 
-    preproc_armeni2022()
+    # preproc_armeni2022()
     preproc_gwilliams2022()
-    preproc_schoffelen2019()
+    # preproc_schoffelen2019()

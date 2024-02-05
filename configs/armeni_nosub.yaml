@@ -40,5 +40,4 @@ model:
     codebook_size: 1024
     shared_dim: 300
     hidden_dim: 512
-    sub_block:
     data_block:

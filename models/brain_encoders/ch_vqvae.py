@@ -13,12 +13,12 @@ def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_di
 
     # TODO: Update to use SEANet style encoder/decoder setup
     temporal_encoder = TemporalEncoder(
-        temporal_dim=temporal_dim,
-        hidden_dim=256,
+        shared_dim=shared_dim,
+        hidden_dim=768,
     )
     temporal_decoder = TemporalDecoder(
-        temporal_dim=temporal_dim,
-        hidden_dim=256,
+        shared_dim=shared_dim,
+        hidden_dim=768,
     )
 
 
@@ -74,12 +74,12 @@ class ResnetBlock(nn.Module):
         return self.shortcut(x) + self.block(x)
 
 class TemporalEncoder(nn.Module):
-    def __init__(self, temporal_dim, hidden_dim):
+    def __init__(self, shared_dim, hidden_dim):
         super(TemporalEncoder, self).__init__()
 
         self.model = nn.Sequential(
             nn.Conv1d(
-                in_channels=1,
+                in_channels=shared_dim,
                 out_channels=hidden_dim,
                 kernel_size=1,
             ),
@@ -106,7 +106,7 @@ class TemporalEncoder(nn.Module):
             nn.ELU(alpha=1.0),
             nn.Conv1d(
                 in_channels=hidden_dim,
-                out_channels=temporal_dim,
+                out_channels=hidden_dim,
                 kernel_size=1,
             ),
         )
@@ -123,7 +123,7 @@ class TemporalDecoder(nn.Module):
 
         self.model = nn.Sequential(
             nn.Conv1d(
-                in_channels=temporal_dim,
+                in_channels=hidden_dim,
                 out_channels=hidden_dim,
                 kernel_size=1,
             ),
@@ -150,7 +150,7 @@ class TemporalDecoder(nn.Module):
             nn.ELU(alpha=1.0),
             nn.Conv1d(
                 in_channels=hidden_dim,
-                out_channels=1,
+                out_channels=shared_dim,
                 kernel_size=1,
             ),
         )
@@ -195,10 +195,25 @@ class ChVQVAE(nn.Module):
 
         self.act = nn.ELU(alpha=1.0)
 
-
     def forward(self, x, dataset_id, subject_id):
 
         original_x = x.clone()
+
+        # # Stage 1: Temporally pool with very large spatial dimension (over all channels simultaneously)
+        # # i.e. [B, C, T] => [B, CC, t]
+        # x = self.temporal_encoder(x)
+
+        # # Stage 2: Spatially encode to reduce CC dimension to embedding dimension
+        # # i.e. [B * t, 1, CC] => [B * t, E, 1] => [B, t, E]
+        # # I *think* this may do the trick?
+        # # Reduce shared dimension down to something small then mean pool the remaining embeddings?
+        # # Applying this vice versa inflates temporal dimension which i can't see being a good thing! :/
+        # B, _, t = x.shape
+        # x = x.permute(0, 2, 1).flatten(start_dim=0, end_dim=1).unsqueeze(1) # [B, CC, t] => [B, t, CC] => [B * t, 1, CC]
+        # x = self.spatial_encoder(x) # [B * t, 1, CC] => [B * t, E, c]
+        # # warning: make sure that c is sufficiently small (ideally 1)
+        # x = x.mean(dim=2) # [B * t, E, c] => [B * t, E] (mean pooling the remaining embeddings)
+        # x = x.unflatten(0, (B, t)) # [B * t, E] => [B, t, E] and we're done!
 
         # Split channel dimension into segments of size x to avoid memory errors
         sections = x.split(split_size=8, dim=1) # Tuple of split sections [B, C_i, T]

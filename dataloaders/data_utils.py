@@ -28,36 +28,57 @@ def load_dataset(bids_root, subject_id, task, session, preproc_config, cache_pat
     """Loads a dataset. First checks if a preprocessed version already exists in cache and loads it."""
 
     if not cache_path:
-        # Generate a hash to describe this dataset and its processing configuration
-        identifier = str(
-            _string_hash(f"{bids_root}_{subject_id}_{session}_{task}_{preproc_config}")
-        )
-        cache_path = DATA_PATH / f"dataset_cache/{identifier}_raw.fif"
-        (DATA_PATH / "dataset_cache").mkdir(parents=True, exist_ok=True)
+        # Work out cache path
+        fname = f"sub-{subject_id}_ses-{session}_task-{task}_meg_preproc_raw.fif"
+        cache_path = str(bids_root) + f"/preproc/sub-{subject_id}/sub-{subject_id}_ses-{session}_task-{task}_meg"
+        cache_path = cache_path + "/" + fname
+        print(f"Computed dataset cache path: {cache_path}")
 
-        print(f"Computed dataset cache hash: {identifier}")
-
-    # Load cached dataset if it exists, otherwise load BIDS dataset and preprocess
+    # Load cached dataset if it exists
     if os.path.exists(cache_path):
         print("Cache found. Loading cached dataset.")
         raw = mne.io.read_raw_fif(cache_path, preload=False)  # Ensures lazy loading
         return raw, True, cache_path
     else:
-        print("Cache not found. Loading dataset.")
-        with warnings.catch_warnings():
-            # Save the eyes from a huge trace of irrelevant warnings
-            # http://tinyurl.com/yv3pnptu
-            warnings.simplefilter("ignore")
-            bids_path = BIDSPath(
-                subject=subject_id,
-                task=task,
-                datatype="meg",
-                suffix="meg",
-                session=session,
-                root=bids_root,
-            )
-            raw = read_raw_bids(bids_path)
-        return raw, False, cache_path
+        raise FileNotFoundError(f"Could not find {cache_path}. Run preprocessing first.")
+
+def get_valid_indices(raw, slice_len):
+    """
+    Takes a raw object and the slice length, generating a set of iterable indices that skip bad segments.
+    """
+
+    sfreq = float(raw.info["sfreq"])
+    slice_samples = int(sfreq * slice_len)
+
+    annotations = raw.annotations
+
+    # Compute list of all indices
+    valid_indices = set(range(0, len(raw), slice_samples))
+    orig_size = len(valid_indices)
+
+    # Compute indices of bad segments
+    for annot in annotations:
+        onset_samples = int(sfreq * annot["onset"])
+        duration_samples = int(sfreq * annot["duration"])
+
+        # Which index does the onset occur in?
+        onset_idx = (onset_samples // slice_samples) * slice_samples
+
+        # Which index does the bad segment end in?
+        end_idx = ((onset_samples + duration_samples) // slice_samples) * slice_samples
+
+        # Which indices should we ignore?
+        ignore = set(range(onset_idx, end_idx + 1, slice_samples))
+
+        valid_indices -= ignore
+
+    valid_indices = sorted(list(valid_indices))[:-1] # Drop last to get even slice sizes.
+
+    final_size = len(valid_indices)
+    print(f"Initialised with {orig_size}, now {final_size}. Removed {orig_size - final_size} bad slices.")
+
+    return valid_indices, slice_samples
+        
 
 def preprocess(raw, preproc_config, channels, cache_path):
     print(f"Preprocessing data with configuration {preproc_config}")
@@ -85,8 +106,9 @@ def preprocess(raw, preproc_config, channels, cache_path):
     return raw
 
 
-def get_slice(raw, idx, samples_per_slice):
-    return raw[:, samples_per_slice * idx : samples_per_slice * (idx + 1)]
+def get_slice(raw, idx, samples_per_slice, valid_indices):
+    sample_start = valid_indices[idx]
+    return raw[:, sample_start : sample_start + samples_per_slice]
 
 
 def get_slice_stats(raw, slice_len):
