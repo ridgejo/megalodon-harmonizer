@@ -4,7 +4,13 @@ import torch.nn.functional as F
 from vector_quantize_pytorch import VectorQuantize
 from encodec import EncodecModel
 
-def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_dim):
+from models.dataset_layer import DatasetLayer
+from models.subject_block import SubjectBlock
+
+def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_dim, hidden_dim, dataset_sizes,
+    subject_ids,
+    use_sub_block,
+    use_data_block,):
 
     # encodec_model = EncodecModel.encodec_model_24khz()
     # encodec_model.set_target_bandwidth(12.0) # warning: increase to 12.0 for more accurate reconstructions.
@@ -13,12 +19,14 @@ def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_di
 
     # TODO: Update to use SEANet style encoder/decoder setup
     temporal_encoder = TemporalEncoder(
-        shared_dim=shared_dim,
-        hidden_dim=768,
+        ch_in_dim=1,
+        hidden_dim=hidden_dim,
+        ch_out_dim=temporal_dim,
     )
     temporal_decoder = TemporalDecoder(
-        shared_dim=shared_dim,
-        hidden_dim=768,
+        ch_in_dim=1,
+        hidden_dim=hidden_dim,
+        ch_out_dim=temporal_dim,
     )
 
 
@@ -32,7 +40,22 @@ def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_di
         # kmeans_iters=10,
     )
 
+    dataset_layer = DatasetLayer(
+        dataset_sizes=dataset_sizes,
+        shared_dim=shared_dim,
+        use_data_block=use_data_block,
+    )
+
+    subject_block = SubjectBlock(
+        subject_ids=subject_ids,
+        in_channels=shared_dim,
+        out_channels=shared_dim,
+        use_sub_block=use_sub_block,
+    )
+
     return ChVQVAE(
+        dataset_layer=dataset_layer,
+        subject_block=subject_block,
         temporal_encoder=temporal_encoder,
         temporal_decoder=temporal_decoder,
         temporal_dim=temporal_dim,
@@ -50,21 +73,21 @@ class ResnetBlock(nn.Module):
 
         self.block = nn.Sequential(
             nn.ELU(alpha=1.0),
-            nn.Conv1d(
+            nn.Conv2d(
                 in_channels=dim,
                 out_channels=hidden,
                 kernel_size=kernel_size,
                 padding="same",
             ),
             nn.ELU(alpha=1.0),
-            nn.Conv1d(
+            nn.Conv2d(
                 in_channels=hidden,
                 out_channels=dim,
                 kernel_size=1,
             ),
         )
 
-        self.shortcut = nn.Conv1d(
+        self.shortcut = nn.Conv2d(
             in_channels=dim,
             out_channels=dim,
             kernel_size=1,
@@ -74,39 +97,39 @@ class ResnetBlock(nn.Module):
         return self.shortcut(x) + self.block(x)
 
 class TemporalEncoder(nn.Module):
-    def __init__(self, shared_dim, hidden_dim):
+    def __init__(self, ch_in_dim, hidden_dim, ch_out_dim):
         super(TemporalEncoder, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Conv1d(
-                in_channels=shared_dim,
+            nn.Conv2d(
+                in_channels=ch_in_dim,
                 out_channels=hidden_dim,
                 kernel_size=1,
             ),
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),  # rf: 6
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),  # 12
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),  # 18
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),  # 24
             nn.ELU(alpha=1.0),
-            nn.Conv1d(
-                in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=3, stride=3
+            nn.Conv2d(
+                in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=(1, 3), stride=(1, 3),
             ),  # 30 (+ downsample)
             nn.ELU(alpha=1.0),
-            nn.Conv1d(
+            nn.Conv2d(
                 in_channels=hidden_dim,
-                out_channels=hidden_dim,
+                out_channels=ch_out_dim,
                 kernel_size=1,
             ),
         )
@@ -118,39 +141,39 @@ class TemporalEncoder(nn.Module):
         return self.model(x)
 
 class TemporalDecoder(nn.Module):
-    def __init__(self, temporal_dim, hidden_dim):
+    def __init__(self, ch_in_dim, hidden_dim, ch_out_dim):
         super(TemporalDecoder, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Conv1d(
-                in_channels=hidden_dim,
+            nn.Conv2d(
+                in_channels=ch_out_dim,
                 out_channels=hidden_dim,
                 kernel_size=1,
             ),
             nn.ELU(alpha=1.0),
-            nn.ConvTranspose1d(
-                in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=3, stride=3
+            nn.ConvTranspose2d(
+                in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=(1, 3), stride=(1, 3),
             ),
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),
             ResnetBlock(
                 dim=hidden_dim,
-                kernel_size=7,
+                kernel_size=(1, 7),
             ),
             nn.ELU(alpha=1.0),
-            nn.Conv1d(
+            nn.Conv2d(
                 in_channels=hidden_dim,
-                out_channels=shared_dim,
+                out_channels=ch_in_dim,
                 kernel_size=1,
             ),
         )
@@ -160,17 +183,56 @@ class TemporalDecoder(nn.Module):
 
 class ChVQVAE(nn.Module):
 
-    def __init__(self, temporal_encoder, temporal_decoder, temporal_dim, quantizer, sampling_rate, shared_dim, vq_dim):
+    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, temporal_dim, quantizer, sampling_rate, shared_dim, vq_dim):
         super(ChVQVAE, self).__init__()
+
+        self.dataset_layer = dataset_layer
+        self.subject_block = subject_block
 
         self.temporal_encoder = temporal_encoder
         self.temporal_decoder = temporal_decoder
-        self.sampling_rate = sampling_rate
 
-        self.spatial_pooling = nn.Conv1d(
-            in_channels=shared_dim,
-            out_channels=1,
-            kernel_size=1,
+        ch_dim = temporal_dim
+
+        self.spatial_encoder = nn.Sequential(
+            nn.Conv2d(
+                in_channels=ch_dim,
+                out_channels=ch_dim * 4,
+                kernel_size=1,
+            ),
+            nn.ELU(alpha=1.0),
+            nn.Conv2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                kernel_size=(30, 1),
+                dilation=(4, 1),
+                stride=(20, 1), # 300 -> 10 channels
+            ),
+            nn.ELU(alpha=1.0),
+        )
+
+        self.spatial_decoder = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                stride=(5, 1), # Take 1 -> 10
+                kernel_size=(10, 1),
+            ),
+            nn.ELU(alpha=1.0),
+            nn.ConvTranspose2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                kernel_size=(30, 1),
+                dilation=(4, 1),
+                stride=(20, 1), # 10 -> 300 channels
+                output_padding=(3, 0),
+            ),
+            nn.ELU(alpha=1.0),
+            nn.Conv2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim,
+                kernel_size=1,
+            ),
         )
 
         self.pre_vq = nn.Conv1d(
@@ -187,96 +249,38 @@ class ChVQVAE(nn.Module):
             kernel_size=1,
         )
 
-        self.spatial_unpooling = nn.Conv1d(
-            in_channels=1,
-            out_channels=shared_dim,
-            kernel_size=1,
-        )
-
-        self.act = nn.ELU(alpha=1.0)
-
     def forward(self, x, dataset_id, subject_id):
 
-        original_x = x.clone()
+        original_x = x.clone() # [B, S, T]
 
-        # # Stage 1: Temporally pool with very large spatial dimension (over all channels simultaneously)
-        # # i.e. [B, C, T] => [B, CC, t]
-        # x = self.temporal_encoder(x)
+        x = self.dataset_layer(x, dataset_id)
+        x = self.subject_block(x, subject_id)
 
-        # # Stage 2: Spatially encode to reduce CC dimension to embedding dimension
-        # # i.e. [B * t, 1, CC] => [B * t, E, 1] => [B, t, E]
-        # # I *think* this may do the trick?
-        # # Reduce shared dimension down to something small then mean pool the remaining embeddings?
-        # # Applying this vice versa inflates temporal dimension which i can't see being a good thing! :/
-        # B, _, t = x.shape
-        # x = x.permute(0, 2, 1).flatten(start_dim=0, end_dim=1).unsqueeze(1) # [B, CC, t] => [B, t, CC] => [B * t, 1, CC]
-        # x = self.spatial_encoder(x) # [B * t, 1, CC] => [B * t, E, c]
-        # # warning: make sure that c is sufficiently small (ideally 1)
-        # x = x.mean(dim=2) # [B * t, E, c] => [B * t, E] (mean pooling the remaining embeddings)
-        # x = x.unflatten(0, (B, t)) # [B * t, E] => [B, t, E] and we're done!
+        # Expand to create channel (embedding) dimension
+        x = x.unsqueeze(1) # [B, C, S, T]
 
-        # Split channel dimension into segments of size x to avoid memory errors
-        sections = x.split(split_size=8, dim=1) # Tuple of split sections [B, C_i, T]
-        split_out = []
-        for section in sections:
-            B, C, T = section.shape
-            section = section.flatten(start_dim=0, end_dim=1).unsqueeze(1) # [B * C, 1, T]
-            outputs = self.temporal_encoder(section)
-            outputs = outputs.permute(0, 2, 1) # [B * C, T, E]
-            T, E = outputs.shape[-2:]
-            contextual_embeddings = outputs.unflatten(0, (B, C)) # [B, C, T, E]
-            split_out.append(contextual_embeddings)
-        contextual_embeddings = torch.cat(split_out, dim=1)
+        # Apply temporal encoder [B, C, S, T @ 250Hz] -> [B, C, S, T @ ~62Hz]
+        x = self.temporal_encoder(x)
 
-        # Pool in spatial dimension and output [B, T, E]
-        B, C, T, E = contextual_embeddings.shape
-        contextual_embeddings = contextual_embeddings.flatten(start_dim=2, end_dim=3) # [B, C, T * E]
-        contextual_embeddings = self.spatial_pooling(contextual_embeddings) # [B, 1, T * E]
-        contextual_embeddings = contextual_embeddings.unflatten(2, (T, E)).squeeze(1) # [B, T, E]
+        # Apply spatial pooling layers
+        x = self.spatial_encoder(x)
+        x = x.mean(dim=2) # Average pool over what's left in the spatial dimension
 
-        # contextual_embeddings = self.act(contextual_embeddings)
+        # Expand in spatial dimension
+        x = x.unsqueeze(2)
+        x = self.spatial_decoder(x)
 
-        # # Project embeddings down to VQ dimension
-        # codex_embedding = self.pre_vq(contextual_embeddings.permute(0, 2, 1)).permute(0, 2, 1)
-        # codex_embedding = self.act(codex_embedding)
+        # Expand in temporal dimension
+        # warning: not equal to spatial dimension
+        x = self.temporal_decoder(x)
+        x = x.squeeze(1)
 
-        # # Quantize embeddings
-        # quantized, codes, commit_loss = self.quantizer(codex_embedding)
-
-        # # Project quantized embeddings up to transformer dimension
-        # z = self.post_vq(quantized.permute(0, 2, 1)).permute(0, 2, 1)
-
-        # z = self.act(z)
-
-        z = contextual_embeddings
-
-        # Unpool in spatial dimension
-        z = z.unsqueeze(1) # [B, 1, T, E]
-        B, C, T, E = z.shape
-        z = z.flatten(start_dim=2, end_dim=3) # [B, 1, T * E]
-        z = self.spatial_unpooling(z) # [B, C, T * E]
-        z = z.unflatten(2, (T, E)) # [B, C, T, E]
-
-        # z = self.act(z)
-
-
-        # Split channel dimension into segments of size x to avoid memory errors
-        sections = z.split(split_size=8, dim=1)
-        segments = []
-        for section in sections:
-            B, C, T, E = section.shape
-            section = section.permute(0, 1, 3, 2) # [B, C, E, T]
-            section = section.flatten(start_dim=0, end_dim=1) # [B * C, E, T]
-            section = self.temporal_decoder(section) # [B * C, 1, T]
-            T = section.shape[-1]
-            section = section.squeeze(1) # [B * C, T]
-            output_waves = section.unflatten(0, (B, C)) # [B, C, T]
-            segments.append(output_waves)
-        output_waves = torch.cat(segments, dim=1)
+        x = self.subject_block.decode(x, subject_id)
+        x = self.dataset_layer.decode(x, dataset_id)
 
         # Compute losses
         commit_loss = 0.0
-        recon_loss = F.mse_loss(original_x, output_waves)
+        recon_loss = F.mse_loss(original_x, x)
         loss = {
             "loss": recon_loss + commit_loss,
             "commit_loss": commit_loss,
@@ -291,21 +295,21 @@ class ChVQVAE(nn.Module):
             f"S_{dataset_id}_{subject_id}_recon_loss": recon_loss,
         }
 
-        return output_waves, loss
+        return x, loss
 
 if __name__ == "__main__":
 
     import torch
 
     model = _make_ch_vqvae(
-        shared_dim=20,
+        shared_dim=300,
         temporal_dim=512, # Output dimension of encodec model
         sampling_rate=300,
         vq_dim=512,
         codebook_size=1024
     ).cuda()
 
-    x = torch.randn(1, 20, 90).cuda() # [B, C, T]
+    x = torch.randn(1, 300, 90).cuda() # [B, C, T]
     dataset_id = "TestDataset"
     subject_id = "TestSubject"
 

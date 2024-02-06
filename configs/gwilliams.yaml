@@ -17,9 +17,6 @@ data:
     per_channel: True
     scaler_conf:
       standard_scaler:
-      # robust_scaler:
-      #   lo_q: 0.16
-      #   hi_q: 0.84
 
   dataset_sizes:
     Gwilliams2022: 208
@@ -27,10 +24,10 @@ data:
   preproc_config:
     gwilliams2022:
       filtering: True
-      resample: 300
-      notch_freqs: [50, 100, 150]
+      resample: 250
+      notch_freqs: [50, 100]
       bandpass_lo: 0.5
-      bandpass_hi: 150
+      bandpass_hi: 125
 
 model:
   short:

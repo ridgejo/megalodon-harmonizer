@@ -29,8 +29,13 @@ def load_dataset(bids_root, subject_id, task, session, preproc_config, cache_pat
 
     if not cache_path:
         # Work out cache path
-        fname = f"sub-{subject_id}_ses-{session}_task-{task}_meg_preproc_raw.fif"
-        cache_path = str(bids_root) + f"/preproc/sub-{subject_id}/sub-{subject_id}_ses-{session}_task-{task}_meg"
+        if session:
+            fname = f"sub-{subject_id}_ses-{session}_task-{task}_meg_preproc_raw.fif"
+            cache_path = str(bids_root) + f"/preproc/sub-{subject_id}/sub-{subject_id}_ses-{session}_task-{task}_meg"
+        else:
+            fname = f"sub-{subject_id}_task-{task}_meg_preproc_raw.fif"
+            cache_path = str(bids_root) + f"/preproc/sub-{subject_id}/sub-{subject_id}_task-{task}_meg"
+        
         cache_path = cache_path + "/" + fname
         print(f"Computed dataset cache path: {cache_path}")
 

@@ -119,6 +119,11 @@ elif "ch" in config["model"]:
         codebook_size=config["model"]["ch"]["codebook_size"],
         shared_dim=config["model"]["ch"]["shared_dim"],
         temporal_dim=config["model"]["ch"]["temporal_dim"],
+        hidden_dim=config["model"]["ch"]["hidden_dim"],
+        dataset_sizes=config["data"]["dataset_sizes"],
+        subject_ids=subjects,
+        use_sub_block="sub_block" in config["model"]["ch"],
+        use_data_block="data_block" in config["model"]["ch"],
     ).to(args.device)
 
 
@@ -261,7 +266,7 @@ for epoch in range(num_epochs):
                     )
 
                     for j, (dataset_id, (x, x_hat, times)) in enumerate(
-                        test_examples.items()
+                        train_examples.items()
                     ):
                         x_sample = x[0].cpu()
                         x_hat_sample = x_hat[0].cpu()

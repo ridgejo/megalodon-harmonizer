@@ -149,14 +149,10 @@ def _load_gwilliams_2022(
     seconds = 0
     datasets = []
 
-    # Determined via std. rejection
+    # Determined via visual inspection
     bad_subjects = [
-        # "05", "15", "21", "14", "4"
-        "05",
-        "19",
-        "17",
+        "18", "19", "22", 
     ]
-    # Generally: watch out for bad channels
 
     if not debug:
         n_subjects = 27
@@ -356,8 +352,8 @@ if __name__ == "__main__":
     # Even worth running on its own as preprocessing work is cached for next time! 😉
     train_sampler, test_sampler, scalers = load_pretraining_data(
         preproc_config={
-            "armeni2022": preproc_config,
-            # "gwilliams2022": preproc_config,
+            # "armeni2022": preproc_config,
+            "gwilliams2022": preproc_config,
             # "schoffelen2019": preproc_config,
         },
         slice_len=3.0,
@@ -381,7 +377,7 @@ if __name__ == "__main__":
     print("Analysing dataset statistics")
     subject_data = {}
     sample_batches = 8
-    sample_subjects = 3  # TODO: change for different datasets
+    sample_subjects = 27  # TODO: change for different datasets
     for i, batch in enumerate(train_sampler):
         data, times, subject, dataset = batch[0], batch[1], batch[-1]["subject"][0], batch[-1]["dataset"][0]
 
