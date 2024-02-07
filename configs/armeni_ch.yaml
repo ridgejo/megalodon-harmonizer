@@ -34,10 +34,10 @@ data:
 
 model:
   ch:
-    vq_dim: 512
+    vq_dim: 64
     codebook_size: 1024
     shared_dim: 300
     temporal_dim: 128
-    hidden_dim: 128
+    hidden_dim: 256 # Must be 2x temporal dim
     sub_block:
     data_block:

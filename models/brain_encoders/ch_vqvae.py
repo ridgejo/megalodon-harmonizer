@@ -19,12 +19,12 @@ def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_di
 
     # TODO: Update to use SEANet style encoder/decoder setup
     temporal_encoder = TemporalEncoder(
-        ch_in_dim=1,
+        ch_in_dim=128,
         hidden_dim=hidden_dim,
         ch_out_dim=temporal_dim,
     )
     temporal_decoder = TemporalDecoder(
-        ch_in_dim=1,
+        ch_in_dim=128,
         hidden_dim=hidden_dim,
         ch_out_dim=temporal_dim,
     )
@@ -33,7 +33,7 @@ def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_di
     quantizer = VectorQuantize(
         dim=vq_dim,
         codebook_size=codebook_size,
-        codebook_dim=16,
+        # codebook_dim=16,
         use_cosine_sim=True,
         threshold_ema_dead_code=2,
         kmeans_init=True,
@@ -132,6 +132,7 @@ class TemporalEncoder(nn.Module):
             #     out_channels=ch_out_dim,
             #     kernel_size=1,
             # ),
+            # nn.ELU(alpha=1.0),
         )
 
     def forward(self, x):
@@ -194,84 +195,82 @@ class ChVQVAE(nn.Module):
 
         ch_dim = temporal_dim
 
-        # Gentle spatial downsampling from 300 -> 10 channels
-        self.spatial_encoder = nn.Sequential(
+        # 300 -> 29 channels
+        self.spatial_fuse30 = nn.Sequential(
             nn.Conv2d(
-                in_channels=ch_dim,
-                out_channels=ch_dim * 4,
+                in_channels=1,
+                out_channels=ch_dim,
                 kernel_size=1,
             ),
             nn.ELU(alpha=1.0),
             nn.Conv2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(10, 1),
-                stride=(5, 1), # 300 -> 60
-            ),
-            ResnetBlock(
-                dim=ch_dim * 4,
-                kernel_size=(3, 1),
-            ),
-            nn.Conv2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(6, 1),
-                stride=(3, 1), # 60 -> 20
-            ),
-            ResnetBlock(
-                dim=ch_dim * 4,
-                kernel_size=(3, 1),
-            ),
-            nn.Conv2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(4, 1),
-                stride=(2, 1), # 20 -> 10
+                in_channels=ch_dim,
+                out_channels=ch_dim,
+                kernel_size=(20, 1),
+                stride=(10, 1),
             ),
             nn.ELU(alpha=1.0),
         )
 
-        self.spatial_decoder = nn.Sequential(
-            nn.ConvTranspose2d(
-                in_channels=ch_dim * 4,
+        # 29 -> 1
+        self.spatial_fuse1 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=ch_dim * 2,
                 out_channels=ch_dim * 4,
-                stride=(4, 1), # Take 1 -> 8
-                kernel_size=(8, 1),
-            ),
-            nn.ELU(alpha=1.0),
-            nn.ConvTranspose2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(4, 1),
-                stride=(2, 1), # 8 -> 20
-            ),
-            ResnetBlock(
-                dim=ch_dim * 4,
-                kernel_size=(3, 1),
-            ),
-            nn.ConvTranspose2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(6, 1),
-                stride=(3, 1), # 20 -> 60
-                output_padding=(2, 0),
-            ),
-            ResnetBlock(
-                dim=ch_dim * 4,
-                kernel_size=(3, 1),
-            ),
-            nn.ConvTranspose2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(10, 1),
-                stride=(5, 1), # 60 -> 300
+                kernel_size=1,
             ),
             nn.ELU(alpha=1.0),
             nn.Conv2d(
                 in_channels=ch_dim * 4,
-                out_channels=ch_dim,
+                out_channels=ch_dim * 4,
+                kernel_size=(29, 1),
+            ),
+            nn.ELU(alpha=1.0),
+        )
+
+        # 1 -> 29
+        self.spatial_unfuse1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                kernel_size=(29, 1),
+            ),
+            nn.ELU(alpha=1.0),
+            nn.Conv2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 2,
                 kernel_size=1,
             ),
+            nn.ELU(alpha=1.0),
+        )
+
+        # 29 -> 300
+        self.spatial_unfuse30 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=ch_dim,
+                out_channels=ch_dim,
+                kernel_size=(20, 1),
+                stride=(10, 1),
+            ),
+            nn.ELU(alpha=1.0),
+            nn.Conv2d(
+                in_channels=ch_dim,
+                out_channels=1,
+                kernel_size=1,
+            ),
+            nn.ELU(alpha=1.0),
+        )
+
+        self.pre_vq = nn.Conv2d(
+            in_channels=ch_dim * 2,
+            out_channels=vq_dim,
+            kernel_size=1,
+        )
+
+        self.post_vq = nn.Conv2d(
+            in_channels=vq_dim,
+            out_channels=ch_dim * 2,
+            kernel_size=1,
         )
 
         self.quantizer = quantizer
@@ -283,26 +282,34 @@ class ChVQVAE(nn.Module):
         x = self.dataset_layer(x, dataset_id)
         x = self.subject_block(x, subject_id)
 
-        # Expand to create channel (embedding) dimension
+        # Expand to create channel (embedding) dimension (C = 1)
         x = x.unsqueeze(1) # [B, C, S, T]
 
+        x = self.spatial_fuse30(x) # S = 300 -> S = 29 (C = 128)
+
         # Apply temporal encoder [B, C, S, T @ 250Hz] -> [B, C, S, T @ ~62Hz]
-        x = self.temporal_encoder(x)
+        x = self.temporal_encoder(x) # (C = 256)
 
-        # Apply spatial pooling layers
-        x = self.spatial_encoder(x)
-        x = x.mean(dim=2) # Average pool over what's left in the spatial dimension
+        # x = self.spatial_fuse1(x) # S = 29 -> S = 1 (C = 512)
 
-        # Vector quantization
+        # # Vector quantization
+        x = self.pre_vq(x)
+        # x = x.squeeze(2)
+        B, C, S, T = x.shape
+        x = x.flatten(start_dim=2, end_dim=3)
         quantized, codes, commit_loss = self.quantizer(x.permute(0, 2, 1))
         x = quantized.permute(0, 2, 1)
+        # x = x.unsqueeze(2)
+        x = x.unflatten(2, (S, T))
+        x = self.post_vq(x)
 
         # Expand in spatial dimension
-        x = x.unsqueeze(2)
-        x = self.spatial_decoder(x)
+        # x = self.spatial_unfuse1(x) # S = 1 -> S = 29
 
         # Expand in temporal dimension
         x = self.temporal_decoder(x)
+
+        x = self.spatial_unfuse30(x) # S = 29 -> S = 300
         x = x.squeeze(1)
 
         x = self.subject_block.decode(x, subject_id)
@@ -333,9 +340,9 @@ if __name__ == "__main__":
     model = _make_ch_vqvae(
         shared_dim=300,
         temporal_dim=128, # Output dimension of encodec model
-        hidden_dim=128,
+        hidden_dim=256,
         sampling_rate=300,
-        vq_dim=512,
+        vq_dim=64,
         codebook_size=1024,
         dataset_sizes={
             "TestDataset": 269,
