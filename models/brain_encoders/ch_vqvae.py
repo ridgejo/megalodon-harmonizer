@@ -33,11 +33,11 @@ def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_di
     quantizer = VectorQuantize(
         dim=vq_dim,
         codebook_size=codebook_size,
-        # codebook_dim=16,
-        # use_cosine_sim=True,
-        # threshold_ema_dead_code=2,
-        # kmeans_init=True,
-        # kmeans_iters=10,
+        codebook_dim=16,
+        use_cosine_sim=True,
+        threshold_ema_dead_code=2,
+        kmeans_init=True,
+        kmeans_iters=10,
     )
 
     dataset_layer = DatasetLayer(
@@ -127,11 +127,11 @@ class TemporalEncoder(nn.Module):
                 in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=(1, 3), stride=(1, 3),
             ),  # 30 (+ downsample)
             nn.ELU(alpha=1.0),
-            nn.Conv2d(
-                in_channels=hidden_dim,
-                out_channels=ch_out_dim,
-                kernel_size=1,
-            ),
+            # nn.Conv2d(
+            #     in_channels=hidden_dim,
+            #     out_channels=ch_out_dim,
+            #     kernel_size=1,
+            # ),
         )
 
     def forward(self, x):
@@ -145,12 +145,12 @@ class TemporalDecoder(nn.Module):
         super(TemporalDecoder, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Conv2d(
-                in_channels=ch_out_dim,
-                out_channels=hidden_dim,
-                kernel_size=1,
-            ),
-            nn.ELU(alpha=1.0),
+            # nn.Conv2d(
+            #     in_channels=ch_out_dim,
+            #     out_channels=hidden_dim,
+            #     kernel_size=1,
+            # ),
+            # nn.ELU(alpha=1.0),
             nn.ConvTranspose2d(
                 in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=(1, 3), stride=(1, 3),
             ),
@@ -194,6 +194,7 @@ class ChVQVAE(nn.Module):
 
         ch_dim = temporal_dim
 
+        # Gentle spatial downsampling from 300 -> 10 channels
         self.spatial_encoder = nn.Sequential(
             nn.Conv2d(
                 in_channels=ch_dim,
@@ -204,9 +205,28 @@ class ChVQVAE(nn.Module):
             nn.Conv2d(
                 in_channels=ch_dim * 4,
                 out_channels=ch_dim * 4,
-                kernel_size=(30, 1),
-                dilation=(4, 1),
-                stride=(20, 1), # 300 -> 10 channels
+                kernel_size=(10, 1),
+                stride=(5, 1), # 300 -> 60
+            ),
+            ResnetBlock(
+                dim=ch_dim * 4,
+                kernel_size=(3, 1),
+            ),
+            nn.Conv2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                kernel_size=(6, 1),
+                stride=(3, 1), # 60 -> 20
+            ),
+            ResnetBlock(
+                dim=ch_dim * 4,
+                kernel_size=(3, 1),
+            ),
+            nn.Conv2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                kernel_size=(4, 1),
+                stride=(2, 1), # 20 -> 10
             ),
             nn.ELU(alpha=1.0),
         )
@@ -215,17 +235,36 @@ class ChVQVAE(nn.Module):
             nn.ConvTranspose2d(
                 in_channels=ch_dim * 4,
                 out_channels=ch_dim * 4,
-                stride=(5, 1), # Take 1 -> 10
-                kernel_size=(10, 1),
+                stride=(4, 1), # Take 1 -> 8
+                kernel_size=(8, 1),
             ),
             nn.ELU(alpha=1.0),
             nn.ConvTranspose2d(
                 in_channels=ch_dim * 4,
                 out_channels=ch_dim * 4,
-                kernel_size=(30, 1),
-                dilation=(4, 1),
-                stride=(20, 1), # 10 -> 300 channels
-                output_padding=(3, 0),
+                kernel_size=(4, 1),
+                stride=(2, 1), # 8 -> 20
+            ),
+            ResnetBlock(
+                dim=ch_dim * 4,
+                kernel_size=(3, 1),
+            ),
+            nn.ConvTranspose2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                kernel_size=(6, 1),
+                stride=(3, 1), # 20 -> 60
+                output_padding=(2, 0),
+            ),
+            ResnetBlock(
+                dim=ch_dim * 4,
+                kernel_size=(3, 1),
+            ),
+            nn.ConvTranspose2d(
+                in_channels=ch_dim * 4,
+                out_channels=ch_dim * 4,
+                kernel_size=(10, 1),
+                stride=(5, 1), # 60 -> 300
             ),
             nn.ELU(alpha=1.0),
             nn.Conv2d(
@@ -235,19 +274,7 @@ class ChVQVAE(nn.Module):
             ),
         )
 
-        self.pre_vq = nn.Conv1d(
-            in_channels=temporal_dim,
-            out_channels=vq_dim,
-            kernel_size=1,
-        )
-
         self.quantizer = quantizer
-
-        self.post_vq = nn.Conv1d(
-            in_channels=vq_dim,
-            out_channels=temporal_dim,
-            kernel_size=1,
-        )
 
     def forward(self, x, dataset_id, subject_id):
 
@@ -266,12 +293,15 @@ class ChVQVAE(nn.Module):
         x = self.spatial_encoder(x)
         x = x.mean(dim=2) # Average pool over what's left in the spatial dimension
 
+        # Vector quantization
+        quantized, codes, commit_loss = self.quantizer(x.permute(0, 2, 1))
+        x = quantized.permute(0, 2, 1)
+
         # Expand in spatial dimension
         x = x.unsqueeze(2)
         x = self.spatial_decoder(x)
 
         # Expand in temporal dimension
-        # warning: not equal to spatial dimension
         x = self.temporal_decoder(x)
         x = x.squeeze(1)
 
@@ -279,7 +309,6 @@ class ChVQVAE(nn.Module):
         x = self.dataset_layer.decode(x, dataset_id)
 
         # Compute losses
-        commit_loss = 0.0
         recon_loss = F.mse_loss(original_x, x)
         loss = {
             "loss": recon_loss + commit_loss,
@@ -303,13 +332,20 @@ if __name__ == "__main__":
 
     model = _make_ch_vqvae(
         shared_dim=300,
-        temporal_dim=512, # Output dimension of encodec model
+        temporal_dim=128, # Output dimension of encodec model
+        hidden_dim=128,
         sampling_rate=300,
         vq_dim=512,
-        codebook_size=1024
+        codebook_size=1024,
+        dataset_sizes={
+            "TestDataset": 269,
+        },
+        subject_ids=["TestSubject"],
+        use_sub_block=True,
+        use_data_block=True,
     ).cuda()
 
-    x = torch.randn(1, 300, 90).cuda() # [B, C, T]
+    x = torch.randn(1, 269, 90).cuda() # [B, C, T]
     dataset_id = "TestDataset"
     subject_id = "TestSubject"
 
