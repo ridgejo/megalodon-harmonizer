@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from vector_quantize_pytorch import VectorQuantize
+from vector_quantize_pytorch import VectorQuantize, FSQ
 from encodec import EncodecModel
 
 from models.dataset_layer import DatasetLayer
@@ -19,21 +19,20 @@ def _make_ch_vqvae(sampling_rate, vq_dim, codebook_size, shared_dim, temporal_di
 
     # TODO: Update to use SEANet style encoder/decoder setup
     temporal_encoder = TemporalEncoder(
-        ch_in_dim=128,
+        ch_in_dim=temporal_dim,
         hidden_dim=hidden_dim,
         ch_out_dim=temporal_dim,
     )
     temporal_decoder = TemporalDecoder(
-        ch_in_dim=128,
+        ch_in_dim=temporal_dim,
         hidden_dim=hidden_dim,
         ch_out_dim=temporal_dim,
     )
 
-
     quantizer = VectorQuantize(
         dim=vq_dim,
         codebook_size=codebook_size,
-        # codebook_dim=16,
+        codebook_dim=16,
         use_cosine_sim=True,
         threshold_ema_dead_code=2,
         kmeans_init=True,
@@ -297,7 +296,9 @@ class ChVQVAE(nn.Module):
         # x = x.squeeze(2)
         B, C, S, T = x.shape
         x = x.flatten(start_dim=2, end_dim=3)
+
         quantized, codes, commit_loss = self.quantizer(x.permute(0, 2, 1))
+
         x = quantized.permute(0, 2, 1)
         # x = x.unsqueeze(2)
         x = x.unflatten(2, (S, T))

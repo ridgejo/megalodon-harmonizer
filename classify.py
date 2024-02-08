@@ -16,6 +16,7 @@ import yaml
 import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
 from models.lstm_classifier import _make_lstm_classifier
+from models.transformer_classifier import _make_transformer_classifier
 from models.lstm_seq import _make_lstm_seq
 from models.full_epoch_classifier import _make_full_epoch_classifier
 
@@ -90,6 +91,17 @@ if config["data"]["label_type"] in ["voiced"]:
             hidden_dim=config["model"]["lstm"]["hidden_dim"],
             num_layers=config["model"]["lstm"]["num_layers"],
             output_classes=config["model"]["lstm"]["output_classes"],
+        ).cuda()
+    elif "transformer" in config["model"]:
+        model = _make_transformer_classifier(
+            dataset_sizes=config["data"]["dataset_sizes"],
+            use_data_block="data_block" in config["model"]["transformer"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["transformer"],
+            feature_dim=config["model"]["transformer"]["feature_dim"],
+            hidden_dim=config["model"]["transformer"]["hidden_dim"],
+            num_layers=config["model"]["transformer"]["num_layers"],
+            output_classes=config["model"]["transformer"]["output_classes"],
         ).cuda()
     elif "full_epoch" in config["model"]:
         model = _make_full_epoch_classifier(

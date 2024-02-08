@@ -151,7 +151,7 @@ def _load_gwilliams_2022(
 
     # Determined via visual inspection
     bad_subjects = [
-        "18", "19", "22", 
+        "18", "19", "22", "20",
     ]
 
     if not debug:

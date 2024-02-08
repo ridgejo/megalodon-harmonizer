@@ -1,6 +1,7 @@
 """MOUS dataset dataloader."""
 
 import gc
+import mne
 
 from torch.utils.data import Dataset
 
@@ -316,6 +317,11 @@ class Schoffelen2019(Dataset):
             session=None,
             preproc_config=preproc_config,
         )
+
+        picks = mne.pick_types(
+            raw.info, meg=True, eeg=False, stim=False, eog=False, ecg=False
+        )[:273] #[28: (28 + 273)]
+        raw = raw.pick(picks)
 
         self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(raw, slice_len)
         self.num_slices = len(self.valid_indices)
