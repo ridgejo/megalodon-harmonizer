@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import textgrid
+import ast
 
 ARPABET = [
     "AA",
@@ -164,6 +165,75 @@ def get_vad_labels(events, raw, offset=0.0):
     # Warning: labels may need to be downsampled later (e.g. if encoded). Deal with label downsampling online (scipy?)
 
     return labels
+
+def get_vad_labels_gwilliams(events, raw, offset=0.0):
+
+    sample_freq = raw.info["sfreq"]
+    offset_samples = int(sample_freq * offset)
+
+    word_events = events[["'kind': 'word'" in trial_type for trial_type in list(events["trial_type"])]]
+    labels = np.zeros(len(raw))
+    for i, word_event in word_events.iterrows():
+        onset = float(word_event["onset"])
+        duration = float(word_event["duration"])
+        t_start = (
+            int(onset * sample_freq) + offset_samples
+        )  # Delay labels so they occur at same time as brain response
+        t_end = int((onset + duration) * sample_freq) + offset_samples
+        labels[t_start : t_end + 1] = 1.0
+
+    return labels
+
+
+def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
+
+    sample_freq = raw.info["sfreq"]
+    offset_samples = int(sample_freq * offset)
+
+    # Filter events with phoneme labels
+    phoneme_events = events[["'kind': 'phoneme'" in trial_type for trial_type in list(events["trial_type"])]]
+    
+    phoneme_onsets = []
+    labels = []
+
+    bad_segments = 0
+    for i, phoneme_event in phoneme_events.iterrows():
+        trial_type = ast.literal_eval(phoneme_event["trial_type"])
+
+        phoneme = trial_type["phoneme"].split("_")[0] # Remove BIE indicators
+        onset_samples = int(float(phoneme_event["onset"]) * sample_freq)
+        duration_samples = int(float(phoneme_event["duration"]) * sample_freq)
+        phonation = phoneme_codes[phoneme_codes["phoneme"] == phoneme]["phonation"].item()
+
+        # Check that we're not in a bad segment
+        bad_phoneme = False
+        for annot in raw.annotations:
+            if "bad_segment" in annot["description"]:
+                bad_onset = int(sample_freq * annot["onset"])
+                bad_samples = int(sample_freq * annot["duration"])
+                phone_end = onset_samples + duration_samples
+                # Check phoneme onset is not in a bad segment
+                if (onset_samples >= bad_onset) and ( onset_samples <= (bad_onset + bad_samples) ):
+                    bad_phoneme = True
+                elif (phone_end >= bad_onset) and ( phone_end <= (bad_onset + bad_samples) ):
+                    bad_phoneme = True
+        if bad_phoneme:
+            bad_segments += 1
+            continue
+
+        # Label as voiced or unvoiced
+        if phonation == "v":
+            labels.append(1.0)
+            phoneme_onsets.append(onset_samples)
+        elif phonation == "uv":
+            labels.append(0.0)
+            phoneme_onsets.append(onset_samples)
+
+    print(f"Found {bad_segments} (out of {len(phoneme_onsets) + bad_segments}) phonemes in bad segments while computing phoneme label onsets")
+
+    return phoneme_onsets, labels
+
+
 
 
 def get_voiced_labels(events, raw, offset=0.0):

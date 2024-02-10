@@ -10,6 +10,7 @@ import dataloaders.data_utils as data_utils
 from dataloaders.armeni2022 import Armeni2022
 from dataloaders.armeni2022_labelled import Armeni2022Labelled
 from dataloaders.gwilliams2022 import Gwilliams2022
+from dataloaders.gwilliams2022_labelled import Gwilliams2022Labelled
 from dataloaders.schoffelen2019 import Schoffelen2019
 
 
@@ -152,7 +153,7 @@ def _load_gwilliams_2022(
     # Determined via visual inspection
     bad_subjects = [
         "18", "19", "22", "20",
-    ]
+    ] + exclude_subjects
 
     if not debug:
         n_subjects = 27
@@ -178,13 +179,23 @@ def _load_gwilliams_2022(
                 task = str(task)
 
                 try:
-                    data = Gwilliams2022(
-                        subject_id=subject,
-                        session=session,
-                        task=task,
-                        slice_len=slice_len,
-                        preproc_config=preproc_config,
-                    )
+                    if labels:
+                        data = Gwilliams2022Labelled(
+                            subject_id=subject,
+                            session=session,
+                            task=task,
+                            slice_len=slice_len,
+                            preproc_config=preproc_config,
+                            label_type=labels,
+                        )
+                    else:
+                        data = Gwilliams2022(
+                            subject_id=subject,
+                            session=session,
+                            task=task,
+                            slice_len=slice_len,
+                            preproc_config=preproc_config,
+                        )
                 except Exception as e:
                     print("Skipping: ", e)
                     continue  # Subject may not have completed task or session

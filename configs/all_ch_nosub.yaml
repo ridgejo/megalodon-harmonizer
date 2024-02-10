@@ -50,5 +50,5 @@ model:
     shared_dim: 300
     temporal_dim: 128
     hidden_dim: 256 # Must be 2x temporal dim
-    sub_block:
+    # sub_block:
     data_block:

@@ -205,51 +205,51 @@ class ChVQVAE(nn.Module):
             nn.Conv2d(
                 in_channels=ch_dim,
                 out_channels=ch_dim,
-                kernel_size=(20, 1),
-                stride=(10, 1),
+                kernel_size=(60, 1), # 20, 1
+                stride=(30, 1), # 10, 1
             ),
             nn.ELU(alpha=1.0),
         )
 
-        # 29 -> 1
-        self.spatial_fuse1 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=ch_dim * 2,
-                out_channels=ch_dim * 4,
-                kernel_size=1,
-            ),
-            nn.ELU(alpha=1.0),
-            nn.Conv2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(29, 1),
-            ),
-            nn.ELU(alpha=1.0),
-        )
+        # # 29 -> 1
+        # self.spatial_fuse1 = nn.Sequential(
+        #     # nn.Conv2d(
+        #     #     in_channels=ch_dim * 2,
+        #     #     out_channels=ch_dim * 2,
+        #     #     kernel_size=1,
+        #     # ),
+        #     # nn.ELU(alpha=1.0),
+        #     nn.Conv2d(
+        #         in_channels=ch_dim * 2,
+        #         out_channels=ch_dim * 2,
+        #         kernel_size=(29, 1),
+        #     ),
+        #     nn.ELU(alpha=1.0),
+        # )
 
-        # 1 -> 29
-        self.spatial_unfuse1 = nn.Sequential(
-            nn.ConvTranspose2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 4,
-                kernel_size=(29, 1),
-            ),
-            nn.ELU(alpha=1.0),
-            nn.Conv2d(
-                in_channels=ch_dim * 4,
-                out_channels=ch_dim * 2,
-                kernel_size=1,
-            ),
-            nn.ELU(alpha=1.0),
-        )
+        # # 1 -> 29
+        # self.spatial_unfuse1 = nn.Sequential(
+        #     nn.ConvTranspose2d(
+        #         in_channels=ch_dim * 2,
+        #         out_channels=ch_dim * 2,
+        #         kernel_size=(29, 1),
+        #     ),
+        #     nn.ELU(alpha=1.0),
+        #     # nn.Conv2d(
+        #     #     in_channels=ch_dim * 2,
+        #     #     out_channels=ch_dim * 2,
+        #     #     kernel_size=1,
+        #     # ),
+        #     # nn.ELU(alpha=1.0),
+        # )
 
         # 29 -> 300
         self.spatial_unfuse30 = nn.Sequential(
             nn.ConvTranspose2d(
                 in_channels=ch_dim,
                 out_channels=ch_dim,
-                kernel_size=(20, 1),
-                stride=(10, 1),
+                kernel_size=(60, 1),
+                stride=(30, 1),
             ),
             nn.ELU(alpha=1.0),
             nn.Conv2d(
@@ -293,14 +293,12 @@ class ChVQVAE(nn.Module):
 
         # # Vector quantization
         x = self.pre_vq(x)
-        # x = x.squeeze(2)
         B, C, S, T = x.shape
         x = x.flatten(start_dim=2, end_dim=3)
 
         quantized, codes, commit_loss = self.quantizer(x.permute(0, 2, 1))
 
         x = quantized.permute(0, 2, 1)
-        # x = x.unsqueeze(2)
         x = x.unflatten(2, (S, T))
         x = self.post_vq(x)
 
