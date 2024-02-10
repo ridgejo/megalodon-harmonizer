@@ -19,6 +19,7 @@ from models.lstm_classifier import _make_lstm_classifier
 from models.transformer_classifier import _make_transformer_classifier
 from models.lstm_seq import _make_lstm_seq
 from models.full_epoch_classifier import _make_full_epoch_classifier
+from models.brain_encoders.ch_vqvae import _make_ch_vqvae
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-phonemes",
@@ -68,6 +69,34 @@ train_sampler, test_sampler, scalers = load_pretraining_data(
 )
 
 print(f"Loaded train : test ({len(train_sampler)}, {len(test_sampler)})")
+
+# load tokenizer if given
+use_tokenizer = False
+if "tokenizer" in config:
+    use_tokenizer = True
+    if "ch" in config["tokenizer"]:
+        first_ds = next(iter(config["data"]["preproc_config"].keys()))
+        tokenizer = _make_ch_vqvae(
+            sampling_rate=config["data"]["preproc_config"][first_ds]["resample"],
+            vq_dim=config["model"]["ch"]["vq_dim"],
+            codebook_size=config["model"]["ch"]["codebook_size"],
+            shared_dim=config["model"]["ch"]["shared_dim"],
+            temporal_dim=config["model"]["ch"]["temporal_dim"],
+            hidden_dim=config["model"]["ch"]["hidden_dim"],
+            dataset_sizes=config["data"]["dataset_sizes"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["ch"],
+            use_data_block="data_block" in config["model"]["ch"],
+        )
+
+    if "state_dict" in config["tokenizer"]:
+        tokenizer.load_state_dict(torch.load(config["tokenizer"]["state_dict"]))
+        # Freeze tokenizer if weights are loaded, if not, assume we want to train alongside classifier.
+        for param in tokenizer.parameters():
+            param.requires_grad = False
+    
+    tokenizer = tokenizer.to(args.device)
+
 
 # load model
 subjects = []
@@ -152,6 +181,9 @@ for epoch in range(num_epochs):
         x = torch.from_numpy(x).cuda().float()
         label = label.cuda()
 
+        if use_tokenizer:
+            x, _codes, _commit_loss, _S, _T = tokenizer.encode(x, dataset_id, subject_id)
+
         y_hat, loss = model(x, label, dataset_id, subject_id)
 
         loss["loss"].backward()
@@ -189,6 +221,8 @@ for epoch in range(num_epochs):
                     x = scalers[data_utils.get_scaler_hash(batch)](x)
                     x = torch.from_numpy(x).cuda().float()
                     label = label.cuda()
+                    if use_tokenizer:
+                        x, _codes, _commit_loss, _S, _T = tokenizer.encode(x, dataset_id, subject_id)
                     y_hat, test_loss = model(x, label, dataset_id, subject_id)
                     test_losses.update(test_loss)
 

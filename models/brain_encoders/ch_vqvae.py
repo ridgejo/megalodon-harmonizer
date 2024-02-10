@@ -273,10 +273,8 @@ class ChVQVAE(nn.Module):
         )
 
         self.quantizer = quantizer
-
-    def forward(self, x, dataset_id, subject_id):
-
-        original_x = x.clone() # [B, S, T]
+    
+    def encode(self, x, dataset_id, subject_id):
 
         x = self.dataset_layer(x, dataset_id)
         x = self.subject_block(x, subject_id)
@@ -289,21 +287,19 @@ class ChVQVAE(nn.Module):
         # Apply temporal encoder [B, C, S, T @ 250Hz] -> [B, C, S, T @ ~62Hz]
         x = self.temporal_encoder(x) # (C = 256)
 
-        # x = self.spatial_fuse1(x) # S = 29 -> S = 1 (C = 512)
-
         # # Vector quantization
         x = self.pre_vq(x)
         B, C, S, T = x.shape
         x = x.flatten(start_dim=2, end_dim=3)
-
         quantized, codes, commit_loss = self.quantizer(x.permute(0, 2, 1))
+        quantized = quantized.permute(0, 2, 1)
 
-        x = quantized.permute(0, 2, 1)
+        return quantized, codes, commit_loss, S, T
+
+    def decode(self, x, dataset_id, subject_id, S, T):
+
         x = x.unflatten(2, (S, T))
         x = self.post_vq(x)
-
-        # Expand in spatial dimension
-        # x = self.spatial_unfuse1(x) # S = 1 -> S = 29
 
         # Expand in temporal dimension
         x = self.temporal_decoder(x)
@@ -314,6 +310,16 @@ class ChVQVAE(nn.Module):
         x = self.subject_block.decode(x, subject_id)
         x = self.dataset_layer.decode(x, dataset_id)
 
+        return x
+
+    def forward(self, x, dataset_id, subject_id):
+
+        original_x = x.clone() # [B, S, T]
+
+        quantized, codes, commit_loss, S, T = self.encode(x, dataset_id, subject_id)
+
+        x = self.decode(quantized, dataset_id, subject_id, S, T)
+        
         # Compute losses
         recon_loss = F.mse_loss(original_x, x)
         loss = {
