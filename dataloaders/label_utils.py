@@ -72,7 +72,6 @@ def read_textgrid(bids_root, subject_id, session, events):
         bids_root / f"adventuresofsherlockholmes_{session[1:]}_doyle_64kb.TextGrid"
     )
 
-    # warning: Sessions 003-009 have not been checked.
     session_timing = {
         "001": {
             "start": 13,
@@ -116,14 +115,43 @@ def read_textgrid(bids_root, subject_id, session, events):
         },
     }
 
-    true_start = events[["word_onset" in c for c in list(events["type"])]]
-    true_start = true_start[[v != "sp" for v in list(true_start["value"])]]
+    # warning: one of the sessions has a script crash error. ignore that session.
+
+    # Align the labels with the recording, including the long periods of silence.
+    word_events = events[["word_onset" in c for c in list(events["type"])]]
+    gaps = word_events["onset"] - (word_events["onset"] + word_events["duration"]).shift()
+    gaps = gaps.sort_values(ascending=False)
+    gaps = gaps[gaps > 10]
+    gaps = gaps.sort_index()
+
+    # Get onset of gap and insert a marker that's the corresponding length of silence. Then labels will be aligned.
+
+    # Step 1. Align start points of brain recording and force-aligned labels
+    true_start = word_events[[v != "sp" for v in list(word_events["value"])]]
     true_start = float(true_start.iloc[0]["onset"])
+    
+    # This is measured in markers
     start, end = session_timing[session]["start"], session_timing[session]["end"]
+    session_markers = grid[0][start : end + 1]
 
-    return grid[0][start : end + 1], true_start # Return intervals in tier zero
+    # Step 2. Align existing markers to position in brain recording
+    marker_start = session_markers[0].minTime
+    for i in range(len(session_markers)):
 
-def get_vad_labels_from_textgrid(tier, brain_start, raw, offset=0.0):
+
+        # Compute appropriate delay to add
+        delay = 0.0
+        for idx, gap in zip(gaps.index, gaps):
+            t_start = events.loc[idx - 4]["onset"]
+            if session_markers[i].minTime - marker_start + true_start + delay > t_start:
+                delay += gap
+
+        session_markers[i].minTime = session_markers[i].minTime - marker_start + true_start + delay
+        session_markers[i].maxTime = session_markers[i].maxTime - marker_start + true_start + delay
+
+    return session_markers # Return intervals in tier zero
+
+def get_vad_labels_from_textgrid(tier, raw, offset=0.0):
 
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
@@ -131,8 +159,8 @@ def get_vad_labels_from_textgrid(tier, brain_start, raw, offset=0.0):
 
     labels = np.zeros(len(raw))
     for event in tier:
-        onset = float(event.minTime) - grid_start + brain_start
-        offset = float(event.maxTime) - grid_start + brain_start
+        onset = float(event.minTime)
+        offset = float(event.maxTime)
 
         t_start = int(onset * sample_freq + offset_samples)
         t_end = int(offset * sample_freq + offset_samples)
@@ -151,7 +179,7 @@ def get_vad_labels(events, raw, offset=0.0):
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
 
-    phoneme_events = events[["phoneme_onset" in c for c in list(events["type"])]]
+    phoneme_events = events[["word_onset" in c for c in list(events["type"])]]
     labels = np.zeros(len(raw))
     for i, phoneme_event in phoneme_events.iterrows():
         onset = float(phoneme_event["onset"])
@@ -161,8 +189,6 @@ def get_vad_labels(events, raw, offset=0.0):
         )  # Delay labels so they occur at same time as brain response
         t_end = int((onset + duration) * sample_freq) + offset_samples
         labels[t_start : t_end + 1] = 1.0
-
-    # Warning: labels may need to be downsampled later (e.g. if encoded). Deal with label downsampling online (scipy?)
 
     return labels
 

@@ -96,7 +96,7 @@ if __name__ == "__main__":
         subject_id="01",
         task="1",
         session="0",
-        slice_len=100.0,
+        slice_len=1000.0,
         preproc_config={
             "filtering": True,
             "resample": 250,
@@ -123,4 +123,4 @@ if __name__ == "__main__":
     axes[1].plot(times, labels)
     plt.xlabel("Time (s)")
     plt.ylabel("Amplitude")
-    plt.savefig("gwi_vad.png")
+    plt.savefig("gwilliams_vad.png")

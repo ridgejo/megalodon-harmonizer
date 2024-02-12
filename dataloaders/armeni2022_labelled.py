@@ -56,54 +56,19 @@ class Armeni2022Labelled(Dataset):
             task=task,
         )
         
-        textgrid, brain_start = label_utils.read_textgrid(
+        textgrid = label_utils.read_textgrid(
             bids_root=bids_root,
             subject_id=subject_id,
             session=session,
             events=events,
         )
 
-        if not preprocessed:
-            # Subject 3 suffers from unstable channels... remove during preprocessing
-            bad_channels = ["MRC23", "MLO22", "MRP5", "MLC23"]
-
-            # Armeni MEG channels are named starting with an "M"
-            meg_channels = [
-                ch_name
-                for ch_name in raw.ch_names
-                if ch_name.startswith("M") and ch_name not in bad_channels
-            ]
-
-            # All channels are gradiometer channels (I think?)
-            raw.set_channel_types(
-                dict(zip(meg_channels, ["grad" for _ in meg_channels]))
-            )
-
-            raw = data_utils.preprocess(
-                raw=raw,
-                preproc_config=preproc_config,
-                channels=meg_channels,
-                cache_path=cache_path,
-            )
-
-            del raw
-            gc.collect()
-            # Lazy read after preprocessing
-            raw, _, _ = data_utils.load_dataset(
-                bids_root=None,
-                subject_id=None,
-                task=None,
-                session=None,
-                preproc_config=None,
-                cache_path=cache_path,
-            )
-
-        self.num_slices, self.samples_per_slice = data_utils.get_slice_stats(
-            raw, slice_len
-        )
+        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(raw, slice_len)
+        self.num_slices = len(self.valid_indices)
 
         if label_type == "vad":
-            self.labels = label_utils.get_vad_labels_from_textgrid(textgrid, brain_start, raw)
+            self.labels = label_utils.get_vad_labels_from_textgrid(textgrid, raw)
+            # self.labels = label_utils.get_vad_labels(events, raw)
         elif label_type == "voiced":
             self.phoneme_onsets, self.labels = label_utils.get_voiced_labels(
                 events, raw
@@ -148,13 +113,13 @@ if __name__ == "__main__":
         subject_id="001",
         session="001",
         task="compr",
-        slice_len=100,#0.3,  # 5
+        slice_len=1000,#0.3,  # 5
         preproc_config={
             "filtering": True,
-            "resample": 300,
-            "notch_freqs": [50, 100, 150],
+            "resample": 250,
+            "notch_freqs": [50, 100],
             "bandpass_lo": 0.5,
-            "bandpass_hi": 150,
+            "bandpass_hi": 125,
         },
         label_type="vad",
     )
@@ -168,7 +133,7 @@ if __name__ == "__main__":
     # plt.savefig("voiced_labels.png")
     # print(np.histogram(all_labels))
 
-    data, labels, times, dataset, subject = test_dataset[0]  # 35-40s (7)
+    data, labels, times, identifiers = test_dataset[0]  # 35-40s (7)
     fig, axes = plt.subplots(nrows=2, ncols=1)
     for channel in data:
         axes[0].plot(times, channel)
@@ -176,4 +141,4 @@ if __name__ == "__main__":
     plt.xlabel("Time (s)")
     plt.ylabel("Amplitude")
 
-    plt.savefig("armeni.png")
+    plt.savefig("armeni_vad.png")
