@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from sklearn.metrics import balanced_accuracy_score, f1_score
 
 from models.dataset_layer import DatasetLayer
@@ -75,6 +76,10 @@ class LSTMClassifier(nn.Module):
         preds = self.act(logits)
 
         if self.output_classes == 2:
+
+            # Compute batch R-Score between probabilistic output and actual label
+            r_score = np.corrcoef(preds.detach().cpu(), labels.cpu())[0, 1]
+
             loss = F.binary_cross_entropy_with_logits(
                 logits,
                 labels,
@@ -83,6 +88,10 @@ class LSTMClassifier(nn.Module):
             acc = balanced_accuracy_score(labels.cpu(), preds.detach().cpu())
             f1 = f1_score(labels.cpu(), preds.detach().cpu())
         else:
+            
+            # Can't compute r-score if multiple classes
+            r_score = 0.0
+
             loss = F.cross_entropy(
                 logits,
                 labels,
@@ -95,14 +104,17 @@ class LSTMClassifier(nn.Module):
             "loss": loss,
             "balanced_accuracy": acc,
             "f1_score": f1,
+            "r_score": r_score,
             f"D_{dataset_id}": 1,
             f"D_{dataset_id}_loss": loss,
             f"D_{dataset_id}_balanced_accuracy": acc,
             f"D_{dataset_id}_f1_score": f1,
+            f"D_{dataset_id}_r_score": r_score,
             f"S_{dataset_id}_{subject_id}": 1,
             f"S_{dataset_id}_{subject_id}_loss": loss,
             f"S_{dataset_id}_{subject_id}_balanced_accuracy": acc,
             f"S_{dataset_id}_{subject_id}_f1_score": f1,
+            f"S_{dataset_id}_{subject_id}_r_score": r_score,
         }
 
         return preds, loss

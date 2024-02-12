@@ -12,6 +12,8 @@ import numpy as np
 import torch
 import wandb
 import yaml
+import torch.nn.functional as F
+
 
 import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
@@ -70,35 +72,6 @@ train_sampler, test_sampler, scalers = load_pretraining_data(
 
 print(f"Loaded train : test ({len(train_sampler)}, {len(test_sampler)})")
 
-# load tokenizer if given
-use_tokenizer = False
-if "tokenizer" in config:
-    use_tokenizer = True
-    if "ch" in config["tokenizer"]:
-        first_ds = next(iter(config["data"]["preproc_config"].keys()))
-        tokenizer = _make_ch_vqvae(
-            sampling_rate=config["data"]["preproc_config"][first_ds]["resample"],
-            vq_dim=config["model"]["ch"]["vq_dim"],
-            codebook_size=config["model"]["ch"]["codebook_size"],
-            shared_dim=config["model"]["ch"]["shared_dim"],
-            temporal_dim=config["model"]["ch"]["temporal_dim"],
-            hidden_dim=config["model"]["ch"]["hidden_dim"],
-            dataset_sizes=config["data"]["dataset_sizes"],
-            subject_ids=subjects,
-            use_sub_block="sub_block" in config["model"]["ch"],
-            use_data_block="data_block" in config["model"]["ch"],
-        )
-
-    if "state_dict" in config["tokenizer"]:
-        tokenizer.load_state_dict(torch.load(config["tokenizer"]["state_dict"]))
-        # Freeze tokenizer if weights are loaded, if not, assume we want to train alongside classifier.
-        for param in tokenizer.parameters():
-            param.requires_grad = False
-    
-    tokenizer = tokenizer.to(args.device)
-
-
-# load model
 subjects = []
 for k in config["data"]["preproc_config"].keys():
     subjects.extend(
@@ -108,6 +81,38 @@ for k in config["data"]["preproc_config"].keys():
         ]
     )
 
+# load tokenizer if given
+use_tokenizer = False
+if "tokenizer" in config:
+    use_tokenizer = True
+    if "ch" in config["tokenizer"]:
+        first_ds = next(iter(config["data"]["preproc_config"].keys()))
+        tokenizer = _make_ch_vqvae(
+            sampling_rate=config["data"]["preproc_config"][first_ds]["resample"],
+            vq_dim=config["tokenizer"]["ch"]["vq_dim"],
+            codebook_size=config["tokenizer"]["ch"]["codebook_size"],
+            shared_dim=config["tokenizer"]["ch"]["shared_dim"],
+            temporal_dim=config["tokenizer"]["ch"]["temporal_dim"],
+            hidden_dim=config["tokenizer"]["ch"]["hidden_dim"],
+            dataset_sizes=config["data"]["dataset_sizes"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["tokenizer"]["ch"],
+            use_data_block="data_block" in config["tokenizer"]["ch"],
+        )
+
+    if "state_dict" in config["tokenizer"]:
+
+        # warning: strict=False used to ignore unexpected keys for additional tokenizer datasets
+        tokenizer.load_state_dict(torch.load(config["tokenizer"]["state_dict"]), strict=False)
+
+        # Freeze tokenizer if weights are loaded, if not, assume we want to train alongside classifier.
+        for param in tokenizer.parameters():
+            param.requires_grad = False
+    
+    tokenizer = tokenizer.cuda()
+
+
+# load model
 if config["data"]["label_type"] in ["voiced"]:
 
     if "lstm" in config["model"]:
@@ -179,10 +184,16 @@ for epoch in range(num_epochs):
 
         x = scalers[data_utils.get_scaler_hash(batch)](x)
         x = torch.from_numpy(x).cuda().float()
+
         label = label.cuda()
 
         if use_tokenizer:
+            # [B, C, T] -> [B, E, Q]
             x, _codes, _commit_loss, _S, _T = tokenizer.encode(x, dataset_id, subject_id)
+
+            # Resample label if sequence labelling
+            if config["data"]["label_type"] in ["vad"]:
+                label = F.interpolate(label.unsqueeze(1), size=x.shape[-1]).squeeze(1)
 
         y_hat, loss = model(x, label, dataset_id, subject_id)
 
@@ -223,6 +234,8 @@ for epoch in range(num_epochs):
                     label = label.cuda()
                     if use_tokenizer:
                         x, _codes, _commit_loss, _S, _T = tokenizer.encode(x, dataset_id, subject_id)
+                        if config["data"]["label_type"] in ["vad"]:
+                            label = F.interpolate(label.unsqueeze(1), size=x.shape[-1]).squeeze(1)
                     y_hat, test_loss = model(x, label, dataset_id, subject_id)
                     test_losses.update(test_loss)
 

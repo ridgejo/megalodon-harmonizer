@@ -21,7 +21,7 @@ data:
       standard_scaler:
 
   dataset_sizes:
-    Armeni2022: 266
+    Armeni2022: 269
   
   preproc_config:
     armeni2022:
@@ -33,7 +33,7 @@ data:
 
 model:
   lstm:
-    feature_dim: 266
+    feature_dim: 269
     hidden_dim: 128
     num_layers: 2
     output_classes: 2

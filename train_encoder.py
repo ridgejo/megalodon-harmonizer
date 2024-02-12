@@ -23,6 +23,13 @@ from models.brain_encoders.temp_spatial_vqvae import _make_temp_spatial_vqvae
 from models.brain_encoders.attention_vqvae import _make_attention_vqvae
 from models.brain_encoders.ch_vqvae import _make_ch_vqvae
 
+def pp_stats(stats):
+    for k, v in stats.items():
+        if torch.is_tensor(v):
+            print(f"{k:<40}{round(v.item(), 5):>5}")
+        else:
+            print(f"{k:<40}{round(v, 5):>5}")
+
 parser = argparse.ArgumentParser(
     prog="MEGalodon-encoder",
     description="Train a tokenizer to encode brain signals",
@@ -170,6 +177,9 @@ for epoch in range(num_epochs):
 
         # Log data in iterations due to huge amount of data in use.
         if iteration != 0 and iteration % iter_update_freq == 0:
+
+            iter_time = time.perf_counter() - start
+
             for k in train_losses:
                 if k.startswith("D_"):
                     if "loss" in k:
@@ -183,6 +193,7 @@ for epoch in range(num_epochs):
                 else:
                     train_losses[k] /= iter_update_freq
 
+            eval_start = time.perf_counter()
             with torch.no_grad():
                 train_fig, test_fig = None, None
                 test_losses = Counter()
@@ -222,6 +233,9 @@ for epoch in range(num_epochs):
 
                 test_losses = {f"test_{k}": v for k, v in test_losses.items()}
 
+                eval_time = time.perf_counter() - eval_start
+
+                plot_start = time.perf_counter()
                 if (not args.debug) or (
                     args.debug and (epoch % (iter_update_freq * 5) == 0)
                 ):
@@ -282,12 +296,16 @@ for epoch in range(num_epochs):
 
                         train_axes[0, j].set_title(dataset_id)
 
+                plot_time = time.perf_counter() - plot_start
+
             print()
             print(
-                f"Epoch {round(iteration / len(train_sampler), 2)} Iter {iteration}/{num_epochs * len(train_sampler)}"
+                f"Epoch {round(iteration / len(train_sampler), 2)}/{num_epochs} Iter {iteration}/{num_epochs * len(train_sampler)}"
             )
-            print(train_losses)
-            print(test_losses)
+            print("\n==== Train ====")
+            pp_stats(train_losses)
+            print("\n==== Test ====")
+            pp_stats(test_losses)
             print()
 
             torch.save(model.state_dict(), exp_folder / f"{iteration}.pt")
@@ -298,7 +316,9 @@ for epoch in range(num_epochs):
                     "epoch": iteration / len(train_sampler),
                     **train_losses,
                     **test_losses,
-                    "epoch_time": time.perf_counter() - start,
+                    "iter_time": iter_time,
+                    "eval_time": eval_time,
+                    "plot_time": plot_time,
                     "train_recon": wandb.Image(train_fig) if train_fig else None,
                     "test_recon": wandb.Image(test_fig) if test_fig else None,
                 }

@@ -12,7 +12,7 @@ data:
   train_ratio: 0.95
   batch_size: 32
   label_type: "voiced"
-  exclude_subjects: ["002", "003"]
+  exclude_subjects: []
 
   norm:
     n_sample_batches: 8
@@ -21,10 +21,10 @@ data:
       standard_scaler:
 
   dataset_sizes:
-    Armeni2022: 266
+    Gwilliams2022: 208
   
   preproc_config:
-    armeni2022:
+    gwilliams2022:
       filtering: True
       resample: 250
       notch_freqs: [50, 100]
@@ -33,7 +33,7 @@ data:
 
 model:
   lstm:
-    feature_dim: 266
+    feature_dim: 208
     hidden_dim: 128
     num_layers: 2
     output_classes: 2

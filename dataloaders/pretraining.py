@@ -63,7 +63,7 @@ def load_pretraining_data(
     norm_config,
     debug=False,
     labels=None,
-    exclude_subjects=None,
+    exclude_subjects=[],
 ):
     """Loads all pretraining data.
 
@@ -111,6 +111,13 @@ def load_pretraining_data(
         else:
             train_size = int(len(dataset) * train_ratio)
             test_size = len(dataset) - train_size
+
+            # Make test size large enough to fit at least a single batch if too small.
+            # warning: enforces that each session, task, and subject has at least one batch of test data
+            if test_size < batch_size:
+                train_size = len(dataset) - batch_size
+                test_size = batch_size
+
             train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
         train_datasets.append(train_dataset)
         test_datasets.append(test_dataset)
@@ -119,10 +126,13 @@ def load_pretraining_data(
         DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
         for dataset in train_datasets
     ]
+
     test_dataloaders = [
         DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=True)
         for dataset in test_datasets
     ]
+
+    # TODO: Reduce test data to required amount?
 
     print("Fitting scalers")
     scalers = {}
@@ -145,7 +155,7 @@ def load_pretraining_data(
 
 
 def _load_gwilliams_2022(
-    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=None
+    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=[]
 ):
     seconds = 0
     datasets = []
@@ -212,7 +222,7 @@ def _load_gwilliams_2022(
 
 
 def _load_schoffelen_2019(
-    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=None
+    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=[]
 ):
     seconds = 0
     datasets = []
@@ -226,7 +236,7 @@ def _load_schoffelen_2019(
     no_subject += [2112, 2115, 2118, 2123]
 
     # Determined via std. dev. rejection
-    reject = ['A2101', 'V1081', 'A2077', 'A2020', 'A2071', 'V1084', 'A2104', 'A2090', 'A2005', 'A2035', 'V1113', 'A2069', 'V1080', 'A2061', 'A2016', 'V1086', 'A2078', 'A2108', 'A2097', 'A2095', 'A2038', 'A2009', 'A2013', 'A2099', 'A2070', 'A2052', 'V1097', 'V1104', 'A2057', 'A2098', 'A2068', 'A2042', 'A2096', 'A2040', 'V1074']
+    reject = ['A2101', 'V1081', 'A2077', 'A2020', 'A2071', 'V1084', 'A2104', 'A2090', 'A2005', 'A2035', 'V1113', 'A2069', 'V1080', 'A2061', 'A2016', 'V1086', 'A2078', 'A2108', 'A2097', 'A2095', 'A2038', 'A2009', 'A2013', 'A2099', 'A2070', 'A2052', 'V1097', 'V1104', 'A2057', 'A2098', 'A2068', 'A2042', 'A2096', 'A2040', 'V1074'] + exclude_subjects
 
     # Note: "V" subjects read the stimuli, while "A" subjects heard it
     subjects = sorted(
@@ -280,15 +290,12 @@ def _load_schoffelen_2019(
 
 
 def _load_armeni_2022(
-    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=None
+    slice_len, preproc_config, debug=False, labels=None, exclude_subjects=[]
 ):
     seconds = 0
     datasets = []
 
-    if exclude_subjects:
-        bad_subjects = exclude_subjects
-    else:
-        bad_subjects = []
+    bad_subjects = exclude_subjects
 
     bad_sessions = {
         "001": [],

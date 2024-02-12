@@ -11,8 +11,8 @@ data:
   slice_len: 0.3
   train_ratio: 0.95
   batch_size: 32
-  label_type: "voiced"
-  exclude_subjects: ["002", "003"]
+  label_type: "vad"
+  exclude_subjects: []
 
   norm:
     n_sample_batches: 8
@@ -21,19 +21,29 @@ data:
       standard_scaler:
 
   dataset_sizes:
-    Armeni2022: 266
+    Gwilliams2022: 208
   
   preproc_config:
-    armeni2022:
+    gwilliams2022:
       filtering: True
       resample: 250
       notch_freqs: [50, 100]
       bandpass_lo: 0.5
       bandpass_hi: 125
 
+tokenizer:
+  ch:
+    vq_dim: 64
+    codebook_size: 1024
+    shared_dim: 300
+    temporal_dim: 128
+    hidden_dim: 256 # Must be 2x temporal dim
+    data_block:
+  state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240212-133607_lunar-kumquat-237/4600.pt"
+
 model:
   lstm:
-    feature_dim: 266
+    feature_dim: 64
     hidden_dim: 128
     num_layers: 2
     output_classes: 2
