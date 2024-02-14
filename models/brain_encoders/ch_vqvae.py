@@ -287,7 +287,7 @@ class ChVQVAE(nn.Module):
         # Apply temporal encoder [B, C, S, T @ 250Hz] -> [B, C, S, T @ ~62Hz]
         x = self.temporal_encoder(x) # (C = 256)
 
-        # # Vector quantization
+        # Vector quantization
         x = self.pre_vq(x)
         B, C, S, T = x.shape
         x = x.flatten(start_dim=2, end_dim=3)

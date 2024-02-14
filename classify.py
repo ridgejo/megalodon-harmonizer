@@ -14,12 +14,14 @@ import wandb
 import yaml
 import torch.nn.functional as F
 
-
 import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
 from models.lstm_classifier import _make_lstm_classifier
 from models.transformer_classifier import _make_transformer_classifier
 from models.lstm_seq import _make_lstm_seq
+from models.linear_seq import _make_linear_seq
+from models.mlp_seq import _make_mlp_seq
+from models.transformer_seq import _make_transformer_seq
 from models.full_epoch_classifier import _make_full_epoch_classifier
 from models.brain_encoders.ch_vqvae import _make_ch_vqvae
 
@@ -149,16 +151,55 @@ if config["data"]["label_type"] in ["voiced"]:
         ).cuda()
 
 elif config["data"]["label_type"] in ["vad"]:
-    model = _make_lstm_seq(
-        dataset_sizes=config["data"]["dataset_sizes"],
-        use_data_block="data_block" in config["model"]["lstm"],
-        subject_ids=subjects,
-        use_sub_block="sub_block" in config["model"]["lstm"],
-        feature_dim=config["model"]["lstm"]["feature_dim"],
-        hidden_dim=config["model"]["lstm"]["hidden_dim"],
-        num_layers=config["model"]["lstm"]["num_layers"],
-        output_classes=config["model"]["lstm"]["output_classes"],
-    ).cuda()
+
+    # Project VQ dim to equivalent size if using tokenizer.
+    if use_tokenizer:
+        dataset_sizes = {k : config["tokenizer"]["ch"]["vq_dim"] for k in config["data"]["dataset_sizes"].keys()}
+    else:
+        dataset_sizes = config["data"]["dataset_sizes"]
+
+    if "lstm" in config["model"]:
+        model = _make_lstm_seq(
+            dataset_sizes=dataset_sizes,
+            use_data_block="data_block" in config["model"]["lstm"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["lstm"],
+            feature_dim=config["model"]["lstm"]["feature_dim"],
+            hidden_dim=config["model"]["lstm"]["hidden_dim"],
+            num_layers=config["model"]["lstm"]["num_layers"],
+            output_classes=config["model"]["lstm"]["output_classes"],
+        ).cuda()
+    elif "transformer" in config["model"]:
+        model = _make_transformer_seq(
+            dataset_sizes=dataset_sizes,
+            use_data_block="data_block" in config["model"]["transformer"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["transformer"],
+            feature_dim=config["model"]["transformer"]["feature_dim"],
+            hidden_dim=config["model"]["transformer"]["hidden_dim"],
+            num_layers=config["model"]["transformer"]["num_layers"],
+            output_classes=config["model"]["transformer"]["output_classes"],
+        ).cuda()
+    elif "linear" in config["model"]:
+        model = _make_linear_seq(
+            dataset_sizes=dataset_sizes,
+            use_data_block="data_block" in config["model"]["linear"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["linear"],
+            feature_dim=config["model"]["linear"]["feature_dim"],
+            output_classes=config["model"]["linear"]["output_classes"],
+        ).cuda()
+    elif "mlp" in config["model"]:
+        model = _make_mlp_seq(
+            dataset_sizes=dataset_sizes,
+            use_data_block="data_block" in config["model"]["mlp"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["model"]["mlp"],
+            feature_dim=config["model"]["mlp"]["feature_dim"],
+            hidden_dim=config["model"]["mlp"]["hidden_dim"],
+            output_classes=config["model"]["mlp"]["output_classes"],
+        ).cuda()
+
 
 
 # load optimizer

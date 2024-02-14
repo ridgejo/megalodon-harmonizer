@@ -113,7 +113,7 @@ if __name__ == "__main__":
         subject_id="001",
         session="001",
         task="compr",
-        slice_len=1000,#0.3,  # 5
+        slice_len=100,#0.3,  # 5
         preproc_config={
             "filtering": True,
             "resample": 250,

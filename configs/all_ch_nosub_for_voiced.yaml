@@ -4,11 +4,11 @@ experiment:
   lr: 0.0003 # 0.0003 * sqrt(32 / 4)
 
 stats:
-  iter_update_freq: 1000 # Increase to amortise eval costs
+  iter_update_freq: 200
 
 data:
 
-  slice_len: 3.0  # Same as Moses et al.
+  slice_len: 0.3  # Same as Moses et al.
   train_ratio: 0.99
   batch_size: 16 # Previously: 4
 

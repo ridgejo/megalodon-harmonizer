@@ -21,10 +21,10 @@ data:
       standard_scaler:
 
   dataset_sizes:
-    Gwilliams2022: 208
+    Armeni2022: 269
   
   preproc_config:
-    gwilliams2022:
+    armeni2022:
       filtering: True
       resample: 250
       notch_freqs: [50, 100]
@@ -39,12 +39,13 @@ tokenizer:
     temporal_dim: 128
     hidden_dim: 256 # Must be 2x temporal dim
     data_block:
-  state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240212-133607_lunar-kumquat-237/4600.pt"
+  state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240212-133607_lunar-kumquat-237/22800.pt"
 
 model:
   lstm:
-    feature_dim: 64
+    feature_dim: 512
     hidden_dim: 128
-    num_layers: 2
+    num_layers: 4
     output_classes: 2
     sub_block:
+    data_block:

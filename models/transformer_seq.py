@@ -7,7 +7,7 @@ from models.dataset_layer import DatasetLayer
 from models.subject_block import SubjectBlock
 
 
-def _make_lstm_seq(
+def _make_transformer_seq(
     dataset_sizes,
     use_data_block,
     subject_ids,
@@ -17,7 +17,6 @@ def _make_lstm_seq(
     num_layers,
     output_classes,
 ):
-
     dataset_layer = DatasetLayer(
         dataset_sizes=dataset_sizes,
         shared_dim=feature_dim,
@@ -31,7 +30,7 @@ def _make_lstm_seq(
         use_sub_block=use_sub_block,
     )
 
-    return LSTMSeq(
+    return TransformerSeq(
         dataset_layer,
         subject_block,
         feature_dim,
@@ -41,8 +40,8 @@ def _make_lstm_seq(
     )
 
 
-class LSTMSeq(nn.Module):
-    """Real-time forward-direction LSTM that labels all embeddings in sequence."""
+class TransformerSeq(nn.Module):
+    """Real-time bidirectional transformer that labels all embeddings in sequence."""
 
     def __init__(
         self,
@@ -53,7 +52,7 @@ class LSTMSeq(nn.Module):
         num_layers,
         output_classes,
     ):
-        super(LSTMSeq, self).__init__()
+        super(TransformerSeq, self).__init__()
 
         assert output_classes >= 2
 
@@ -61,20 +60,25 @@ class LSTMSeq(nn.Module):
 
         self.dataset_layer = dataset_layer
         self.subject_block = subject_block
-        self.lstm = nn.LSTM(feature_dim, hidden_dim, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, 1 if output_classes == 2 else output_classes)
+        self.transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=feature_dim,
+                nhead=8,
+            ),
+            num_layers=6,
+        )
+        self.fc = nn.Linear(feature_dim, 1 if output_classes == 2 else output_classes)
         self.act = nn.Sigmoid() if output_classes == 2 else nn.Softmax()
 
     def forward(self, x, labels, dataset_id, subject_id):
         x = self.dataset_layer(x, dataset_id)
         x = self.subject_block(x, subject_id)
         x = x.permute(0, 2, 1)  # [B, C, T] -> [B, T, C]
-        lstm_out, (h_n, c_n) = self.lstm(x)
-
-        B, L, H = lstm_out.shape
-        lstm_out = lstm_out.flatten(start_dim=0, end_dim=1) # [B * L, H]
+        transformer_out = self.transformer(x)
+        B, L, H = transformer_out.shape
+        transformer_out = transformer_out.flatten(start_dim=0, end_dim=1) # [B * L, H]
         logits = self.fc(
-            lstm_out
+            transformer_out
         )  # classify features from last layer of LSTM [B * L, classes]
         preds = self.act(logits) # [B * L, 1]
 

@@ -22,6 +22,7 @@ from models.brain_encoders.short_vqvae import _make_short_vqvae
 from models.brain_encoders.temp_spatial_vqvae import _make_temp_spatial_vqvae
 from models.brain_encoders.attention_vqvae import _make_attention_vqvae
 from models.brain_encoders.ch_vqvae import _make_ch_vqvae
+from models.brain_encoders.seanet_vqvae import _make_seanet_vqvae
 
 def pp_stats(stats):
     for k, v in stats.items():
@@ -131,6 +132,18 @@ elif "ch" in config["model"]:
         subject_ids=subjects,
         use_sub_block="sub_block" in config["model"]["ch"],
         use_data_block="data_block" in config["model"]["ch"],
+    ).to(args.device)
+elif "seanet" in config["model"]:
+    first_ds = next(iter(config["data"]["preproc_config"].keys()))
+    model = _make_seanet_vqvae(
+        vq_dim=config["model"]["seanet"]["vq_dim"],
+        codebook_size=config["model"]["seanet"]["codebook_size"],
+        shared_dim=config["model"]["seanet"]["shared_dim"],
+        ratios=config["model"]["seanet"]["ratios"],
+        dataset_sizes=config["data"]["dataset_sizes"],
+        subject_ids=subjects,
+        use_sub_block="sub_block" in config["model"]["seanet"],
+        use_data_block="data_block" in config["model"]["seanet"],
     ).to(args.device)
 
 

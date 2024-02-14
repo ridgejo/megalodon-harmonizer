@@ -299,8 +299,8 @@ def _load_armeni_2022(
 
     bad_sessions = {
         "001": [],
-        "002": [], #["009"],
-        "003": [], #["003", "004", "005", "006", "008"],
+        "002": [],
+        "003": ["008"], # Experimental script crashed on this run so labels will be misaligned
     }
 
     if debug:

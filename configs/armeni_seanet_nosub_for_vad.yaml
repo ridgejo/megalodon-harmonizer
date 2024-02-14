@@ -1,15 +1,15 @@
 experiment:
   seed: 42
-  epochs: 1000
+  epochs: 10000
   lr: 0.0003 # 0.0003 * sqrt(32 / 4)
 
 stats:
-  iter_update_freq: 1000 # Increase to amortise eval costs
+  iter_update_freq: 1000
 
 data:
 
   slice_len: 3.0  # Same as Moses et al.
-  train_ratio: 0.99
+  train_ratio: 0.98
   batch_size: 16 # Previously: 4
 
   norm:
@@ -20,8 +20,6 @@ data:
 
   dataset_sizes:
     Armeni2022: 269
-    Schoffelen2019: 273
-    Gwilliams2022: 208
   
   preproc_config:
     armeni2022:
@@ -30,25 +28,12 @@ data:
       notch_freqs: [50, 100]
       bandpass_lo: 0.5
       bandpass_hi: 125
-    gwilliams2022:
-      filtering: True
-      resample: 250
-      notch_freqs: [50, 100]
-      bandpass_lo: 0.5
-      bandpass_hi: 125
-    schoffelen2019:
-      filtering: True
-      resample: 250
-      notch_freqs: [50, 100]
-      bandpass_lo: 0.5
-      bandpass_hi: 125
 
 model:
-  ch:
+  seanet:
     vq_dim: 64
     codebook_size: 1024
     shared_dim: 300
-    temporal_dim: 128
-    hidden_dim: 256 # Must be 2x temporal dim
+    ratios: [2, 1, 1]
     # sub_block:
     data_block:

@@ -7,14 +7,13 @@ from models.dataset_layer import DatasetLayer
 from models.subject_block import SubjectBlock
 
 
-def _make_lstm_seq(
+def _make_mlp_seq(
     dataset_sizes,
     use_data_block,
     subject_ids,
     use_sub_block,
     feature_dim,
     hidden_dim,
-    num_layers,
     output_classes,
 ):
 
@@ -31,17 +30,16 @@ def _make_lstm_seq(
         use_sub_block=use_sub_block,
     )
 
-    return LSTMSeq(
+    return MLPSeq(
         dataset_layer,
         subject_block,
         feature_dim,
         hidden_dim,
-        num_layers,
         output_classes,
     )
 
 
-class LSTMSeq(nn.Module):
+class MLPSeq(nn.Module):
     """Real-time forward-direction LSTM that labels all embeddings in sequence."""
 
     def __init__(
@@ -50,10 +48,9 @@ class LSTMSeq(nn.Module):
         subject_block,
         feature_dim,
         hidden_dim,
-        num_layers,
         output_classes,
     ):
-        super(LSTMSeq, self).__init__()
+        super(MLPSeq, self).__init__()
 
         assert output_classes >= 2
 
@@ -61,21 +58,21 @@ class LSTMSeq(nn.Module):
 
         self.dataset_layer = dataset_layer
         self.subject_block = subject_block
-        self.lstm = nn.LSTM(feature_dim, hidden_dim, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, 1 if output_classes == 2 else output_classes)
+        self.fc = nn.Linear(feature_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, 1 if output_classes == 2 else output_classes)
+        self.inter_act = nn.ReLU()
         self.act = nn.Sigmoid() if output_classes == 2 else nn.Softmax()
 
     def forward(self, x, labels, dataset_id, subject_id):
         x = self.dataset_layer(x, dataset_id)
         x = self.subject_block(x, subject_id)
         x = x.permute(0, 2, 1)  # [B, C, T] -> [B, T, C]
-        lstm_out, (h_n, c_n) = self.lstm(x)
 
-        B, L, H = lstm_out.shape
-        lstm_out = lstm_out.flatten(start_dim=0, end_dim=1) # [B * L, H]
-        logits = self.fc(
-            lstm_out
-        )  # classify features from last layer of LSTM [B * L, classes]
+        B, T, C = x.shape
+        x = self.fc(x.flatten(start_dim=0, end_dim=1)) # (B * L) * classes
+        x = self.inter_act(x)
+        logits = self.fc2(x)
+
         preds = self.act(logits) # [B * L, 1]
 
         logits = logits.squeeze()
