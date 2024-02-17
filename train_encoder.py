@@ -140,6 +140,7 @@ elif "seanet" in config["model"]:
         codebook_size=config["model"]["seanet"]["codebook_size"],
         shared_dim=config["model"]["seanet"]["shared_dim"],
         ratios=config["model"]["seanet"]["ratios"],
+        conv_channels=config["model"]["seanet"]["conv_channels"],
         dataset_sizes=config["data"]["dataset_sizes"],
         subject_ids=subjects,
         use_sub_block="sub_block" in config["model"]["seanet"],

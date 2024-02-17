@@ -34,6 +34,7 @@ model:
     vq_dim: 64
     codebook_size: 1024
     shared_dim: 300
-    ratios: [2, 1, 1]
+    ratios: [1]
+    conv_channels: [512, 512]
     # sub_block:
     data_block:

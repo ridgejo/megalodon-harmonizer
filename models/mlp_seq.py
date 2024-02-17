@@ -59,6 +59,7 @@ class MLPSeq(nn.Module):
         self.dataset_layer = dataset_layer
         self.subject_block = subject_block
         self.fc = nn.Linear(feature_dim, hidden_dim)
+        self.fchidden = nn.Linear(hidden_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, 1 if output_classes == 2 else output_classes)
         self.inter_act = nn.ReLU()
         self.act = nn.Sigmoid() if output_classes == 2 else nn.Softmax()
@@ -71,8 +72,9 @@ class MLPSeq(nn.Module):
         B, T, C = x.shape
         x = self.fc(x.flatten(start_dim=0, end_dim=1)) # (B * L) * classes
         x = self.inter_act(x)
+        x = self.fchidden(x)
+        x = self.inter_act(x)
         logits = self.fc2(x)
-
         preds = self.act(logits) # [B * L, 1]
 
         logits = logits.squeeze()

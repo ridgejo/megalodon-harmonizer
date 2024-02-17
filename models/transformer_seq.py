@@ -62,6 +62,7 @@ class TransformerSeq(nn.Module):
         self.subject_block = subject_block
         self.transformer = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(
+                batch_first=True,
                 d_model=feature_dim,
                 nhead=8,
             ),

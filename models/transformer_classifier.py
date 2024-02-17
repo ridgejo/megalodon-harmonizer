@@ -69,6 +69,7 @@ class TransformerClassifier(nn.Module):
 
         self.transformer = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(
+                batch_first=True,
                 d_model=hidden_dim,
                 nhead=8,
             ),

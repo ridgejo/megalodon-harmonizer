@@ -24,6 +24,7 @@ from models.mlp_seq import _make_mlp_seq
 from models.transformer_seq import _make_transformer_seq
 from models.full_epoch_classifier import _make_full_epoch_classifier
 from models.brain_encoders.ch_vqvae import _make_ch_vqvae
+from models.brain_encoders.seanet_vqvae import _make_seanet_vqvae
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-phonemes",
@@ -86,8 +87,11 @@ for k in config["data"]["preproc_config"].keys():
 # load tokenizer if given
 use_tokenizer = False
 if "tokenizer" in config:
+
     use_tokenizer = True
     if "ch" in config["tokenizer"]:
+        tok_type = "ch"
+        print("Loading ch tokenizer")
         first_ds = next(iter(config["data"]["preproc_config"].keys()))
         tokenizer = _make_ch_vqvae(
             sampling_rate=config["data"]["preproc_config"][first_ds]["resample"],
@@ -96,20 +100,39 @@ if "tokenizer" in config:
             shared_dim=config["tokenizer"]["ch"]["shared_dim"],
             temporal_dim=config["tokenizer"]["ch"]["temporal_dim"],
             hidden_dim=config["tokenizer"]["ch"]["hidden_dim"],
-            dataset_sizes=config["data"]["dataset_sizes"],
+            dataset_sizes=config["tokenizer"]["dataset_sizes"],
             subject_ids=subjects,
             use_sub_block="sub_block" in config["tokenizer"]["ch"],
             use_data_block="data_block" in config["tokenizer"]["ch"],
         )
+    elif "seanet" in config["tokenizer"]:
+        tok_type = "seanet"
+        print("Loading SEANet tokenizer")
+        tokenizer = _make_seanet_vqvae(
+            vq_dim=config["tokenizer"]["seanet"]["vq_dim"],
+            codebook_size=config["tokenizer"]["seanet"]["codebook_size"],
+            shared_dim=config["tokenizer"]["seanet"]["shared_dim"],
+            ratios=config["tokenizer"]["seanet"]["ratios"],
+            conv_channels=config["tokenizer"]["seanet"]["conv_channels"],
+            dataset_sizes=config["tokenizer"]["dataset_sizes"],
+            subject_ids=subjects,
+            use_sub_block="sub_block" in config["tokenizer"]["seanet"],
+            use_data_block="data_block" in config["tokenizer"]["seanet"],
+        )
 
     if "state_dict" in config["tokenizer"]:
 
-        # warning: strict=False used to ignore unexpected keys for additional tokenizer datasets
-        tokenizer.load_state_dict(torch.load(config["tokenizer"]["state_dict"]), strict=False)
+        print("Loading state dictionary")
 
-        # Freeze tokenizer if weights are loaded, if not, assume we want to train alongside classifier.
-        for param in tokenizer.parameters():
-            param.requires_grad = False
+        tokenizer.load_state_dict(torch.load(config["tokenizer"]["state_dict"]))
+
+        if "unfreeze" in config["tokenizer"]:
+            print("Leaving tokenizer weights open to tuning")
+        else:
+            print("Freezing tokenizer weights")
+            # By default, freeze tokenizer if weights are loaded
+            for param in tokenizer.parameters():
+                param.requires_grad = False
     
     tokenizer = tokenizer.cuda()
 
@@ -154,7 +177,7 @@ elif config["data"]["label_type"] in ["vad"]:
 
     # Project VQ dim to equivalent size if using tokenizer.
     if use_tokenizer:
-        dataset_sizes = {k : config["tokenizer"]["ch"]["vq_dim"] for k in config["data"]["dataset_sizes"].keys()}
+        dataset_sizes = {k : config["tokenizer"][tok_type]["vq_dim"] for k in config["data"]["dataset_sizes"].keys()}
     else:
         dataset_sizes = config["data"]["dataset_sizes"]
 
@@ -230,7 +253,7 @@ for epoch in range(num_epochs):
 
         if use_tokenizer:
             # [B, C, T] -> [B, E, Q]
-            x, _codes, _commit_loss, _S, _T = tokenizer.encode(x, dataset_id, subject_id)
+            x = tokenizer.encode(x, dataset_id, subject_id)[0]
 
             # Resample label if sequence labelling
             if config["data"]["label_type"] in ["vad"]:
@@ -274,7 +297,7 @@ for epoch in range(num_epochs):
                     x = torch.from_numpy(x).cuda().float()
                     label = label.cuda()
                     if use_tokenizer:
-                        x, _codes, _commit_loss, _S, _T = tokenizer.encode(x, dataset_id, subject_id)
+                        x = tokenizer.encode(x, dataset_id, subject_id)[0]
                         if config["data"]["label_type"] in ["vad"]:
                             label = F.interpolate(label.unsqueeze(1), size=x.shape[-1]).squeeze(1)
                     y_hat, test_loss = model(x, label, dataset_id, subject_id)

@@ -8,7 +8,7 @@ from models.dataset_layer import DatasetLayer
 from models.subject_block import SubjectBlock
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder, SEANetBrainDecoder
 
-def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, dataset_sizes,
+def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels, dataset_sizes,
     subject_ids,
     use_sub_block,
     use_data_block,):
@@ -17,7 +17,7 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, dataset_sizes,
 
     temporal_encoder = SEANetBrainEncoder(
         channels=shared_dim,
-        conv_channels=[128, 256, 512, 1024], # 250
+        conv_channels=conv_channels, #[128, 256, 512, 1024], # 250
         ratios=ratios, # warning: sampling rate must be divisible by this
         dimension=vq_dim,
         causal=True,
@@ -25,7 +25,7 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, dataset_sizes,
 
     temporal_decoder = SEANetBrainDecoder(
         channels=shared_dim,
-        conv_channels=[128, 256, 512, 1024],
+        conv_channels=conv_channels, #[128, 256, 512, 1024],
         ratios=ratios,
         dimension=vq_dim,
         causal=True,
@@ -135,6 +135,8 @@ if __name__ == "__main__":
         shared_dim=300,
         vq_dim=64,
         codebook_size=1024,
+        ratios=[2, 1, 1],
+        conv_channels=[256, 512, 512, 512],
         dataset_sizes={
             "TestDataset": 269,
         },
@@ -143,7 +145,7 @@ if __name__ == "__main__":
         use_data_block=True,
     ).cuda()
 
-    x = torch.randn(1, 269, 200).cuda() # [B, C, T]
+    x = torch.randn(1, 269, 250 * 3).cuda() # [B, C, T @ 250Hz 3 seconds]
     dataset_id = "TestDataset"
     subject_id = "TestSubject"
 
