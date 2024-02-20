@@ -10,7 +10,7 @@ data:
 
   slice_len: 3.0
   train_ratio: 0.95
-  batch_size: 32
+  batch_size: 16
   label_type: "vad"
   exclude_subjects: []
 
@@ -32,19 +32,17 @@ data:
       bandpass_hi: 125
 
 tokenizer:
-  seanet:
+  ch:
     vq_dim: 64
     codebook_size: 1024
     shared_dim: 300
-    ratios: [1]
-    conv_channels: [512, 512]
+    temporal_dim: 128
+    hidden_dim: 256 # Must be 2x temporal dim
     data_block:
-  state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240215-212402_effusive-dove-249/102000.pt"
-  dataset_sizes:
-    Armeni2022: 269
+  state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240214-171950_doting-dove-243/128000.pt"
 
 model:
-  lstm:
+  transformer:
     feature_dim: 512
     hidden_dim: 128
     num_layers: 2

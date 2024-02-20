@@ -145,8 +145,11 @@ elif "seanet" in config["model"]:
         subject_ids=subjects,
         use_sub_block="sub_block" in config["model"]["seanet"],
         use_data_block="data_block" in config["model"]["seanet"],
+        rvq="rvq" in config["model"]["seanet"],
     ).to(args.device)
 
+
+wandb.watch(model, log_freq=100) # log gradients
 
 # load optimizer
 optimizer = torch.optim.AdamW(params=model.parameters(), lr=config["experiment"]["lr"])

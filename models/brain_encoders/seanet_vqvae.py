@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from vector_quantize_pytorch import VectorQuantize, FSQ
+from vector_quantize_pytorch import VectorQuantize, GroupedResidualVQ
 from encodec import EncodecModel
 
 from models.dataset_layer import DatasetLayer
@@ -11,7 +11,8 @@ from models.brain_encoders.seanet.seanet import SEANetBrainEncoder, SEANetBrainD
 def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels, dataset_sizes,
     subject_ids,
     use_sub_block,
-    use_data_block,):
+    use_data_block,
+    rvq=False):
 
     # TODO: Update to use SEANet style encoder/decoder setup
 
@@ -31,15 +32,23 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
         causal=True,
     )
 
-    quantizer = VectorQuantize(
-        dim=vq_dim,
-        codebook_size=codebook_size,
-        codebook_dim=16,
-        use_cosine_sim=True,
-        threshold_ema_dead_code=2,
-        kmeans_init=True,
-        kmeans_iters=10,
-    )
+    if rvq:
+        quantizer = GroupedResidualVQ(
+            dim=vq_dim,
+            num_quantizers=8,
+            groups=2,
+            codebook_size=codebook_size,
+        )
+    else:
+        quantizer = VectorQuantize(
+            dim=vq_dim,
+            codebook_size=codebook_size,
+            codebook_dim=16,
+            use_cosine_sim=True,
+            threshold_ema_dead_code=2,
+            kmeans_init=True,
+            kmeans_iters=10,
+        )
 
     dataset_layer = DatasetLayer(
         dataset_sizes=dataset_sizes,
@@ -106,6 +115,7 @@ class SEANetVQVAE(nn.Module):
         original_x = x.clone() # [B, S, T]
 
         quantized, codes, commit_loss = self.encode(x, dataset_id, subject_id)
+        commit_loss = commit_loss.sum() # In case of RVQ
 
         x = self.decode(quantized, dataset_id, subject_id)
         

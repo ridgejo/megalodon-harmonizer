@@ -42,6 +42,7 @@ tokenizer:
   state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240215-212402_effusive-dove-249/102000.pt"
   dataset_sizes:
     Armeni2022: 269
+  unfreeze:
 
 model:
   lstm:

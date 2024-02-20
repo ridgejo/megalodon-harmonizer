@@ -32,16 +32,15 @@ data:
       bandpass_hi: 125
 
 tokenizer:
-  seanet:
+  ch:
     vq_dim: 64
     codebook_size: 1024
     shared_dim: 300
-    ratios: [1]
-    conv_channels: [512, 512]
+    temporal_dim: 128
+    hidden_dim: 256 # Must be 2x temporal dim
     data_block:
   state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240215-212402_effusive-dove-249/102000.pt"
-  dataset_sizes:
-    Armeni2022: 269
+  unfreeze:
 
 model:
   lstm:

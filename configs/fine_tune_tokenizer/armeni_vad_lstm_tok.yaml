@@ -39,7 +39,6 @@ tokenizer:
     ratios: [1]
     conv_channels: [512, 512]
     data_block:
-  state_dict: "/data/engs-pnpl/lina4368/experiments/exp_20240215-212402_effusive-dove-249/102000.pt"
   dataset_sizes:
     Armeni2022: 269
 
