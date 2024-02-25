@@ -124,6 +124,8 @@ if "tokenizer" in config:
             subject_ids=subjects,
             use_sub_block="sub_block" in config["tokenizer"]["seanet"],
             use_data_block="data_block" in config["tokenizer"]["seanet"],
+            rvq="rvq" in config["tokenizer"]["seanet"],
+            use_transformer="use_transformer" in config["tokenizer"]["seanet"],
         )
 
     if "state_dict" in config["tokenizer"]:

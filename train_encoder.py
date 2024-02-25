@@ -146,6 +146,7 @@ elif "seanet" in config["model"]:
         use_sub_block="sub_block" in config["model"]["seanet"],
         use_data_block="data_block" in config["model"]["seanet"],
         rvq="rvq" in config["model"]["seanet"],
+        use_transformer="use_transformer" in config["model"]["seanet"],
     ).to(args.device)
 
 

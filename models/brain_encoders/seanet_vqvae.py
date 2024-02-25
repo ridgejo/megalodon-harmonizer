@@ -12,7 +12,8 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
     subject_ids,
     use_sub_block,
     use_data_block,
-    rvq=False):
+    rvq=False,
+    use_transformer=False):
 
     # TODO: Update to use SEANet style encoder/decoder setup
 
@@ -71,11 +72,12 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
         quantizer=quantizer,
         shared_dim=shared_dim,
         vq_dim=vq_dim,
+        use_transformer=use_transformer,
     )
 
 class SEANetVQVAE(nn.Module):
 
-    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim):
+    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim, use_transformer):
         super(SEANetVQVAE, self).__init__()
 
         self.dataset_layer = dataset_layer
@@ -83,6 +85,27 @@ class SEANetVQVAE(nn.Module):
 
         self.temporal_encoder = temporal_encoder
         self.temporal_decoder = temporal_decoder
+
+        self.use_transformer = use_transformer
+
+        if self.use_transformer:
+            # aim: build strong contextual representation in latent space.
+            self.transformer_encoder = nn.TransformerEncoder(
+                nn.TransformerEncoderLayer(
+                    batch_first=True,
+                    d_model=vq_dim,
+                    nhead=8,
+                ),
+                num_layers=4, # 2 worked well. 6 failed.
+            )
+            self.transformer_decoder = nn.TransformerEncoder(
+                nn.TransformerEncoderLayer(
+                    batch_first=True,
+                    d_model=vq_dim,
+                    nhead=8,
+                ),
+                num_layers=4,
+            )
 
         self.quantizer = quantizer
     
@@ -93,6 +116,9 @@ class SEANetVQVAE(nn.Module):
 
         x = self.temporal_encoder(x) # [B, C, T] -> [B, E, T @ 75Hz]
 
+        if self.use_transformer:
+            x = self.transformer_encoder(x.permute(0, 2, 1)).permute(0, 2, 1)
+
         # Vector quantization
         B, E, T = x.shape
         quantized, codes, commit_loss = self.quantizer(x.permute(0, 2, 1))
@@ -101,6 +127,9 @@ class SEANetVQVAE(nn.Module):
         return quantized, codes, commit_loss
 
     def decode(self, x, dataset_id, subject_id):
+
+        if self.use_transformer:
+            x = self.transformer_decoder(x.permute(0, 2, 1)).permute(0, 2, 1)
 
         # Expand in temporal dimension
         x = self.temporal_decoder(x) # [B, E, T @ 75] -> [B, C, T]
