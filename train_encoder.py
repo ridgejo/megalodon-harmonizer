@@ -77,6 +77,7 @@ train_sampler, test_sampler, scalers = load_pretraining_data(
     batch_size=batch_size,
     norm_config=config["data"]["norm"],
     debug=args.debug,
+    labels=config["data"]["label_type"], # Load labelled data if available too!
 )
 
 print(f"Loaded train : test ({len(train_sampler)}, {len(test_sampler)})")
@@ -166,17 +167,34 @@ for epoch in range(num_epochs):
     for i, batch in enumerate(train_sampler):
         optimizer.zero_grad()
 
-        x, times, dataset_id, subject_id = (
-            batch[0],
-            batch[1],
-            batch[-1]["dataset"][0],
-            batch[-1]["subject"][0],
-        )
+        if len(batch) > 4:
+            # Labelled data
+            labelled = True
+            x, label, times, dataset_id, subject_id = (
+                batch[0],
+                batch[1],
+                batch[2],
+                batch[-1]["dataset"][0],
+                batch[-1]["subject"][0],
+            )
+            label = label.cuda()
+        else:
+            # Unlabelled data
+            labelled = False
+            x, times, dataset_id, subject_id = (
+                batch[0],
+                batch[1],
+                batch[-1]["dataset"][0],
+                batch[-1]["subject"][0],
+            )
 
         x = scalers[data_utils.get_scaler_hash(batch)](x)
         x = torch.from_numpy(x).to(args.device).float()
 
-        x_hat, loss = model(x, dataset_id, subject_id)
+        if labelled:
+            x_hat, loss = model(x, dataset_id, subject_id, vad_labels=label)
+        else:
+            x_hat, loss = model(x, dataset_id, subject_id)
 
         loss["loss"].backward()
         optimizer.step()

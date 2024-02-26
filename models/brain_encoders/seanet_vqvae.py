@@ -8,6 +8,28 @@ from models.dataset_layer import DatasetLayer
 from models.subject_block import SubjectBlock
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder, SEANetBrainDecoder
 
+from models.mlp_seq import _make_mlp_seq
+
+class ProjectorMLP(nn.Module):
+
+    # Use as projector in SSL
+
+    def __init__(self, in_dim, out_dim, hidden_dim):
+        super(ProjectorMLP, self).__init__()
+
+        model = nn.Sequential(
+            nn.Linear(in_features=in_dim, out_features=hidden_dim),
+            nn.ReLU(),
+            nn.Linear(in_features=hidden_dim, out_features=hidden_dim),
+            nn.ReLU(),
+            nn.Linear(in_features=hidden_dim, out_features=out_dim),
+        )
+    
+    def forward(self, x):
+        return self.model(x)
+
+        
+
 def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels, dataset_sizes,
     subject_ids,
     use_sub_block,
@@ -64,6 +86,16 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
         use_sub_block=use_sub_block,
     )
 
+    vad_classifier = _make_mlp_seq(
+        dataset_sizes=dataset_sizes,
+        use_data_block=False,
+        subject_ids=subjects,
+        use_sub_block="sub_block" in config["model"]["mlp"],
+        feature_dim=vq_dim,
+        hidden_dim=256,
+        output_classes=2,
+    )
+
     return SEANetVQVAE(
         dataset_layer=dataset_layer,
         subject_block=subject_block,
@@ -73,11 +105,12 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
         shared_dim=shared_dim,
         vq_dim=vq_dim,
         use_transformer=use_transformer,
+        vad_classifier=vad_classifier,
     )
 
 class SEANetVQVAE(nn.Module):
 
-    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim, use_transformer):
+    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim, use_transformer, vad_classifier):
         super(SEANetVQVAE, self).__init__()
 
         self.dataset_layer = dataset_layer
@@ -108,6 +141,11 @@ class SEANetVQVAE(nn.Module):
             )
 
         self.quantizer = quantizer
+
+        # Set up projectors
+        self.dec_projection = ProjectorMLP(in_dim=vq_dim, out_dim=vq_dim, hidden_dim=256)
+
+        self.vad_classifier = vad_classifier
     
     def encode(self, x, dataset_id, subject_id):
 
@@ -124,7 +162,7 @@ class SEANetVQVAE(nn.Module):
         quantized, codes, commit_loss = self.quantizer(x.permute(0, 2, 1))
         quantized = quantized.permute(0, 2, 1)
 
-        return quantized, codes, commit_loss
+        return quantized, codes, commit_loss.sum() # In case of RVQ
 
     def decode(self, x, dataset_id, subject_id):
 
@@ -139,30 +177,46 @@ class SEANetVQVAE(nn.Module):
 
         return x
 
-    def forward(self, x, dataset_id, subject_id):
+    def forward(self, x, dataset_id, subject_id, vad_labels):
 
         original_x = x.clone() # [B, S, T]
 
         quantized, codes, commit_loss = self.encode(x, dataset_id, subject_id)
-        commit_loss = commit_loss.sum() # In case of RVQ
 
-        x = self.decode(quantized, dataset_id, subject_id)
+        # Reconstruction objective
+        dec_projection = self.dec_projection(quantized)
+        x = self.decode(dec_projection, dataset_id, subject_id)
+        recon_loss = F.mse_loss(original_x, x)
+
+        # VAD objective (only computed when labels are available)
+        if vad_labels:
+            vad_labels = F.interpolate(vad_labels.unsqueeze(1), size=quantized.shape[-1]).squeeze(1)
+            vad_prediction, vad_loss = self.vad_classifier(quantized, vad_labels, dataset_id, subject_id)
+        else:
+            vad_loss = 0.0
         
         # Compute losses
-        recon_loss = F.mse_loss(original_x, x)
+        total_loss = recon_loss + commit_loss + vad_loss        
         loss = {
-            "loss": recon_loss + commit_loss,
+            "loss": total_loss,
             "commit_loss": commit_loss,
             "recon_loss": recon_loss,
             f"D_{dataset_id}": 1,
-            f"D_{dataset_id}_loss": recon_loss + commit_loss,
+            f"D_{dataset_id}_loss": total_loss,
             f"D_{dataset_id}_commit_loss": commit_loss,
             f"D_{dataset_id}_recon_loss": recon_loss,
             f"S_{dataset_id}_{subject_id}": 1,
-            f"S_{dataset_id}_{subject_id}_loss": recon_loss + commit_loss,
+            f"S_{dataset_id}_{subject_id}_loss": total_loss,
             f"S_{dataset_id}_{subject_id}_commit_loss": commit_loss,
             f"S_{dataset_id}_{subject_id}_recon_loss": recon_loss,
         }
+
+        if vad_labels:
+            loss = dict(loss, **{
+                "vad_loss": vad_loss,
+                f"D_{dataset_id}_vad_loss": vad_loss,
+                f"S_{dataset_id}_{subject_id}_vad_loss": vad_loss,
+            })
 
         return x, loss
 
