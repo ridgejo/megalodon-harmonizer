@@ -149,6 +149,7 @@ elif "seanet" in config["model"]:
         rvq="rvq" in config["model"]["seanet"],
         use_transformer="use_transformer" in config["model"]["seanet"],
         vad_scale=config["model"]["seanet"]["vad_scale"],
+        objective=config["model"]["seanet"].get("objective", "recon"),
     ).to(args.device)
 
 

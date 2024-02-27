@@ -36,7 +36,8 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
     use_data_block,
     rvq=False,
     use_transformer=False,
-    vad_scale=1.0):
+    vad_scale=1.0,
+    objective="recon"):
 
     # TODO: Update to use SEANet style encoder/decoder setup
 
@@ -108,11 +109,12 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
         use_transformer=use_transformer,
         vad_classifier=vad_classifier,
         vad_scale=vad_scale,
+        objective=objective,
     )
 
 class SEANetVQVAE(nn.Module):
 
-    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim, use_transformer, vad_classifier, vad_scale):
+    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim, use_transformer, vad_classifier, vad_scale, objective):
         super(SEANetVQVAE, self).__init__()
 
         self.dataset_layer = dataset_layer
@@ -124,6 +126,7 @@ class SEANetVQVAE(nn.Module):
         self.use_transformer = use_transformer
 
         self.vad_scale = vad_scale
+        self.objective = objective
 
         if self.use_transformer:
             # aim: build strong contextual representation in latent space.
@@ -183,9 +186,20 @@ class SEANetVQVAE(nn.Module):
 
     def forward(self, x, dataset_id, subject_id, vad_labels=None):
 
-        original_x = x.clone() # [B, S, T]
+        if self.objective == "autoregressive":
+            original_x = x.clone()
+            T = x.shape[-1]
+            assert T % 2 == 0, "Sequence length must be even for autoregressive VQ-VAE objective"
+            x_t0 = x[:, :, : T // 2]
+            x_t1 = x[:, :, T // 2 :]
+        elif self.objective == "recon":
+            original_x = x.clone() # [B, S, T]
+            x_t0 = x
+            x_t1 = x
+        else:
+            raise ValueError(f"Unknown objective: {objective}")
 
-        quantized, codes, commit_loss = self.encode(x, dataset_id, subject_id)
+        quantized, codes, commit_loss = self.encode(x_t0, dataset_id, subject_id)
 
         # Reconstruction objective
         B, _, T = quantized.shape
@@ -193,7 +207,8 @@ class SEANetVQVAE(nn.Module):
             quantized.permute(0, 2, 1).flatten(start_dim=0, end_dim=1)
         ).unflatten(dim=0,sizes=(B, T)).permute(0, 2, 1)
         x = self.decode(dec_projection, dataset_id, subject_id)
-        recon_loss = F.mse_loss(original_x, x)
+
+        decoder_loss = F.mse_loss(x, x_t1) # Automatically accounts for autoregressive vs reconstruction
 
         # VAD objective (only computed when labels are available)
         if vad_labels is not None:
@@ -204,19 +219,19 @@ class SEANetVQVAE(nn.Module):
             vad_loss = 0.0
         
         # Compute losses
-        total_loss = recon_loss + commit_loss + self.vad_scale * vad_loss
+        total_loss = decoder_loss + commit_loss + self.vad_scale * vad_loss
         loss = {
             "loss": total_loss,
             "commit_loss": commit_loss,
-            "recon_loss": recon_loss,
+            "decoder_loss": decoder_loss,
             f"D_{dataset_id}": 1,
             f"D_{dataset_id}_loss": total_loss,
             f"D_{dataset_id}_commit_loss": commit_loss,
-            f"D_{dataset_id}_recon_loss": recon_loss,
+            f"D_{dataset_id}_decoder_loss": decoder_loss,
             f"S_{dataset_id}_{subject_id}": 1,
             f"S_{dataset_id}_{subject_id}_loss": total_loss,
             f"S_{dataset_id}_{subject_id}_commit_loss": commit_loss,
-            f"S_{dataset_id}_{subject_id}_recon_loss": recon_loss,
+            f"S_{dataset_id}_{subject_id}_decoder_loss": decoder_loss,
         }
 
         if vad_labels is not None:
