@@ -77,7 +77,7 @@ train_sampler, test_sampler, scalers = load_pretraining_data(
     batch_size=batch_size,
     norm_config=config["data"]["norm"],
     debug=args.debug,
-    labels=config["data"]["label_type"], # Load labelled data if available too!
+    labels="vad", #config["data"]["label_type"], # Load labelled data if available too!
 )
 
 print(f"Loaded train : test ({len(train_sampler)}, {len(test_sampler)})")
@@ -148,6 +148,7 @@ elif "seanet" in config["model"]:
         use_data_block="data_block" in config["model"]["seanet"],
         rvq="rvq" in config["model"]["seanet"],
         use_transformer="use_transformer" in config["model"]["seanet"],
+        vad_scale=config["model"]["seanet"]["vad_scale"],
     ).to(args.device)
 
 
@@ -157,7 +158,7 @@ wandb.watch(model, log_freq=100) # log gradients
 optimizer = torch.optim.AdamW(params=model.parameters(), lr=config["experiment"]["lr"])
 
 num_epochs = config["experiment"]["epochs"]
-iter_update_freq = config["stats"]["iter_update_freq"]
+iter_update_freq = 50 if args.debug else config["stats"]["iter_update_freq"]
 iteration = 0
 start = time.perf_counter()
 train_losses = Counter()
@@ -167,9 +168,8 @@ for epoch in range(num_epochs):
     for i, batch in enumerate(train_sampler):
         optimizer.zero_grad()
 
-        if len(batch) > 4:
-            # Labelled data
-            labelled = True
+        labelled = len(batch) > 3
+        if labelled:
             x, label, times, dataset_id, subject_id = (
                 batch[0],
                 batch[1],
@@ -179,8 +179,6 @@ for epoch in range(num_epochs):
             )
             label = label.cuda()
         else:
-            # Unlabelled data
-            labelled = False
             x, times, dataset_id, subject_id = (
                 batch[0],
                 batch[1],
@@ -235,15 +233,33 @@ for epoch in range(num_epochs):
                 test_losses = Counter()
                 test_examples = {}
                 for i, batch in enumerate(test_sampler):
-                    x, times, dataset_id, subject_id = (
-                        batch[0],
-                        batch[1],
-                        batch[-1]["dataset"][0],
-                        batch[-1]["subject"][0],
-                    )
+
+                    labelled = len(batch) > 3
+                    if labelled:
+                        x, label, times, dataset_id, subject_id = (
+                            batch[0],
+                            batch[1],
+                            batch[2],
+                            batch[-1]["dataset"][0],
+                            batch[-1]["subject"][0],
+                        )
+                        label = label.cuda()
+                    else:
+                        x, times, dataset_id, subject_id = (
+                            batch[0],
+                            batch[1],
+                            batch[-1]["dataset"][0],
+                            batch[-1]["subject"][0],
+                        )
+                    
                     x = scalers[data_utils.get_scaler_hash(batch)](x)
                     x = torch.from_numpy(x).to(args.device).float()
-                    x_hat, test_loss = model(x, dataset_id, subject_id)
+
+                    if labelled:
+                        x_hat, test_loss = model(x, dataset_id, subject_id, vad_labels=label)
+                    else:
+                        x_hat, test_loss = model(x, dataset_id, subject_id)
+
                     test_losses.update(test_loss)
 
                     if dataset_id not in test_examples:

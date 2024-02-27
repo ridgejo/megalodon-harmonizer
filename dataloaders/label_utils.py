@@ -151,6 +151,29 @@ def read_textgrid(bids_root, subject_id, session, events):
 
     return session_markers # Return intervals in tier zero
 
+def get_vad_labels_from_csv(raw, bids_root, subject, session, task, offset=0.0):
+
+    sample_freq = raw.info["sfreq"]
+    offset_samples = int(sample_freq * offset)
+
+    # Read CSV
+    vad_events = pd.read_csv(f"{bids_root}/sub-{subject}/sub-{subject}_ses-{session}_task-{task}_tgs.csv")
+
+    labels = np.zeros(len(raw))
+    for i, event in vad_events.iterrows():
+        onset = float(event["start_events"])
+        end = float(event["end_events"])
+
+        t_start = int(onset * sample_freq + offset_samples)
+        t_end = int(end * sample_freq + offset_samples)
+
+        labels[t_start : t_end + 1] = 1.0
+
+    return labels
+
+
+
+
 def get_vad_labels_from_textgrid(tier, raw, offset=0.0):
 
     sample_freq = raw.info["sfreq"]

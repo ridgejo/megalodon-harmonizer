@@ -36,6 +36,16 @@ data:
       bandpass_lo: 0.5
       bandpass_hi: 125
 
+# model:
+#   seanet:
+#     vq_dim: 64
+#     codebook_size: 1024
+#     shared_dim: 300
+#     ratios: [1]
+#     conv_channels: [512, 512]
+#     # sub_block:
+#     data_block:
+
 model:
   seanet:
     vq_dim: 64
@@ -45,3 +55,4 @@ model:
     conv_channels: [512, 512, 512, 1024]
     # sub_block:
     data_block:
+    vad_scale: 10.0

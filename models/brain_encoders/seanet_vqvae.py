@@ -17,7 +17,7 @@ class ProjectorMLP(nn.Module):
     def __init__(self, in_dim, out_dim, hidden_dim):
         super(ProjectorMLP, self).__init__()
 
-        model = nn.Sequential(
+        self.model = nn.Sequential(
             nn.Linear(in_features=in_dim, out_features=hidden_dim),
             nn.ReLU(),
             nn.Linear(in_features=hidden_dim, out_features=hidden_dim),
@@ -35,7 +35,8 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
     use_sub_block,
     use_data_block,
     rvq=False,
-    use_transformer=False):
+    use_transformer=False,
+    vad_scale=1.0):
 
     # TODO: Update to use SEANet style encoder/decoder setup
 
@@ -89,8 +90,8 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
     vad_classifier = _make_mlp_seq(
         dataset_sizes=dataset_sizes,
         use_data_block=False,
-        subject_ids=subjects,
-        use_sub_block="sub_block" in config["model"]["mlp"],
+        subject_ids=subject_ids,
+        use_sub_block=True,#"sub_block" in config["model"]["mlp"],
         feature_dim=vq_dim,
         hidden_dim=256,
         output_classes=2,
@@ -106,11 +107,12 @@ def _make_seanet_vqvae(vq_dim, codebook_size, shared_dim, ratios, conv_channels,
         vq_dim=vq_dim,
         use_transformer=use_transformer,
         vad_classifier=vad_classifier,
+        vad_scale=vad_scale,
     )
 
 class SEANetVQVAE(nn.Module):
 
-    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim, use_transformer, vad_classifier):
+    def __init__(self, dataset_layer, subject_block, temporal_encoder, temporal_decoder, quantizer, shared_dim, vq_dim, use_transformer, vad_classifier, vad_scale):
         super(SEANetVQVAE, self).__init__()
 
         self.dataset_layer = dataset_layer
@@ -120,6 +122,8 @@ class SEANetVQVAE(nn.Module):
         self.temporal_decoder = temporal_decoder
 
         self.use_transformer = use_transformer
+
+        self.vad_scale = vad_scale
 
         if self.use_transformer:
             # aim: build strong contextual representation in latent space.
@@ -177,26 +181,30 @@ class SEANetVQVAE(nn.Module):
 
         return x
 
-    def forward(self, x, dataset_id, subject_id, vad_labels):
+    def forward(self, x, dataset_id, subject_id, vad_labels=None):
 
         original_x = x.clone() # [B, S, T]
 
         quantized, codes, commit_loss = self.encode(x, dataset_id, subject_id)
 
         # Reconstruction objective
-        dec_projection = self.dec_projection(quantized)
+        B, _, T = quantized.shape
+        dec_projection = self.dec_projection(
+            quantized.permute(0, 2, 1).flatten(start_dim=0, end_dim=1)
+        ).unflatten(dim=0,sizes=(B, T)).permute(0, 2, 1)
         x = self.decode(dec_projection, dataset_id, subject_id)
         recon_loss = F.mse_loss(original_x, x)
 
         # VAD objective (only computed when labels are available)
-        if vad_labels:
+        if vad_labels is not None:
             vad_labels = F.interpolate(vad_labels.unsqueeze(1), size=quantized.shape[-1]).squeeze(1)
             vad_prediction, vad_loss = self.vad_classifier(quantized, vad_labels, dataset_id, subject_id)
+            vad_loss = vad_loss["loss"]
         else:
             vad_loss = 0.0
         
         # Compute losses
-        total_loss = recon_loss + commit_loss + vad_loss        
+        total_loss = recon_loss + commit_loss + self.vad_scale * vad_loss
         loss = {
             "loss": total_loss,
             "commit_loss": commit_loss,
@@ -211,9 +219,9 @@ class SEANetVQVAE(nn.Module):
             f"S_{dataset_id}_{subject_id}_recon_loss": recon_loss,
         }
 
-        if vad_labels:
+        if vad_labels is not None:
             loss = dict(loss, **{
-                "vad_loss": vad_loss,
+                "vad_loss": self.vad_scale * vad_loss,
                 f"D_{dataset_id}_vad_loss": vad_loss,
                 f"S_{dataset_id}_{subject_id}_vad_loss": vad_loss,
             })
