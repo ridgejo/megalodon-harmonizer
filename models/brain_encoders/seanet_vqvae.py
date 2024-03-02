@@ -209,6 +209,7 @@ class SEANetVQVAE(nn.Module):
         x = self.decode(dec_projection, dataset_id, subject_id)
 
         decoder_loss = F.mse_loss(x, x_t1) # Automatically accounts for autoregressive vs reconstruction
+        decoder_loss = 0.0 # warning: ignore for testing only
 
         # VAD objective (only computed when labels are available)
         if vad_labels is not None:

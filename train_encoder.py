@@ -312,7 +312,7 @@ for epoch in range(num_epochs):
 
                         for ch_x, ch_x_hat in zip(x_sample, x_hat_sample):
                             test_axes[0, j].plot(t, ch_x)
-                            test_axes[1, j].plot(t, ch_x_hat)
+                            test_axes[1, j].plot(t[:len(ch_x_hat)], ch_x_hat)
                             test_axes[1, j].set_xlabel("Time (s)")
                             test_axes[0, j].set_ylabel("Amplitude")
                             test_axes[0, j].set_ylim(-5, 5)
@@ -341,7 +341,7 @@ for epoch in range(num_epochs):
 
                         for ch_x, ch_x_hat in zip(x_sample, x_hat_sample):
                             train_axes[0, j].plot(t, ch_x)
-                            train_axes[1, j].plot(t, ch_x_hat)
+                            train_axes[1, j].plot(t[:len(ch_x_hat)], ch_x_hat)
                             train_axes[1, j].set_xlabel("Time (s)")
                             train_axes[0, j].set_ylabel("Amplitude")
                             train_axes[0, j].set_ylim(-5, 5)
