@@ -24,7 +24,7 @@ def _string_hash(text):
     return int(hashlib.md5(text.encode("utf-8")).hexdigest(), 16)
 
 
-def load_dataset(bids_root, subject_id, task, session, preproc_config, cache_path=None):
+def load_dataset(bids_root, subject_id, task, session, cache_path=None):
     """Loads a dataset. First checks if a preprocessed version already exists in cache and loads it."""
 
     if not cache_path:

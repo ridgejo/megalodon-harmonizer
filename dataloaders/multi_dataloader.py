@@ -1,11 +1,15 @@
 import lightning as L
 import typing as tp
 import sys
+import glob
+import os
 
 from torch.utils.data import ConcatDataset, DataLoader, random_split
 from lightning.pytorch.utilities.combined_loader import CombinedLoader
-from dataloaders.data_utils import BatchScaler
+from dataloaders.data_utils import BatchScaler, DATA_PATH
 from dataloaders.armeni2022 import Armeni2022
+from dataloaders.gwilliams2022 import Gwilliams2022
+from dataloaders.schoffelen2019 import Schoffelen2019
 
 class MultiDataLoader(L.LightningDataModule):
     """Loads data from multiple datasets. Supports loading mixed labelled and unlabelled data."""
@@ -23,7 +27,9 @@ class MultiDataLoader(L.LightningDataModule):
         self.data = {}
 
         self.loaders = {
-            "armeni2022": self._load_armeni_2022
+            "armeni2022": self._load_armeni_2022,
+            "gwilliams2022": self._load_gwilliams_2022,
+            "schoffelen2019": self._load_schoffelen_2019,
         }
     
     def prepare_data(self):
@@ -111,7 +117,7 @@ class MultiDataLoader(L.LightningDataModule):
     def predict_dataloader(self):
         return CombinedLoader(self.predict, 'max_size')
 
-    def _load_armeni_2022(self, config, n_subjects=27, n_sessions=10):
+    def _load_armeni_2022(self, config, n_subjects=3, n_sessions=10):
 
         # Dataset key formatted as dat={}_sub={}_ses={}. Necessary for scalers.
 
@@ -123,7 +129,6 @@ class MultiDataLoader(L.LightningDataModule):
         bad_sessions = config["bad_sessions"]
         slice_len = config["slice_len"]
         label_type = config["label_type"]
-        preproc_config = config["preproc_config"]
 
         datasets = {}
 
@@ -148,7 +153,6 @@ class MultiDataLoader(L.LightningDataModule):
                     session=session,
                     task="compr",
                     slice_len=slice_len,
-                    preproc_config=preproc_config,
                     label_type=label_type,
                 )
 
@@ -157,6 +161,98 @@ class MultiDataLoader(L.LightningDataModule):
                 datasets[f"dat=armeni2022_sub={subject}_ses={session}"] = data
 
         return datasets, seconds
+    
+    def _load_gwilliams_2022(self, config, n_subjects=27, n_sessions=1, n_tasks=3):
+
+        if self.debug:
+            n_subjects=1
+            n_tasks=0
+        
+        bad_subjects = config["bad_subjects"]
+        slice_len = config["slice_len"]
+        label_type = config["label_type"]
+
+        seconds = 0
+        datasets = {}
+        for subj_no in range(1, n_subjects + 1):
+            subject = "{:02d}".format(subj_no)  # 01, 02, etc.
+
+            if subject in bad_subjects:
+                continue
+
+            # Loop over sessions
+            for sess_no in range(0, n_sessions + 1):
+                session = str(sess_no)
+
+                for task in range(0, n_tasks + 1):
+                    task = str(task)
+
+                    try:
+                        data = Gwilliams2022(
+                            subject_id=subject,
+                            session=session,
+                            task=task,
+                            slice_len=slice_len,
+                            label_type=label_type,
+                        )
+                    except Exception as e:
+                        print("Skipping: ", e)
+                        continue  # Subject may not have completed task or session
+
+                    seconds += len(data) * slice_len
+
+                    datasets[f"dat=gwilliams2022_sub={subject}_ses={session}_tsk={task}"] = data
+
+        return datasets, seconds
+
+    def _load_schoffelen_2019(self, config, tasks=["auditory", "rest", "visual"]):
+
+        subjects = sorted(
+            [
+                os.path.basename(path).replace("sub-", "")
+                for path in glob.glob(str(DATA_PATH) + "/schoffelen2019/sub-*")
+            ]
+        )
+
+        if self.debug:
+            subjects = [subjects[0]]
+            tasks = ["rest"]
+
+        bad_subjects = config["bad_subjects"]
+        slice_len = config["slice_len"]
+        label_type = config["label_type"]
+        
+        seconds = 0
+        datasets = {}
+        for subject in subjects:
+
+            if subject in bad_subjects:
+                continue  # ignore incomplete subject data
+
+            for task in tasks:
+                if subject.startswith("V") and task == "auditory":
+                    continue
+                elif subject.startswith("A") and task == "visual":
+                    continue
+
+                try:
+                    data = Schoffelen2019(
+                        subject_id=subject,
+                        task=task,
+                        slice_len=slice_len,
+                    )
+                except Exception as e:
+                    print("Skipping: ", e)
+                    continue  # Not all subjects have recordings for both tasks
+
+                seconds += len(data) * slice_len
+
+                datasets[f"dat=schoffelen2019_sub={subject}_tsk={task}"] = data
+        
+        return datasets, seconds
+
+
+
 
 if __name__ == "__main__":
 
@@ -165,15 +261,18 @@ if __name__ == "__main__":
             "armeni2022": {
                 "bad_subjects": [],
                 "bad_sessions": {"001": [], "002": [], "003": []},
-                "slice_len": 3.0,
+                "slice_len": 0.1,
                 "label_type": "vad",
-                "preproc_config": {
-                    "filtering": True,
-                    "resample": 250,
-                    "notch_freqs": [50, 100],
-                    "bandpass_lo": 0.5,
-                    "bandpass_hi": 125,
-                },
+            },
+            "schoffelen2019": {
+                "bad_subjects": [],
+                "slice_len": 0.1,
+                "label_type": None,
+            },
+            "gwilliams2022": {
+                "bad_subjects": [],
+                "slice_len": 0.1,
+                "label_type": None,
             },
         },
         dataloader_configs={
@@ -201,3 +300,5 @@ if __name__ == "__main__":
 
     sample_scaled = datamodule.on_before_batch_transfer(sample, 0)
     print(sample_scaled)
+
+    breakpoint()

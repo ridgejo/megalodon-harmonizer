@@ -21,7 +21,6 @@ class Armeni2022(Dataset):
         task: str,
         session: str,
         slice_len: float,
-        preproc_config: dict,
         label_type: str,
         bids_root: str = data_utils.DATA_PATH / "armeni2022",
         truncate: tp.Optional[int] = None,
@@ -46,7 +45,6 @@ class Armeni2022(Dataset):
             subject_id=subject_id,
             task=task,
             session=session,
-            preproc_config=preproc_config,
         )
 
         events = label_utils.read_events_file(

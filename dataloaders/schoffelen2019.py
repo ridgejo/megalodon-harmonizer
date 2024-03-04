@@ -295,7 +295,6 @@ class Schoffelen2019(Dataset):
         subject_id: str,
         task: str,
         slice_len: float,
-        preproc_config: dict,
         bids_root: str = data_utils.DATA_PATH / "schoffelen2019",
     ):
         """
@@ -315,7 +314,6 @@ class Schoffelen2019(Dataset):
             subject_id=subject_id,
             task=task,
             session=None,
-            preproc_config=preproc_config,
         )
 
         picks = mne.pick_types(
@@ -334,12 +332,7 @@ class Schoffelen2019(Dataset):
     def __getitem__(self, idx):
         data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
 
-        identifiers = {
-            "dataset": self.__class__.__name__,
-            "subject": self.subject_id,
-        }
-
-        return data_slice, times, identifiers
+        return data_slice, times
 
 
 if __name__ == "__main__":
