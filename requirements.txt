@@ -5,6 +5,7 @@ evaluate
 flatten-dict
 jiwer
 jupyter-server-proxy
+lightning
 osl
 plotly
 torch
