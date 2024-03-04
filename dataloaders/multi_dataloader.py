@@ -5,7 +5,7 @@ import sys
 from torch.utils.data import ConcatDataset, DataLoader, random_split
 from lightning.pytorch.utilities.combined_loader import CombinedLoader
 from dataloaders.data_utils import BatchScaler
-from dataloaders.armeni2022_labelled import Armeni2022Labelled
+from dataloaders.armeni2022 import Armeni2022
 
 class MultiDataLoader(L.LightningDataModule):
     """Loads data from multiple datasets. Supports loading mixed labelled and unlabelled data."""
@@ -92,7 +92,7 @@ class MultiDataLoader(L.LightningDataModule):
 
         # Apply batch scaling transformation before transferring to device.
         for dataset, batch_tensor in batch.items():
-            batch[dataset] = self.scalers[dataset](batch_tensor)
+            batch[dataset][0] = self.scalers[dataset](batch_tensor[0])
 
         return batch
 
@@ -113,8 +113,7 @@ class MultiDataLoader(L.LightningDataModule):
 
     def _load_armeni_2022(self, config, n_subjects=27, n_sessions=10):
 
-        # todo: should tag each Dataset with string identifiers: dataset, subject, and session as this is necessary for scalers and any conditional blocks
-        # How to format? dat={}_sub={}_ses={} should work?
+        # Dataset key formatted as dat={}_sub={}_ses={}. Necessary for scalers.
 
         if self.debug:
             n_subjects = 1
@@ -144,8 +143,7 @@ class MultiDataLoader(L.LightningDataModule):
                 if session in bad_sessions[subject]:
                     continue
 
-                # todo: update dataloader
-                data = Armeni2022Labelled(
+                data = Armeni2022(
                     subject_id=subject,
                     session=session,
                     task="compr",
@@ -198,4 +196,8 @@ if __name__ == "__main__":
     datamodule.prepare_data()
     datamodule.setup(stage="fit")
 
-    breakpoint()
+    sample = next(iter(datamodule.train_dataloader()))[0]
+    print(sample)
+
+    sample_scaled = datamodule.on_before_batch_transfer(sample, 0)
+    print(sample_scaled)
