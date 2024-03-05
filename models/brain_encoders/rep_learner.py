@@ -3,6 +3,7 @@ import torch
 import typing as tp
 import torch.nn as nn
 import torch.nn.functional as F
+import torchmetrics.functional as TM
 
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder, SEANetBrainDecoder
 from models.dataset_block import DatasetBlock
@@ -52,12 +53,19 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
 
     return ArgmaxAmpPredictor(input_dim, hidden_dim, dataset_keys)
 
+def make_vad_classifier(input_dim, hidden_dim):
+    return nn.Sequential(
+        nn.Linear(in_features=input_dim, out_features=hidden_dim),
+        nn.ReLU(),
+        nn.Linear(in_features=hidden_dim, out_features=1),
+    )
+
 class RepLearner(L.LightningModule):
     """
     Representation learner.
     """
 
-    def __init__(self, rep_config):
+    def __init__(self, rep_config, batch_size):
         super().__init__()
 
         # Requirements:
@@ -74,6 +82,7 @@ class RepLearner(L.LightningModule):
         # etc.
 
         self.lr = rep_config["lr"]
+        self.batch_size = batch_size
 
         active_models = {}
 
@@ -82,9 +91,10 @@ class RepLearner(L.LightningModule):
                 **rep_config["dataset_block"]
             )
         
-        active_models["encoder"] = SEANetBrainEncoder(
-            **rep_config["encoder"]
-        )
+        if "encoder" in rep_config:
+            active_models["encoder"] = SEANetBrainEncoder(
+                **rep_config["encoder"]
+            )
 
         if "transformer" in rep_config:
             active_models["transformer"] = nn.TransformerEncoder(
@@ -103,6 +113,11 @@ class RepLearner(L.LightningModule):
                 **rep_config["argmax_amp_predictor"]
             )
 
+        if "vad_classifier" in rep_config:
+            active_models["vad_classifier"] = make_vad_classifier(
+                **rep_config["vad_classifier"]
+            )
+
         self.active_models = nn.ModuleDict(active_models)
         self.rep_config = rep_config
 
@@ -111,15 +126,16 @@ class RepLearner(L.LightningModule):
         x = inputs["data"]
         z = x.clone() # Operate on a copy
 
-        if "dataset_block" in self.rep_config:
+        if "dataset_block" in self.active_models:
             z = self.active_models["dataset_block"](
                 z,
                 dataset_id=get_key_from_identifier("dat", identifier)
             )
         
-        z = self.active_models["encoder"](z)
+        if "encoder" in self.active_models:
+            z = self.active_models["encoder"](z)
 
-        if "transformer" in self.rep_config:
+        if "transformer" in self.active_models:
             z = self.active_models["transformer"](z)
 
         # Batch the temporal dimension for independent classification [B, E, T] -> [B * T, E]
@@ -127,13 +143,13 @@ class RepLearner(L.LightningModule):
 
         return_values = {}
 
-        if "phase_amp_regressor" in self.rep_config:
+        if "phase_amp_regressor" in self.active_models:
             pa = self.active_models["phase_amp_regressor"](z)
             phase, amp = pa[:, 0], pa[:, 1]
             return_values["phase"] = phase
             return_values["amp"] = amp
 
-        if "argmax_amp_predictor" in self.rep_config:
+        if "argmax_amp_predictor" in self.active_models:
             argmax_amp = self.active_models["argmax_amp_predictor"](
                 z,
                 dataset_key=get_key_from_identifier("dat", identifier),
@@ -141,12 +157,47 @@ class RepLearner(L.LightningModule):
             )
             return_values["argmax_amp"] = argmax_amp
 
+        if "vad_classifier" in self.active_models and "vad_labels" in inputs:
+            vad_logits = self.active_models["vad_classifier"](z).squeeze(-1)
+            return_values["vad_logits"] = vad_logits
+
         return return_values
 
     def training_step(self, batch, batch_idx):
 
-        # batch will contains keys from all datasets.
-        # each of these will contain keys for data/labels/times/etc.
+        loss, losses, metrics = self._shared_step(batch, batch_idx, "train")
+
+        if loss is not None:
+            self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
+            self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+            self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+
+        loss, losses, metrics = self._shared_step(batch, batch_idx, "val")
+
+        if loss is not None:
+            self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
+            self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+            self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+
+        return loss
+
+    def test_step(self, batch, batch_idx):
+
+        loss, losses, metrics = self._shared_step(batch, batch_idx, "test")
+
+        if loss is not None:
+            self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
+            self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+            self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+
+        return loss
+
+
+    def _shared_step(self, batch, batch_idx, stage : str):
 
         losses = {}
         metrics = {}
@@ -163,19 +214,31 @@ class RepLearner(L.LightningModule):
                         # Compute max amplitude index at all time points in signal
 
                         argmax_amp_loss, rmse_metric = val
-                        losses[f"train_{data_key}+argmax_amp_loss"] = argmax_amp_loss
-                        metrics[f"train_{data_key}+argmax_amp_rmse"] = rmse_metric
+                        losses[f"{stage}_{data_key}+argmax_amp_loss"] = argmax_amp_loss
+                        metrics[f"{stage}_{data_key}+argmax_amp_rmse"] = rmse_metric
+
+                    if key == "vad_logits":
+                        vad_logits = val
+                        vad_labels = data_batch["vad_labels"].flatten(start_dim=0, end_dim=1)
+                        vad_loss = F.binary_cross_entropy_with_logits(vad_logits, vad_labels)
+
+                        vad_preds = torch.round(F.sigmoid(vad_logits))
+                        vad_balacc = TM.classification.accuracy(
+                            vad_preds.int(), vad_labels.int(), task='multiclass', num_classes=2, average='macro'
+                        )
+                        losses[f"{stage}_{data_key}+vad_bce_loss"] = vad_loss
+                        metrics[f"{stage}_{data_key}+vad_balacc"] = vad_balacc
         
         # Combine all losses to get total loss
-        loss = 0
+        loss = 0.0
         for key, val in losses.items():
             loss += val
 
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-        self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        if loss == 0.0:
+            loss = None
 
-        return loss
+        return loss, losses, metrics
+        
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.active_models.parameters(), lr=self.lr)

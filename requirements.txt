@@ -10,6 +10,7 @@ osl
 plotly
 torch
 torchaudio
+torchmetrics
 numpy
 mne
 mne_bids

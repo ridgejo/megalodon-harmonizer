@@ -72,8 +72,6 @@ class Armeni2022(Dataset):
                 events, raw
             )
             self.num_slices = len(self.phoneme_onsets)
-        else:
-            raise ValueError(f"Unrecognised label type {label_type}")
 
         self.raw = raw
 
@@ -96,18 +94,22 @@ class Armeni2022(Dataset):
             data_slice, label_slice, times = label_utils.get_slice(
                 self.raw, self.labels, idx, self.samples_per_slice
             )
+            return {
+                "data": data_slice,
+                "vad_labels": label_slice,
+                "times": times,
+            }
         elif self.label_type == "voiced":
             start = self.phoneme_onsets[idx]
             data_slice, times = self.raw[:, start : start + self.samples_per_slice]
-            label_slice = self.labels[
+            label = self.labels[
                 idx
             ]  # Warning: not actually a slice, just a single label.
-
-        return {
-            "data": data_slice,
-            "labels": label_slice,
-            "times": times,
-        }
+            return {
+                "data": data_slice,
+                "voiced_label": label,
+                "times": times,
+            }
 
 
 if __name__ == "__main__":

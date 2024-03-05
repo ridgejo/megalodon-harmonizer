@@ -1,0 +1,55 @@
+experiment:
+  seed: 42
+
+rep_config:
+  lr: 0.001
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+    shared_dim: 256
+    use_data_block: true
+  # encoder:
+  #   channels: 300
+  #   conv_channels: [512, 512]
+  #   ratios: [1]
+  #   dimension: 256
+  # argmax_amp_predictor:
+  #   input_dim: 256
+  #   hidden_dim: 512
+  #   dataset_keys: ["armeni2022", "schoffelen2019", "gwilliams2022"]
+  vad_classifier:
+    input_dim: 256
+    hidden_dim: 512
+
+datamodule_config:
+  dataset_preproc_configs:
+    # armeni2022:
+    #   bad_subjects: []
+    #   bad_sessions:
+    #     "001": []
+    #     "002": []
+    #     "003": []
+    #   slice_len: 0.1
+    #   label_type: null
+    # schoffelen2019:
+    #   bad_subjects: []
+    #   slice_len: 0.1
+    #   label_type: null
+    gwilliams2022:
+      bad_subjects: []
+      slice_len: 0.1
+      label_type: "vad" # Armeni VAD labels are questionable
+  dataloader_configs:
+    train_ratio: 0.9
+    val_ratio: 0.04
+    test_ratio: 0.04
+    pred_ratio: 0.02
+    batch_size: 32
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:
+  debug: true

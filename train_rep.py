@@ -32,7 +32,10 @@ wandb_logger = WandbLogger(
     dir=DATA_PATH / "wandb",
 )
 
-model = RepLearner(config["rep_config"])
+model = RepLearner(
+    config["rep_config"],
+    batch_size=config["datamodule_config"]["dataloader_configs"]["batch_size"]
+)
 datamodule = MultiDataLoader(**config["datamodule_config"])
 
 trainer = Trainer(logger=wandb_logger)
