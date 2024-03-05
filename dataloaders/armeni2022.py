@@ -87,7 +87,10 @@ class Armeni2022(Dataset):
 
         if self.label_type is None:
             data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
-            return data_slice, times
+            return {
+                "data": data_slice,
+                "times": times,
+            }
 
         if self.label_type == "vad":
             data_slice, label_slice, times = label_utils.get_slice(
@@ -100,7 +103,11 @@ class Armeni2022(Dataset):
                 idx
             ]  # Warning: not actually a slice, just a single label.
 
-        return data_slice, label_slice, times
+        return {
+            "data": data_slice,
+            "labels": label_slice,
+            "times": times,
+        }
 
 
 if __name__ == "__main__":

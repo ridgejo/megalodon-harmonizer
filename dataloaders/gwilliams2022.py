@@ -69,9 +69,14 @@ class Gwilliams2022(Dataset):
 
     def __getitem__(self, idx):
 
+        return_dict = {}
+
         if self.label_type is None:
             data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
-            return data_slice, times
+            return {
+                "data": data_slice,
+                "times": times,
+            }
 
         if self.label_type == "voiced":
             start = self.phoneme_onsets[idx]
@@ -82,7 +87,11 @@ class Gwilliams2022(Dataset):
                 self.raw, self.labels, idx, self.samples_per_slice,
             )
 
-        return data_slice, label_slice, times
+        return {
+            "data": data_slice,
+            "labels": label_slice,
+            "times": times,
+        }
 
 
 if __name__ == "__main__":

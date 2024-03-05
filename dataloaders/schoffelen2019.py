@@ -332,7 +332,10 @@ class Schoffelen2019(Dataset):
     def __getitem__(self, idx):
         data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
 
-        return data_slice, times
+        return {
+            "data": data_slice,
+            "times": times,
+        }
 
 
 if __name__ == "__main__":

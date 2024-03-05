@@ -149,7 +149,7 @@ class BatchScaler(nn.Module):
     def fit(self, dataloader):
         sample_batches = []
         for i, batch in enumerate(dataloader):
-            sample_batches.append(batch[0])  # Keep only data
+            sample_batches.append(batch["data"])
             if i >= self.n_sample_batches:
                 break
 

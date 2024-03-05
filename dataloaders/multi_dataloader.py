@@ -98,7 +98,7 @@ class MultiDataLoader(L.LightningDataModule):
 
         # Apply batch scaling transformation before transferring to device.
         for dataset, batch_tensor in batch.items():
-            batch[dataset][0] = self.scalers[dataset](batch_tensor[0])
+            batch[dataset]["data"] = self.scalers[dataset](batch_tensor["data"])
 
         return batch
 
