@@ -1,5 +1,6 @@
 import lightning as L
 import typing as tp
+import torch
 import sys
 import glob
 import os
@@ -98,7 +99,10 @@ class MultiDataLoader(L.LightningDataModule):
 
         # Apply batch scaling transformation before transferring to device.
         for dataset, batch_tensor in batch.items():
-            batch[dataset]["data"] = self.scalers[dataset](batch_tensor["data"])
+            if batch[dataset] is not None:
+                batch[dataset]["data"] = torch.from_numpy(
+                    self.scalers[dataset](batch_tensor["data"])
+                ).float()
 
         return batch
 
