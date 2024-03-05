@@ -18,11 +18,13 @@ def make_phase_amp_regressor(input_dim, hidden_dim):
         nn.Linear(in_features=hidden_dim, out_features=2),
     )
 
-def make_argmax_amp_predictor(input_dim, hidden_dim, output_dims):
+def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
 
     class ArgmaxAmpPredictor(nn.Module):
-        def __init__(self, input_dim, hidden_dim, output_dims):
+        def __init__(self, input_dim, hidden_dim, dataset_keys, target_divisor=300):
             super(ArgmaxAmpPredictor, self).__init__()
+
+            self.target_divisor = target_divisor
 
             self.body = nn.Sequential(
                 nn.Linear(in_features=input_dim, out_features=hidden_dim),
@@ -31,19 +33,24 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, output_dims):
 
             self.output_layer = nn.ModuleDict({
                 dataset_key: nn.Linear(
-                        in_features=hidden_dim, out_features=out_dim
-                    ) for dataset_key, out_dim in output_dims.items()
+                        in_features=hidden_dim, out_features=1
+                    ) for dataset_key in dataset_keys
             })
-
-            self.selector = nn.CrossEntropyLoss()
 
         def forward(self, x, dataset_key, targets):
             z = self.body(x)
             z = self.output_layer[dataset_key](z)
-            cross_entropy_loss = self.selector(z, targets)
-            return cross_entropy_loss
 
-    return ArgmaxAmpPredictor(input_dim, hidden_dim, output_dims)
+            # This is much closer to a regression than a classification problem.
+            # Scale targets down to approximately [0, 1] range for stability.
+            mse_loss = F.mse_loss(z.squeeze(-1), targets.float() / self.target_divisor)
+
+            # Compute real distance to sensor prediction
+            rmse_metric = torch.sqrt(F.mse_loss(z.squeeze(-1) * self.target_divisor, targets.float()))
+
+            return mse_loss, rmse_metric
+
+    return ArgmaxAmpPredictor(input_dim, hidden_dim, dataset_keys)
 
 class RepLearner(L.LightningModule):
     """
@@ -142,10 +149,10 @@ class RepLearner(L.LightningModule):
         # each of these will contain keys for data/labels/times/etc.
 
         losses = {}
+        metrics = {}
         for data_key, data_batch in batch.items():
 
             if data_batch is not None:
-                losses[data_key] = {}
 
                 return_values = self(data_batch, data_key)
 
@@ -154,16 +161,21 @@ class RepLearner(L.LightningModule):
 
                     if key == "argmax_amp":
                         # Compute max amplitude index at all time points in signal
-                        losses[data_key]["argmax_amp_loss"] = val
+
+                        argmax_amp_loss, rmse_metric = val
+                        losses[f"train_{data_key}+argmax_amp_loss"] = argmax_amp_loss
+                        metrics[f"train_{data_key}+argmax_amp_rmse"] = rmse_metric
         
         # Combine all losses to get total loss
         loss = 0
-        for key, subdict in losses.items():
-            for k, v in subdict.items():
-                loss += v
-        losses["loss"] = loss
+        for key, val in losses.items():
+            loss += val
 
-        return losses
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+
+        return loss
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.active_models.parameters(), lr=self.lr)
@@ -202,11 +214,7 @@ if __name__ == "__main__":
             "argmax_amp_predictor": {
                 "input_dim": 256,
                 "hidden_dim": 512,
-                "output_dims": {
-                    "armeni2022": 269,
-                    "schoffelen2019": 273,
-                    "gwilliams2022": 208,
-                },
+                "dataset_keys": ["armeni2022", "schoffelen2019", "gwilliams2022"],
             },
             # "phase_amp_regressor": {
             #     "input_dim": 256,
