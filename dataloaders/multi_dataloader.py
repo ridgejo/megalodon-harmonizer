@@ -1,25 +1,26 @@
-import lightning as L
-import typing as tp
-import torch
-import sys
 import glob
 import os
+import typing as tp
 
-from torch.utils.data import ConcatDataset, DataLoader, random_split
+import lightning as L
+import torch
 from lightning.pytorch.utilities.combined_loader import CombinedLoader
-from dataloaders.data_utils import BatchScaler, DATA_PATH
+from torch.utils.data import DataLoader, random_split
+
 from dataloaders.armeni2022 import Armeni2022
+from dataloaders.data_utils import DATA_PATH, BatchScaler
 from dataloaders.gwilliams2022 import Gwilliams2022
 from dataloaders.schoffelen2019 import Schoffelen2019
+
 
 class MultiDataLoader(L.LightningDataModule):
     """Loads data from multiple datasets. Supports loading mixed labelled and unlabelled data."""
 
     def __init__(
         self,
-        dataset_preproc_configs : tp.Dict,
-        dataloader_configs : tp.Dict,
-        debug : bool = False,
+        dataset_preproc_configs: tp.Dict,
+        dataloader_configs: tp.Dict,
+        debug: bool = False,
     ):
         super().__init__()
         self.dataset_preproc_configs = dataset_preproc_configs
@@ -32,14 +33,12 @@ class MultiDataLoader(L.LightningDataModule):
             "gwilliams2022": self._load_gwilliams_2022,
             "schoffelen2019": self._load_schoffelen_2019,
         }
-    
-    def prepare_data(self):
 
+    def prepare_data(self):
         # Preprocess or load cached versions of all required datasets
         # NOTE: Called once within a single process on CPU
 
         for dataset, config in self.dataset_preproc_configs.items():
-
             print(f"Loading data from {dataset}...")
 
             data, seconds = self.loaders[dataset](config)
@@ -50,38 +49,45 @@ class MultiDataLoader(L.LightningDataModule):
             )
 
     def setup(self, stage: str):
-
         print("Performing train/val/test/pred splitting...")
 
-        train_ratio, val_ratio, test_ratio, pred_ratio = (
+        train_ratio, val_ratio, test_ratio = (
             self.dataloader_configs["train_ratio"],
             self.dataloader_configs["val_ratio"],
             self.dataloader_configs["test_ratio"],
-            self.dataloader_configs["pred_ratio"]
         )
 
         batch_size = self.dataloader_configs["batch_size"]
 
         self.train, self.val, self.test, self.pred = {}, {}, {}, {}
         for dataset, data in self.data.items():
-
             train_size = int(train_ratio * len(data))
             val_size = int(val_ratio * len(data))
             test_size = int(test_ratio * len(data))
             pred_size = len(data) - train_size - val_size - test_size
 
             if min([train_size, val_size, test_size, pred_size]) < batch_size:
-                print(f"Warning: One of train/val/test/pred smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available.")
+                print(
+                    f"Warning: One of train/val/test/pred smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+                )
 
             train_split, val_split, test_split, pred_split = random_split(
                 data, [train_size, val_size, test_size, pred_size]
             )
 
-            self.train[dataset] = DataLoader(train_split, batch_size=batch_size, shuffle=True, drop_last=True)
-            self.val[dataset] = DataLoader(val_split, batch_size=batch_size, shuffle=False, drop_last=False)
-            self.test[dataset]= DataLoader(test_split, batch_size=batch_size, shuffle=False, drop_last=False)
-            self.pred[dataset] = DataLoader(pred_split, batch_size=batch_size, shuffle=True, drop_last=True)
-        
+            self.train[dataset] = DataLoader(
+                train_split, batch_size=batch_size, shuffle=True, drop_last=True
+            )
+            self.val[dataset] = DataLoader(
+                val_split, batch_size=batch_size, shuffle=False, drop_last=False
+            )
+            self.test[dataset] = DataLoader(
+                test_split, batch_size=batch_size, shuffle=False, drop_last=False
+            )
+            self.pred[dataset] = DataLoader(
+                pred_split, batch_size=batch_size, shuffle=True, drop_last=True
+            )
+
         print("Fitting scalers to datasets...")
 
         self.scalers = {}
@@ -96,7 +102,6 @@ class MultiDataLoader(L.LightningDataModule):
             self.scalers[dataset] = scaler
 
     def on_before_batch_transfer(self, batch, dataloader_idx):
-
         # Apply batch scaling transformation before transferring to device.
         for dataset, batch_tensor in batch.items():
             if batch[dataset] is not None:
@@ -107,22 +112,20 @@ class MultiDataLoader(L.LightningDataModule):
         return batch
 
     def train_dataloader(self):
-
         # NOTE: 'max_size' will stop after the longest iterable is done, returning None for exhausted iterables.
 
-        return CombinedLoader(self.train, 'max_size')
+        return CombinedLoader(self.train, "max_size")
 
     def val_dataloader(self):
-        return CombinedLoader(self.val, 'max_size')
+        return CombinedLoader(self.val, "max_size")
 
     def test_dataloader(self):
-        return CombinedLoader(self.test, 'max_size')
-    
+        return CombinedLoader(self.test, "max_size")
+
     def predict_dataloader(self):
-        return CombinedLoader(self.predict, 'max_size')
+        return CombinedLoader(self.predict, "max_size")
 
     def _load_armeni_2022(self, config, n_subjects=3, n_sessions=10):
-
         # Dataset key formatted as dat={}_sub={}_ses={}. Necessary for scalers.
 
         if self.debug:
@@ -139,7 +142,6 @@ class MultiDataLoader(L.LightningDataModule):
         # Loop over subjects
         seconds = 0
         for subj_no in range(1, n_subjects + 1):
-
             subject = "{:03d}".format(subj_no)  # 001, 002, and 003
 
             if subject in bad_subjects:
@@ -165,13 +167,12 @@ class MultiDataLoader(L.LightningDataModule):
                 datasets[f"dat=armeni2022_sub={subject}_ses={session}"] = data
 
         return datasets, seconds
-    
-    def _load_gwilliams_2022(self, config, n_subjects=27, n_sessions=1, n_tasks=3):
 
+    def _load_gwilliams_2022(self, config, n_subjects=27, n_sessions=1, n_tasks=3):
         if self.debug:
-            n_subjects=1
-            n_tasks=0
-        
+            n_subjects = 1
+            n_tasks = 0
+
         bad_subjects = config["bad_subjects"]
         slice_len = config["slice_len"]
         label_type = config["label_type"]
@@ -205,12 +206,13 @@ class MultiDataLoader(L.LightningDataModule):
 
                     seconds += len(data) * slice_len
 
-                    datasets[f"dat=gwilliams2022_sub={subject}_ses={session}_tsk={task}"] = data
+                    datasets[
+                        f"dat=gwilliams2022_sub={subject}_ses={session}_tsk={task}"
+                    ] = data
 
         return datasets, seconds
 
     def _load_schoffelen_2019(self, config, tasks=["auditory", "rest", "visual"]):
-
         subjects = sorted(
             [
                 os.path.basename(path).replace("sub-", "")
@@ -224,12 +226,10 @@ class MultiDataLoader(L.LightningDataModule):
 
         bad_subjects = config["bad_subjects"]
         slice_len = config["slice_len"]
-        label_type = config["label_type"]
-        
+
         seconds = 0
         datasets = {}
         for subject in subjects:
-
             if subject in bad_subjects:
                 continue  # ignore incomplete subject data
 
@@ -252,14 +252,11 @@ class MultiDataLoader(L.LightningDataModule):
                 seconds += len(data) * slice_len
 
                 datasets[f"dat=schoffelen2019_sub={subject}_tsk={task}"] = data
-        
+
         return datasets, seconds
 
 
-
-
 if __name__ == "__main__":
-
     datamodule = MultiDataLoader(
         dataset_preproc_configs={
             "armeni2022": {
@@ -288,9 +285,7 @@ if __name__ == "__main__":
             "normalisation": {
                 "n_sample_batches": 8,
                 "per_channel": True,
-                "scaler_conf": {
-                    "standard_scaler": None
-                },
+                "scaler_conf": {"standard_scaler": None},
             },
         },
         debug=True,

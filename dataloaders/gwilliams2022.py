@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 import dataloaders.data_utils as data_utils
 import dataloaders.label_utils as label_utils
 
+
 class Gwilliams2022(Dataset):
     """
     Loads fixed windows from the MEG data in Gwilliams et al. (2022).
@@ -42,9 +43,7 @@ class Gwilliams2022(Dataset):
             session=session,
         )
 
-        phoneme_codes = pd.read_csv(
-            bids_root / "phoneme_info.csv"
-        )
+        phoneme_codes = pd.read_csv(bids_root / "phoneme_info.csv")
 
         events = label_utils.read_events_file(
             bids_root=bids_root,
@@ -53,11 +52,15 @@ class Gwilliams2022(Dataset):
             task=task,
         )
 
-        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(raw, slice_len)
+        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(
+            raw, slice_len
+        )
         self.num_slices = len(self.valid_indices)
 
         if label_type == "voiced":
-            self.phoneme_onsets, self.labels = label_utils.get_voiced_labels_gwilliams(events, phoneme_codes, raw)
+            self.phoneme_onsets, self.labels = label_utils.get_voiced_labels_gwilliams(
+                events, phoneme_codes, raw
+            )
             self.num_slices = len(self.phoneme_onsets)
         elif label_type == "vad":
             self.labels = label_utils.get_vad_labels_gwilliams(events, raw)
@@ -68,11 +71,10 @@ class Gwilliams2022(Dataset):
         return self.num_slices
 
     def __getitem__(self, idx):
-
-        return_dict = {}
-
         if self.label_type is None:
-            data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
+            data_slice, times = data_utils.get_slice(
+                self.raw, idx, self.samples_per_slice, self.valid_indices
+            )
             return {
                 "data": data_slice,
                 "times": times,
@@ -89,7 +91,10 @@ class Gwilliams2022(Dataset):
             }
         elif self.label_type == "vad":
             data_slice, label_slice, times = label_utils.get_slice(
-                self.raw, self.labels, idx, self.samples_per_slice,
+                self.raw,
+                self.labels,
+                idx,
+                self.samples_per_slice,
             )
             return {
                 "data": data_slice,

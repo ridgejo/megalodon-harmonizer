@@ -1,16 +1,17 @@
 import lightning as L
 import torch
-import typing as tp
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as TM
 
-from models.brain_encoders.seanet.seanet import SEANetBrainEncoder, SEANetBrainDecoder
+from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.dataset_block import DatasetBlock
+
 
 def get_key_from_identifier(key: str, identifier: str):
     """Get key from identifier in style dat=..._sub=..._ses=..."""
     return identifier.split(f"{key}=")[1].split("_")[0]
+
 
 def make_phase_amp_regressor(input_dim, hidden_dim):
     return nn.Sequential(
@@ -19,8 +20,8 @@ def make_phase_amp_regressor(input_dim, hidden_dim):
         nn.Linear(in_features=hidden_dim, out_features=2),
     )
 
-def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
 
+def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
     class ArgmaxAmpPredictor(nn.Module):
         def __init__(self, input_dim, hidden_dim, dataset_keys, target_divisor=300):
             super(ArgmaxAmpPredictor, self).__init__()
@@ -32,11 +33,12 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
                 nn.ReLU(),
             )
 
-            self.output_layer = nn.ModuleDict({
-                dataset_key: nn.Linear(
-                        in_features=hidden_dim, out_features=1
-                    ) for dataset_key in dataset_keys
-            })
+            self.output_layer = nn.ModuleDict(
+                {
+                    dataset_key: nn.Linear(in_features=hidden_dim, out_features=1)
+                    for dataset_key in dataset_keys
+                }
+            )
 
         def forward(self, x, dataset_key, targets):
             z = self.body(x)
@@ -47,18 +49,30 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
             mse_loss = F.mse_loss(z.squeeze(-1), targets.float() / self.target_divisor)
 
             # Compute real distance to sensor prediction
-            rmse_metric = torch.sqrt(F.mse_loss(z.squeeze(-1) * self.target_divisor, targets.float()))
+            rmse_metric = torch.sqrt(
+                F.mse_loss(z.squeeze(-1) * self.target_divisor, targets.float())
+            )
 
             return mse_loss, rmse_metric
 
     return ArgmaxAmpPredictor(input_dim, hidden_dim, dataset_keys)
 
+
 def make_vad_classifier(input_dim, hidden_dim):
+    # class VADLSTMClassifier(nn.Module):
+    #     def __init__(self):
+    #         super(VADLSTMClassifier, self, input_dim, hidden_dim, num_layers).__init__()
+
+    #         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True)
+
+    #     def forward(self, x):
+
     return nn.Sequential(
         nn.Linear(in_features=input_dim, out_features=hidden_dim),
         nn.ReLU(),
         nn.Linear(in_features=hidden_dim, out_features=1),
     )
+
 
 class RepLearner(L.LightningModule):
     """
@@ -87,14 +101,10 @@ class RepLearner(L.LightningModule):
         active_models = {}
 
         if "dataset_block" in rep_config:
-            active_models["dataset_block"] = DatasetBlock(
-                **rep_config["dataset_block"]
-            )
-        
+            active_models["dataset_block"] = DatasetBlock(**rep_config["dataset_block"])
+
         if "encoder" in rep_config:
-            active_models["encoder"] = SEANetBrainEncoder(
-                **rep_config["encoder"]
-            )
+            active_models["encoder"] = SEANetBrainEncoder(**rep_config["encoder"])
 
         if "transformer" in rep_config:
             active_models["transformer"] = nn.TransformerEncoder(
@@ -122,94 +132,153 @@ class RepLearner(L.LightningModule):
         self.rep_config = rep_config
 
     def forward(self, inputs, identifier):
-
         x = inputs["data"]
-        z = x.clone() # Operate on a copy
+        z = x.clone()  # Operate on a copy
 
         if "dataset_block" in self.active_models:
             z = self.active_models["dataset_block"](
-                z,
-                dataset_id=get_key_from_identifier("dat", identifier)
+                z, dataset_id=get_key_from_identifier("dat", identifier)
             )
-        
+
         if "encoder" in self.active_models:
             z = self.active_models["encoder"](z)
 
         if "transformer" in self.active_models:
             z = self.active_models["transformer"](z)
 
-        # Batch the temporal dimension for independent classification [B, E, T] -> [B * T, E]
-        z = z.permute(0, 2, 1).flatten(start_dim=0, end_dim=1)
+        # todo: vector quantization
+
+        # Create two different views for sequence models and independent classifiers
+        z_sequence = z.permute(0, 2, 1)  # [B, T, E]
+        z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
 
         return_values = {}
 
         if "phase_amp_regressor" in self.active_models:
-            pa = self.active_models["phase_amp_regressor"](z)
+            pa = self.active_models["phase_amp_regressor"](z_independent)
             phase, amp = pa[:, 0], pa[:, 1]
             return_values["phase"] = phase
             return_values["amp"] = amp
 
         if "argmax_amp_predictor" in self.active_models:
             argmax_amp = self.active_models["argmax_amp_predictor"](
-                z,
+                z_independent,
                 dataset_key=get_key_from_identifier("dat", identifier),
-                targets=self.compute_argmax_amp(x)
+                targets=self.compute_argmax_amp(x),
             )
             return_values["argmax_amp"] = argmax_amp
 
         if "vad_classifier" in self.active_models and "vad_labels" in inputs:
-            vad_logits = self.active_models["vad_classifier"](z).squeeze(-1)
+            vad_logits = self.active_models["vad_classifier"](z_independent).squeeze(-1)
             return_values["vad_logits"] = vad_logits
 
         return return_values
 
     def training_step(self, batch, batch_idx):
-
         loss, losses, metrics = self._shared_step(batch, batch_idx, "train")
 
         if loss is not None:
-            self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
-            self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
-            self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+            self.log(
+                "train_loss",
+                loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=self.batch_size,
+            )
+            self.log_dict(
+                losses,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                batch_size=self.batch_size,
+            )
+            self.log_dict(
+                metrics,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                batch_size=self.batch_size,
+            )
 
         return loss
-    
-    def validation_step(self, batch, batch_idx):
 
+    def validation_step(self, batch, batch_idx):
         loss, losses, metrics = self._shared_step(batch, batch_idx, "val")
 
         if loss is not None:
-            self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
-            self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
-            self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+            self.log(
+                "val_loss",
+                loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=self.batch_size,
+            )
+            self.log_dict(
+                losses,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                batch_size=self.batch_size,
+            )
+            self.log_dict(
+                metrics,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                batch_size=self.batch_size,
+            )
 
         return loss
 
     def test_step(self, batch, batch_idx):
-
         loss, losses, metrics = self._shared_step(batch, batch_idx, "test")
 
         if loss is not None:
-            self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
-            self.log_dict(losses, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
-            self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.batch_size)
+            self.log(
+                "test_loss",
+                loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=self.batch_size,
+            )
+            self.log_dict(
+                losses,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                batch_size=self.batch_size,
+            )
+            self.log_dict(
+                metrics,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                batch_size=self.batch_size,
+            )
 
         return loss
 
-
-    def _shared_step(self, batch, batch_idx, stage : str):
-
+    def _shared_step(self, batch, batch_idx, stage: str):
         losses = {}
         metrics = {}
         for data_key, data_batch in batch.items():
-
             if data_batch is not None:
-
                 return_values = self(data_batch, data_key)
 
                 # Compute losses over this data batch
                 for key, val in return_values.items():
-
                     if key == "argmax_amp":
                         # Compute max amplitude index at all time points in signal
 
@@ -219,16 +288,24 @@ class RepLearner(L.LightningModule):
 
                     if key == "vad_logits":
                         vad_logits = val
-                        vad_labels = data_batch["vad_labels"].flatten(start_dim=0, end_dim=1)
-                        vad_loss = F.binary_cross_entropy_with_logits(vad_logits, vad_labels)
+                        vad_labels = data_batch["vad_labels"].flatten(
+                            start_dim=0, end_dim=1
+                        )
+                        vad_loss = F.binary_cross_entropy_with_logits(
+                            vad_logits, vad_labels
+                        )
 
                         vad_preds = torch.round(F.sigmoid(vad_logits))
                         vad_balacc = TM.classification.accuracy(
-                            vad_preds.int(), vad_labels.int(), task='multiclass', num_classes=2, average='macro'
+                            vad_preds.int(),
+                            vad_labels.int(),
+                            task="multiclass",
+                            num_classes=2,
+                            average="macro",
                         )
                         losses[f"{stage}_{data_key}+vad_bce_loss"] = vad_loss
                         metrics[f"{stage}_{data_key}+vad_balacc"] = vad_balacc
-        
+
         # Combine all losses to get total loss
         loss = 0.0
         for key, val in losses.items():
@@ -238,7 +315,6 @@ class RepLearner(L.LightningModule):
             loss = None
 
         return loss, losses, metrics
-        
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.active_models.parameters(), lr=self.lr)
@@ -254,8 +330,8 @@ class RepLearner(L.LightningModule):
         argmax = torch.argmax(amplitude, dim=1)
         return argmax.flatten(start_dim=0, end_dim=1)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     model = RepLearner(
         rep_config={
             "lr": 0.001,
@@ -288,15 +364,18 @@ if __name__ == "__main__":
 
     def test_with_mocked_data():
         x = torch.randn(32, 269, 750)
-        model.training_step({
-            "data": x,
-            "labels": None,
-            "times": None,
-        }, 0)
+        model.training_step(
+            {
+                "data": x,
+                "labels": None,
+                "times": None,
+            },
+            0,
+        )
 
     def test_with_real_data():
-
         from dataloaders.multi_dataloader import MultiDataLoader
+
         datamodule = MultiDataLoader(
             dataset_preproc_configs={
                 "armeni2022": {
@@ -325,9 +404,7 @@ if __name__ == "__main__":
                 "normalisation": {
                     "n_sample_batches": 8,
                     "per_channel": True,
-                    "scaler_conf": {
-                        "standard_scaler": None
-                    },
+                    "scaler_conf": {"standard_scaler": None},
                 },
             },
             debug=True,

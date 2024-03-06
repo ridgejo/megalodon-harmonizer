@@ -1,24 +1,26 @@
 import hashlib
 import os
-import warnings
 from pathlib import Path
+
+import mne
 
 # import mne
 import numpy as np
 import torch
 import torch.nn as nn
-import mne
+
 # from mne_bids import (
 #     BIDSPath,
 #     read_raw_bids,
 # )
-from osl import preprocessing, utils
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, StandardScaler
 
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
 
+
 def get_scaler_hash(batch):
     return str([batch[-1][k][0] for k in batch[-1].keys()])
+
 
 def _string_hash(text):
     return int(hashlib.md5(text.encode("utf-8")).hexdigest(), 16)
@@ -31,11 +33,17 @@ def load_dataset(bids_root, subject_id, task, session, cache_path=None):
         # Work out cache path
         if session:
             fname = f"sub-{subject_id}_ses-{session}_task-{task}_meg_preproc_raw.fif"
-            cache_path = str(bids_root) + f"/preproc/sub-{subject_id}/sub-{subject_id}_ses-{session}_task-{task}_meg"
+            cache_path = (
+                str(bids_root)
+                + f"/preproc/sub-{subject_id}/sub-{subject_id}_ses-{session}_task-{task}_meg"
+            )
         else:
             fname = f"sub-{subject_id}_task-{task}_meg_preproc_raw.fif"
-            cache_path = str(bids_root) + f"/preproc/sub-{subject_id}/sub-{subject_id}_task-{task}_meg"
-        
+            cache_path = (
+                str(bids_root)
+                + f"/preproc/sub-{subject_id}/sub-{subject_id}_task-{task}_meg"
+            )
+
         cache_path = cache_path + "/" + fname
         print(f"Computed dataset cache path: {cache_path}")
 
@@ -45,7 +53,10 @@ def load_dataset(bids_root, subject_id, task, session, cache_path=None):
         raw = mne.io.read_raw_fif(cache_path, preload=False)  # Ensures lazy loading
         return raw, True, cache_path
     else:
-        raise FileNotFoundError(f"Could not find {cache_path}. Run preprocessing first.")
+        raise FileNotFoundError(
+            f"Could not find {cache_path}. Run preprocessing first."
+        )
+
 
 def get_valid_indices(raw, slice_len):
     """
@@ -77,13 +88,17 @@ def get_valid_indices(raw, slice_len):
 
         valid_indices -= ignore
 
-    valid_indices = sorted(list(valid_indices))[:-1] # Drop last to get even slice sizes.
+    valid_indices = sorted(list(valid_indices))[
+        :-1
+    ]  # Drop last to get even slice sizes.
 
     final_size = len(valid_indices)
-    print(f"Initialised with {orig_size}, now {final_size}. Removed {orig_size - final_size} bad slices.")
+    print(
+        f"Initialised with {orig_size}, now {final_size}. Removed {orig_size - final_size} bad slices."
+    )
 
     return valid_indices, slice_samples
-        
+
 
 def preprocess(raw, preproc_config, channels, cache_path):
     print(f"Preprocessing data with configuration {preproc_config}")
@@ -193,13 +208,21 @@ class BatchScaler(nn.Module):
             batch = np.clip(batch, a_min=-self.std * 20, a_max=self.std * 20)
             return batch.reshape(*shape)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     # Test preprocessed file.
 
     import mne
-    raw = mne.io.read_raw_fif("/data/engs-pnpl/lina4368/armeni2022/preproc/sub-001/sub-001_ses-001_task-compr_meg/sub-001_ses-001_task-compr_meg_preproc_raw.fif", preload=False)
-    raw = raw.pick_types(meg=True, ref_meg=False, exclude=["MRC23-4304", "MLO22-4304", "MRP5-4304", "MLC23-4304"])
+
+    raw = mne.io.read_raw_fif(
+        "/data/engs-pnpl/lina4368/armeni2022/preproc/sub-001/sub-001_ses-001_task-compr_meg/sub-001_ses-001_task-compr_meg_preproc_raw.fif",
+        preload=False,
+    )
+    raw = raw.pick_types(
+        meg=True,
+        ref_meg=False,
+        exclude=["MRC23-4304", "MLO22-4304", "MRP5-4304", "MLC23-4304"],
+    )
 
     breakpoint()
 

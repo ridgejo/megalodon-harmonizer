@@ -1,6 +1,5 @@
 """10-hour dataset dataloader"""
 
-import gc
 import typing as tp
 
 from torch.utils.data import Dataset
@@ -53,7 +52,7 @@ class Armeni2022(Dataset):
             session=session,
             task=task,
         )
-        
+
         textgrid = label_utils.read_textgrid(
             bids_root=bids_root,
             subject_id=subject_id,
@@ -61,7 +60,9 @@ class Armeni2022(Dataset):
             events=events,
         )
 
-        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(raw, slice_len)
+        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(
+            raw, slice_len
+        )
         self.num_slices = len(self.valid_indices)
 
         if label_type == "vad":
@@ -82,9 +83,10 @@ class Armeni2022(Dataset):
         return self.num_slices
 
     def __getitem__(self, idx):
-
         if self.label_type is None:
-            data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
+            data_slice, times = data_utils.get_slice(
+                self.raw, idx, self.samples_per_slice, self.valid_indices
+            )
             return {
                 "data": data_slice,
                 "times": times,
@@ -119,7 +121,7 @@ if __name__ == "__main__":
         subject_id="001",
         session="001",
         task="compr",
-        slice_len=100,#0.3,  # 5
+        slice_len=100,  # 0.3,  # 5
         preproc_config={
             "filtering": True,
             "resample": 250,

@@ -10,21 +10,21 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 import wandb
 import yaml
-import torch.nn.functional as F
 
 import dataloaders.data_utils as data_utils
 from dataloaders.pretraining import load_pretraining_data
-from models.lstm_classifier import _make_lstm_classifier
-from models.transformer_classifier import _make_transformer_classifier
-from models.lstm_seq import _make_lstm_seq
-from models.linear_seq import _make_linear_seq
-from models.mlp_seq import _make_mlp_seq
-from models.transformer_seq import _make_transformer_seq
-from models.full_epoch_classifier import _make_full_epoch_classifier
 from models.brain_encoders.ch_vqvae import _make_ch_vqvae
 from models.brain_encoders.seanet_vqvae import _make_seanet_vqvae
+from models.full_epoch_classifier import _make_full_epoch_classifier
+from models.linear_seq import _make_linear_seq
+from models.lstm_classifier import _make_lstm_classifier
+from models.lstm_seq import _make_lstm_seq
+from models.mlp_seq import _make_mlp_seq
+from models.transformer_classifier import _make_transformer_classifier
+from models.transformer_seq import _make_transformer_seq
 
 parser = argparse.ArgumentParser(
     prog="MEGalodon-phonemes",
@@ -88,9 +88,8 @@ for k in config["data"]["preproc_config"].keys():
 use_tokenizer = False
 debug_representation = False
 if "tokenizer" in config:
-
     debug_representation = "debug" in config["tokenizer"]
-    
+
     if debug_representation:
         print("Using tokenizer to reconstruct and debug representation")
 
@@ -129,7 +128,6 @@ if "tokenizer" in config:
         )
 
     if "state_dict" in config["tokenizer"]:
-
         print("Loading state dictionary")
 
         tokenizer.load_state_dict(torch.load(config["tokenizer"]["state_dict"]))
@@ -141,15 +139,14 @@ if "tokenizer" in config:
             # By default, freeze tokenizer if weights are loaded
             for param in tokenizer.parameters():
                 param.requires_grad = False
-    
+
     tokenizer = tokenizer.cuda()
 
-    wandb.watch(tokenizer, log_freq=100) # log gradients
+    wandb.watch(tokenizer, log_freq=100)  # log gradients
 
 
 # load model
 if config["data"]["label_type"] in ["voiced"]:
-
     if "lstm" in config["model"]:
         model = _make_lstm_classifier(
             dataset_sizes=config["data"]["dataset_sizes"],
@@ -182,12 +179,14 @@ if config["data"]["label_type"] in ["voiced"]:
             time=config["model"]["full_epoch"]["time"],
             output_classes=config["model"]["full_epoch"]["output_classes"],
         ).cuda()
-    
-elif config["data"]["label_type"] in ["vad"]:
 
+elif config["data"]["label_type"] in ["vad"]:
     # Project VQ dim to equivalent size if using tokenizer.
     if use_tokenizer and not debug_representation:
-        dataset_sizes = {k : config["tokenizer"][tok_type]["vq_dim"] for k in config["data"]["dataset_sizes"].keys()}
+        dataset_sizes = {
+            k: config["tokenizer"][tok_type]["vq_dim"]
+            for k in config["data"]["dataset_sizes"].keys()
+        }
     else:
         dataset_sizes = config["data"]["dataset_sizes"]
 
@@ -233,7 +232,7 @@ elif config["data"]["label_type"] in ["vad"]:
             output_classes=config["model"]["mlp"]["output_classes"],
         ).cuda()
 
-wandb.watch(model, log_freq=100) # log gradients
+wandb.watch(model, log_freq=100)  # log gradients
 
 
 # load optimizer
@@ -263,7 +262,6 @@ for epoch in range(num_epochs):
         label = label.cuda()
 
         if use_tokenizer:
-
             if debug_representation:
                 # Reconstruct x using tokenizer to debug missing components in representation
                 x, _ = tokenizer(x, dataset_id, subject_id)
@@ -271,11 +269,13 @@ for epoch in range(num_epochs):
             else:
                 # [B, C, T] -> [B, E, Q]
                 encoding = tokenizer.encode(x, dataset_id, subject_id)
-                x = encoding[0] * 8 # Try to scale to unit variance in latent space
+                x = encoding[0] * 8  # Try to scale to unit variance in latent space
                 commit_loss = encoding[2]
                 # Resample label if sequence labelling
                 if config["data"]["label_type"] in ["vad"]:
-                    label = F.interpolate(label.unsqueeze(1), size=x.shape[-1]).squeeze(1)
+                    label = F.interpolate(label.unsqueeze(1), size=x.shape[-1]).squeeze(
+                        1
+                    )
         else:
             commit_loss = 0.0
 
@@ -324,7 +324,9 @@ for epoch in range(num_epochs):
                         else:
                             x = tokenizer.encode(x, dataset_id, subject_id)[0]
                             if config["data"]["label_type"] in ["vad"]:
-                                label = F.interpolate(label.unsqueeze(1), size=x.shape[-1]).squeeze(1)
+                                label = F.interpolate(
+                                    label.unsqueeze(1), size=x.shape[-1]
+                                ).squeeze(1)
                     y_hat, test_loss = model(x, label, dataset_id, subject_id)
                     test_losses.update(test_loss)
 

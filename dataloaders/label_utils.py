@@ -1,7 +1,8 @@
+import ast
+
 import numpy as np
 import pandas as pd
 import textgrid
-import ast
 
 ARPABET = [
     "AA",
@@ -67,6 +68,7 @@ def read_events_file(bids_root, subject_id, session, task):
         sep="\t",
     )
 
+
 def read_textgrid(bids_root, subject_id, session, events):
     grid = textgrid.TextGrid.fromFile(
         bids_root / f"adventuresofsherlockholmes_{session[1:]}_doyle_64kb.TextGrid"
@@ -119,7 +121,9 @@ def read_textgrid(bids_root, subject_id, session, events):
 
     # Align the labels with the recording, including the long periods of silence.
     word_events = events[["word_onset" in c for c in list(events["type"])]]
-    gaps = word_events["onset"] - (word_events["onset"] + word_events["duration"]).shift()
+    gaps = (
+        word_events["onset"] - (word_events["onset"] + word_events["duration"]).shift()
+    )
     gaps = gaps.sort_values(ascending=False)
     gaps = gaps[gaps > 10]
     gaps = gaps.sort_index()
@@ -129,7 +133,7 @@ def read_textgrid(bids_root, subject_id, session, events):
     # Step 1. Align start points of brain recording and force-aligned labels
     true_start = word_events[[v != "sp" for v in list(word_events["value"])]]
     true_start = float(true_start.iloc[0]["onset"])
-    
+
     # This is measured in markers
     start, end = session_timing[session]["start"], session_timing[session]["end"]
     session_markers = grid[0][start : end + 1]
@@ -137,8 +141,6 @@ def read_textgrid(bids_root, subject_id, session, events):
     # Step 2. Align existing markers to position in brain recording
     marker_start = session_markers[0].minTime
     for i in range(len(session_markers)):
-
-
         # Compute appropriate delay to add
         delay = 0.0
         for idx, gap in zip(gaps.index, gaps):
@@ -146,18 +148,24 @@ def read_textgrid(bids_root, subject_id, session, events):
             if session_markers[i].minTime - marker_start + true_start + delay > t_start:
                 delay += gap
 
-        session_markers[i].minTime = session_markers[i].minTime - marker_start + true_start + delay
-        session_markers[i].maxTime = session_markers[i].maxTime - marker_start + true_start + delay
+        session_markers[i].minTime = (
+            session_markers[i].minTime - marker_start + true_start + delay
+        )
+        session_markers[i].maxTime = (
+            session_markers[i].maxTime - marker_start + true_start + delay
+        )
 
-    return session_markers # Return intervals in tier zero
+    return session_markers  # Return intervals in tier zero
+
 
 def get_vad_labels_from_csv(raw, bids_root, subject, session, task, offset=0.0):
-
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
 
     # Read CSV
-    vad_events = pd.read_csv(f"{bids_root}/sub-{subject}/sub-{subject}_ses-{session}_task-{task}_tgs.csv")
+    vad_events = pd.read_csv(
+        f"{bids_root}/sub-{subject}/sub-{subject}_ses-{session}_task-{task}_tgs.csv"
+    )
 
     labels = np.zeros(len(raw))
     for i, event in vad_events.iterrows():
@@ -172,13 +180,9 @@ def get_vad_labels_from_csv(raw, bids_root, subject, session, task, offset=0.0):
     return labels
 
 
-
-
 def get_vad_labels_from_textgrid(tier, raw, offset=0.0):
-
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
-    grid_start = tier[0].minTime
 
     labels = np.zeros(len(raw))
     for event in tier:
@@ -188,9 +192,9 @@ def get_vad_labels_from_textgrid(tier, raw, offset=0.0):
         t_start = int(onset * sample_freq + offset_samples)
         t_end = int(offset * sample_freq + offset_samples)
 
-        if event.mark != '':
+        if event.mark != "":
             labels[t_start : t_end + 1] = 1.0
-    
+
     return labels
 
 
@@ -215,12 +219,14 @@ def get_vad_labels(events, raw, offset=0.0):
 
     return labels
 
-def get_vad_labels_gwilliams(events, raw, offset=0.0):
 
+def get_vad_labels_gwilliams(events, raw, offset=0.0):
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
 
-    word_events = events[["'kind': 'word'" in trial_type for trial_type in list(events["trial_type"])]]
+    word_events = events[
+        ["'kind': 'word'" in trial_type for trial_type in list(events["trial_type"])]
+    ]
     labels = np.zeros(len(raw))
     for i, word_event in word_events.iterrows():
         onset = float(word_event["onset"])
@@ -235,13 +241,13 @@ def get_vad_labels_gwilliams(events, raw, offset=0.0):
 
 
 def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
-
     sample_freq = raw.info["sfreq"]
-    offset_samples = int(sample_freq * offset)
 
     # Filter events with phoneme labels
-    phoneme_events = events[["'kind': 'phoneme'" in trial_type for trial_type in list(events["trial_type"])]]
-    
+    phoneme_events = events[
+        ["'kind': 'phoneme'" in trial_type for trial_type in list(events["trial_type"])]
+    ]
+
     phoneme_onsets = []
     labels = []
 
@@ -249,10 +255,12 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
     for i, phoneme_event in phoneme_events.iterrows():
         trial_type = ast.literal_eval(phoneme_event["trial_type"])
 
-        phoneme = trial_type["phoneme"].split("_")[0] # Remove BIE indicators
+        phoneme = trial_type["phoneme"].split("_")[0]  # Remove BIE indicators
         onset_samples = int(float(phoneme_event["onset"]) * sample_freq)
         duration_samples = int(float(phoneme_event["duration"]) * sample_freq)
-        phonation = phoneme_codes[phoneme_codes["phoneme"] == phoneme]["phonation"].item()
+        phonation = phoneme_codes[phoneme_codes["phoneme"] == phoneme][
+            "phonation"
+        ].item()
 
         # Check that we're not in a bad segment
         bad_phoneme = False
@@ -262,9 +270,13 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
                 bad_samples = int(sample_freq * annot["duration"])
                 phone_end = onset_samples + duration_samples
                 # Check phoneme onset is not in a bad segment
-                if (onset_samples >= bad_onset) and ( onset_samples <= (bad_onset + bad_samples) ):
+                if (onset_samples >= bad_onset) and (
+                    onset_samples <= (bad_onset + bad_samples)
+                ):
                     bad_phoneme = True
-                elif (phone_end >= bad_onset) and ( phone_end <= (bad_onset + bad_samples) ):
+                elif (phone_end >= bad_onset) and (
+                    phone_end <= (bad_onset + bad_samples)
+                ):
                     bad_phoneme = True
         if bad_phoneme:
             bad_segments += 1
@@ -278,11 +290,11 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
             labels.append(0.0)
             phoneme_onsets.append(onset_samples)
 
-    print(f"Found {bad_segments} (out of {len(phoneme_onsets) + bad_segments}) phonemes in bad segments while computing phoneme label onsets")
+    print(
+        f"Found {bad_segments} (out of {len(phoneme_onsets) + bad_segments}) phonemes in bad segments while computing phoneme label onsets"
+    )
 
     return phoneme_onsets, labels
-
-
 
 
 def get_voiced_labels(events, raw, offset=0.0):
