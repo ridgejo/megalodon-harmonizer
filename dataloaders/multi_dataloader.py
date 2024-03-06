@@ -5,7 +5,7 @@ import typing as tp
 import lightning as L
 import torch
 from lightning.pytorch.utilities.combined_loader import CombinedLoader
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, ConcatDataset
 
 from dataloaders.armeni2022 import Armeni2022
 from dataloaders.data_utils import DATA_PATH, BatchScaler
@@ -189,6 +189,8 @@ class MultiDataLoader(L.LightningDataModule):
             for sess_no in range(0, n_sessions + 1):
                 session = str(sess_no)
 
+                task_datasets = []
+
                 for task in range(0, n_tasks + 1):
                     task = str(task)
 
@@ -206,9 +208,12 @@ class MultiDataLoader(L.LightningDataModule):
 
                     seconds += len(data) * slice_len
 
+                    task_datasets.append(data)
+
+                if len(task_datasets) > 0:
                     datasets[
-                        f"dat=gwilliams2022_sub={subject}_ses={session}_tsk={task}"
-                    ] = data
+                        f"dat=gwilliams2022_sub={subject}_ses={session}"
+                    ] = ConcatDataset(task_datasets)
 
         return datasets, seconds
 
@@ -233,6 +238,7 @@ class MultiDataLoader(L.LightningDataModule):
             if subject in bad_subjects:
                 continue  # ignore incomplete subject data
 
+            task_datasets = []
             for task in tasks:
                 if subject.startswith("V") and task == "auditory":
                     continue
@@ -251,7 +257,10 @@ class MultiDataLoader(L.LightningDataModule):
 
                 seconds += len(data) * slice_len
 
-                datasets[f"dat=schoffelen2019_sub={subject}_tsk={task}"] = data
+                task_datasets.append(data)
+
+            if len(task_datasets) > 0:
+                datasets[f"dat=schoffelen2019_sub={subject}"] = ConcatDataset(task_datasets)
 
         return datasets, seconds
 
