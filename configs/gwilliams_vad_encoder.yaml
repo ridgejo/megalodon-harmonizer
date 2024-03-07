@@ -30,7 +30,7 @@ datamodule_config:
     val_ratio: 0.04
     test_ratio: 0.04
     pred_ratio: 0.02
-    batch_size: 32
+    batch_size: 8 # Use batch_size = 8 (72% memory) for standard 24GiB GPU
     normalisation:
       n_sample_batches: 8
       per_channel: true

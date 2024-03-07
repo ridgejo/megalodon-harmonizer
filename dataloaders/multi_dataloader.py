@@ -114,16 +114,16 @@ class MultiDataLoader(L.LightningDataModule):
     def train_dataloader(self):
         # NOTE: 'max_size' will stop after the longest iterable is done, returning None for exhausted iterables.
 
-        return CombinedLoader(self.train, "max_size")
+        return CombinedLoader(self.train, "max_size_cycle") # Automatically balances datasets
 
     def val_dataloader(self):
-        return CombinedLoader(self.val, "max_size")
+        return CombinedLoader(self.val, "max_size_cycle")
 
     def test_dataloader(self):
-        return CombinedLoader(self.test, "max_size")
+        return CombinedLoader(self.test, "max_size_cycle")
 
     def predict_dataloader(self):
-        return CombinedLoader(self.predict, "max_size")
+        return CombinedLoader(self.predict, "max_size_cycle")
 
     def _load_armeni_2022(self, config, n_subjects=3, n_sessions=10):
         # Dataset key formatted as dat={}_sub={}_ses={}. Necessary for scalers.

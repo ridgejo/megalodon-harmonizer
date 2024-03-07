@@ -39,7 +39,11 @@ wandb_logger = WandbLogger(
 wandb_logger.experiment.config.update(config)
 
 # Checkpoint model only when validation loss improves
-checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min")
+checkpoint_callback = ModelCheckpoint(
+    monitor="val_loss",
+    mode="min",
+    auto_insert_metric_name=True,
+)
 
 model = RepLearner(
     config["rep_config"],

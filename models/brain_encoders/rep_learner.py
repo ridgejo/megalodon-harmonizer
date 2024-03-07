@@ -59,13 +59,6 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
 
 
 def make_vad_classifier(input_dim, hidden_dim):
-    # class VADLSTMClassifier(nn.Module):
-    #     def __init__(self):
-    #         super(VADLSTMClassifier, self, input_dim, hidden_dim, num_layers).__init__()
-
-    #         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True)
-
-    #     def forward(self, x):
 
     return nn.Sequential(
         nn.Linear(in_features=input_dim, out_features=hidden_dim),
@@ -112,6 +105,12 @@ class RepLearner(L.LightningModule):
             )
 
         # todo: Subject embeddings only in the classifier stage so we don't need to retrain encoder for novel subjects
+        # if "subject_embedding" in rep_config:
+        #     # Create subject embedding for each dataset
+        #     nn.ModuleDict({
+        #         "armeni2022": nn.Embedding(num_subjects, embedding_dim),...
+        #     })
+
 
         if "phase_amp_regressor" in rep_config:
             active_models["phase_amp_regressor"] = make_phase_amp_regressor(
@@ -206,7 +205,7 @@ class RepLearner(L.LightningModule):
 
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         loss, losses, metrics = self._shared_step(batch, batch_idx, "val")
 
         if loss is not None:
@@ -314,10 +313,33 @@ class RepLearner(L.LightningModule):
         if loss == 0.0:
             loss = None
 
+        # Aggregate losses and metrics over keys
+        agg_losses = self.aggregate_values(losses)
+        agg_metrics = self.aggregate_values(metrics)
+        losses.update(agg_losses)
+        metrics.update(agg_metrics)
+        
         return loss, losses, metrics
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.active_models.parameters(), lr=self.lr)
+
+    def aggregate_values(self, stat_dict):
+
+        aggregate_losses = {}
+        aggregate_counts = {}
+        for key, val in stat_dict.items():
+            true_key = key.split("+")[1]
+            if true_key in aggregate_losses:
+                aggregate_losses[true_key] += val
+                aggregate_counts[true_key] += 1
+            else:
+                aggregate_losses[true_key] = val
+                aggregate_counts[true_key] = 1
+        for key in aggregate_losses.keys():
+            aggregate_losses[key] /= aggregate_counts[key]
+        
+        return aggregate_losses
 
     def compute_phase_amp(self, x):
         X_fft = torch.fft.fft(x)

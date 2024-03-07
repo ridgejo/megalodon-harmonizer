@@ -8,35 +8,35 @@ rep_config:
       armeni2022: 269
       schoffelen2019: 273
       gwilliams2022: 208
-    shared_dim: 256
+    shared_dim: 300
     use_data_block: true
-  # encoder:
-  #   channels: 300
-  #   conv_channels: [512, 512]
-  #   ratios: [1]
-  #   dimension: 256
-  # argmax_amp_predictor:
-  #   input_dim: 256
-  #   hidden_dim: 512
-  #   dataset_keys: ["armeni2022", "schoffelen2019", "gwilliams2022"]
+  encoder:
+    channels: 300
+    conv_channels: [512, 512]
+    ratios: [1]
+    dimension: 300
+  argmax_amp_predictor:
+    input_dim: 300
+    hidden_dim: 512
+    dataset_keys: ["armeni2022", "schoffelen2019", "gwilliams2022"]
   vad_classifier:
-    input_dim: 256
+    input_dim: 300
     hidden_dim: 512
 
 datamodule_config:
   dataset_preproc_configs:
-    # armeni2022:
-    #   bad_subjects: []
-    #   bad_sessions:
-    #     "001": []
-    #     "002": []
-    #     "003": []
-    #   slice_len: 0.1
-    #   label_type: null
-    # schoffelen2019:
-    #   bad_subjects: []
-    #   slice_len: 0.1
-    #   label_type: null
+    armeni2022:
+      bad_subjects: []
+      bad_sessions:
+        "001": []
+        "002": []
+        "003": []
+      slice_len: 0.1
+      label_type: null
+    schoffelen2019:
+      bad_subjects: []
+      slice_len: 0.1
+      label_type: null
     gwilliams2022:
       bad_subjects: []
       slice_len: 0.1
@@ -46,10 +46,9 @@ datamodule_config:
     val_ratio: 0.04
     test_ratio: 0.04
     pred_ratio: 0.02
-    batch_size: 32
+    batch_size: 8 # True batch size is 8 * 3 datasets = 24
     normalisation:
       n_sample_batches: 8
       per_channel: true
       scaler_conf:
         standard_scaler:
-  debug: true
