@@ -337,6 +337,7 @@ class Schoffelen2019(Dataset):
         return {
             "data": data_slice,
             "times": times,
+            "identifier": {"subject": self.subject_id, "dataset": "schoffelen2019"},
         }
 
 

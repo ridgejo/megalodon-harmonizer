@@ -4,13 +4,27 @@ import typing as tp
 
 import lightning as L
 import torch
-from lightning.pytorch.utilities.combined_loader import CombinedLoader
-from torch.utils.data import DataLoader, random_split, ConcatDataset
+from torch.utils.data import ConcatDataset, DataLoader, random_split
 
 from dataloaders.armeni2022 import Armeni2022
+from dataloaders.batch_invariant_sampler import BatchInvariantSampler
 from dataloaders.data_utils import DATA_PATH, BatchScaler
 from dataloaders.gwilliams2022 import Gwilliams2022
 from dataloaders.schoffelen2019 import Schoffelen2019
+
+
+def get_key_from_batch_identifier(batch_identifier: dict) -> str:
+    identifier = {k: batch_identifier[k][0] for k in batch_identifier.keys()}
+    return get_key_from_identifier(identifier)
+
+
+def get_key_from_identifier(identifier: dict) -> str:
+    key = f"dat={identifier['dataset']}"
+    if "subject" in identifier:
+        key += f"_sub={identifier['subject']}"
+    if "session" in identifier:
+        key += f"_ses={identifier['session']}"
+    return key
 
 
 class MultiDataLoader(L.LightningDataModule):
@@ -42,7 +56,7 @@ class MultiDataLoader(L.LightningDataModule):
             print(f"Loading data from {dataset}...")
 
             data, seconds = self.loaders[dataset](config)
-            self.data.update(data)
+            self.data[dataset] = data
 
             print(
                 f"Loaded approximately {seconds // 3600} hours of data from {dataset}"
@@ -60,73 +74,94 @@ class MultiDataLoader(L.LightningDataModule):
         batch_size = self.dataloader_configs["batch_size"]
 
         self.train, self.val, self.test, self.pred = {}, {}, {}, {}
-        for dataset, data in self.data.items():
-            train_size = int(train_ratio * len(data))
-            val_size = int(val_ratio * len(data))
-            test_size = int(test_ratio * len(data))
-            pred_size = len(data) - train_size - val_size - test_size
+        self.scalers = {}
+        for dataset, datasets in self.data.items():
+            # Data will be a list of datasets by subject and (possibly) session for each underlying dataset
 
-            if min([train_size, val_size, test_size, pred_size]) < batch_size:
-                print(
-                    f"Warning: One of train/val/test/pred smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+            for data in datasets:
+                train_size = int(train_ratio * len(data))
+                val_size = int(val_ratio * len(data))
+                test_size = int(test_ratio * len(data))
+                pred_size = len(data) - train_size - val_size - test_size
+
+                if min([train_size, val_size, test_size, pred_size]) < batch_size:
+                    print(
+                        f"Warning: One of train/val/test/pred smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+                    )
+
+                train_split, val_split, test_split, pred_split = random_split(
+                    data, [train_size, val_size, test_size, pred_size]
                 )
 
-            train_split, val_split, test_split, pred_split = random_split(
-                data, [train_size, val_size, test_size, pred_size]
-            )
+                identifier = get_key_from_identifier(train_split[0]["identifier"])
 
-            self.train[dataset] = DataLoader(
-                train_split, batch_size=batch_size, shuffle=True, drop_last=True
-            )
-            self.val[dataset] = DataLoader(
-                val_split, batch_size=batch_size, shuffle=False, drop_last=False
-            )
-            self.test[dataset] = DataLoader(
-                test_split, batch_size=batch_size, shuffle=False, drop_last=False
-            )
-            self.pred[dataset] = DataLoader(
-                pred_split, batch_size=batch_size, shuffle=True, drop_last=True
-            )
+                self.train[identifier] = DataLoader(
+                    train_split, batch_size=batch_size, shuffle=True, drop_last=True
+                )
+                self.val[identifier] = DataLoader(
+                    val_split, batch_size=batch_size, shuffle=False, drop_last=False
+                )
+                self.test[identifier] = DataLoader(
+                    test_split, batch_size=batch_size, shuffle=False, drop_last=False
+                )
+                self.pred[identifier] = DataLoader(
+                    pred_split, batch_size=batch_size, shuffle=False, drop_last=True
+                )
 
         print("Fitting scalers to datasets...")
 
         self.scalers = {}
         norm_conf = self.dataloader_configs["normalisation"]
-        for dataset, train_dl in self.train.items():
+        for identifier, train_dl in self.train.items():
             scaler = BatchScaler(
                 n_sample_batches=norm_conf["n_sample_batches"],
                 per_channel=norm_conf["per_channel"],
                 scaler_conf=norm_conf["scaler_conf"],
             )
             scaler.fit(train_dl)
-            self.scalers[dataset] = scaler
+            self.scalers[identifier] = scaler
+
+        # Construct batch-invariant samplers
+        self.train = BatchInvariantSampler(
+            dataloaders=list(self.train.values()),
+            shuffle=True,
+        )
+        self.val = BatchInvariantSampler(
+            dataloaders=list(self.val.values()),
+            shuffle=False,
+        )
+        self.test = BatchInvariantSampler(
+            dataloaders=list(self.test.values()),
+            shuffle=False,
+        )
+        self.pred = BatchInvariantSampler(
+            dataloaders=list(self.pred.values()),
+            shuffle=False,
+        )
 
     def on_before_batch_transfer(self, batch, dataloader_idx):
+        # Get identifier from first sample
+        key = get_key_from_batch_identifier(batch["identifier"])
+
         # Apply batch scaling transformation before transferring to device.
-        for dataset, batch_tensor in batch.items():
-            if batch[dataset] is not None:
-                batch[dataset]["data"] = torch.from_numpy(
-                    self.scalers[dataset](batch_tensor["data"])
-                ).float()
+        batch["data"] = torch.from_numpy(self.scalers[key](batch["data"])).float()
 
         return batch
 
     def train_dataloader(self):
-        # NOTE: 'max_size' will stop after the longest iterable is done, returning None for exhausted iterables.
-
-        return CombinedLoader(self.train, "max_size_cycle") # Automatically balances datasets
+        return self.train  # Automatically balances datasets
 
     def val_dataloader(self):
-        return CombinedLoader(self.val, "max_size_cycle")
+        return self.val
 
     def test_dataloader(self):
-        return CombinedLoader(self.test, "max_size_cycle")
+        return self.test
 
     def predict_dataloader(self):
-        return CombinedLoader(self.predict, "max_size_cycle")
+        return self.pred
 
     def _load_armeni_2022(self, config, n_subjects=3, n_sessions=10):
-        # Dataset key formatted as dat={}_sub={}_ses={}. Necessary for scalers.
+        # Return list of datasets. Each dataset should correspond to a single subject and session.
 
         if self.debug:
             n_subjects = 1
@@ -137,7 +172,7 @@ class MultiDataLoader(L.LightningDataModule):
         slice_len = config["slice_len"]
         label_type = config["label_type"]
 
-        datasets = {}
+        datasets = []
 
         # Loop over subjects
         seconds = 0
@@ -164,7 +199,7 @@ class MultiDataLoader(L.LightningDataModule):
 
                 seconds += len(data) * slice_len
 
-                datasets[f"dat=armeni2022_sub={subject}_ses={session}"] = data
+                datasets.append(data)
 
         return datasets, seconds
 
@@ -178,7 +213,7 @@ class MultiDataLoader(L.LightningDataModule):
         label_type = config["label_type"]
 
         seconds = 0
-        datasets = {}
+        datasets = []
         for subj_no in range(1, n_subjects + 1):
             subject = "{:02d}".format(subj_no)  # 01, 02, etc.
 
@@ -211,9 +246,7 @@ class MultiDataLoader(L.LightningDataModule):
                     task_datasets.append(data)
 
                 if len(task_datasets) > 0:
-                    datasets[
-                        f"dat=gwilliams2022_sub={subject}_ses={session}"
-                    ] = ConcatDataset(task_datasets)
+                    datasets.append(ConcatDataset(task_datasets))
 
         return datasets, seconds
 
@@ -233,7 +266,7 @@ class MultiDataLoader(L.LightningDataModule):
         slice_len = config["slice_len"]
 
         seconds = 0
-        datasets = {}
+        datasets = []
         for subject in subjects:
             if subject in bad_subjects:
                 continue  # ignore incomplete subject data
@@ -260,7 +293,7 @@ class MultiDataLoader(L.LightningDataModule):
                 task_datasets.append(data)
 
             if len(task_datasets) > 0:
-                datasets[f"dat=schoffelen2019_sub={subject}"] = ConcatDataset(task_datasets)
+                datasets.append(ConcatDataset(task_datasets))
 
         return datasets, seconds
 
@@ -303,7 +336,7 @@ if __name__ == "__main__":
     datamodule.prepare_data()
     datamodule.setup(stage="fit")
 
-    sample = next(iter(datamodule.train_dataloader()))[0]
+    sample = next(iter(datamodule.train_dataloader()))
     print(sample)
 
     sample_scaled = datamodule.on_before_batch_transfer(sample, 0)

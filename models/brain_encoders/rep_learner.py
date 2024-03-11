@@ -4,13 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as TM
 
+from dataloaders.multi_dataloader import get_key_from_batch_identifier
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.dataset_block import DatasetBlock
-
-
-def get_key_from_identifier(key: str, identifier: str):
-    """Get key from identifier in style dat=..._sub=..._ses=..."""
-    return identifier.split(f"{key}=")[1].split("_")[0]
 
 
 def make_phase_amp_regressor(input_dim, hidden_dim):
@@ -59,7 +55,6 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
 
 
 def make_vad_classifier(input_dim, hidden_dim):
-
     return nn.Sequential(
         nn.Linear(in_features=input_dim, out_features=hidden_dim),
         nn.ReLU(),
@@ -111,7 +106,6 @@ class RepLearner(L.LightningModule):
         #         "armeni2022": nn.Embedding(num_subjects, embedding_dim),...
         #     })
 
-
         if "phase_amp_regressor" in rep_config:
             active_models["phase_amp_regressor"] = make_phase_amp_regressor(
                 **rep_config["phase_amp_regressor"]
@@ -130,14 +124,14 @@ class RepLearner(L.LightningModule):
         self.active_models = nn.ModuleDict(active_models)
         self.rep_config = rep_config
 
-    def forward(self, inputs, identifier):
+    def forward(self, inputs):
         x = inputs["data"]
         z = x.clone()  # Operate on a copy
 
+        dataset = inputs["identifier"]["dataset"][0]
+
         if "dataset_block" in self.active_models:
-            z = self.active_models["dataset_block"](
-                z, dataset_id=get_key_from_identifier("dat", identifier)
-            )
+            z = self.active_models["dataset_block"](z, dataset_id=dataset)
 
         if "encoder" in self.active_models:
             z = self.active_models["encoder"](z)
@@ -162,7 +156,7 @@ class RepLearner(L.LightningModule):
         if "argmax_amp_predictor" in self.active_models:
             argmax_amp = self.active_models["argmax_amp_predictor"](
                 z_independent,
-                dataset_key=get_key_from_identifier("dat", identifier),
+                dataset_key=dataset,
                 targets=self.compute_argmax_amp(x),
             )
             return_values["argmax_amp"] = argmax_amp
@@ -270,76 +264,54 @@ class RepLearner(L.LightningModule):
         return loss
 
     def _shared_step(self, batch, batch_idx, stage: str):
+        loss = 0.0
         losses = {}
         metrics = {}
-        for data_key, data_batch in batch.items():
-            if data_batch is not None:
-                return_values = self(data_batch, data_key)
 
-                # Compute losses over this data batch
-                for key, val in return_values.items():
-                    if key == "argmax_amp":
-                        # Compute max amplitude index at all time points in signal
+        key = get_key_from_batch_identifier(batch["identifier"])
+        dataset = batch["identifier"]["dataset"][0]
 
-                        argmax_amp_loss, rmse_metric = val
-                        losses[f"{stage}_{data_key}+argmax_amp_loss"] = argmax_amp_loss
-                        metrics[f"{stage}_{data_key}+argmax_amp_rmse"] = rmse_metric
+        return_values = self(batch)
 
-                    if key == "vad_logits":
-                        vad_logits = val
-                        vad_labels = data_batch["vad_labels"].flatten(
-                            start_dim=0, end_dim=1
-                        )
-                        vad_loss = F.binary_cross_entropy_with_logits(
-                            vad_logits, vad_labels
-                        )
+        # Compute losses over this data batch
+        for key, val in return_values.items():
+            if key == "argmax_amp":
+                # Compute max amplitude index at all time points in signal
 
-                        vad_preds = torch.round(F.sigmoid(vad_logits))
-                        vad_balacc = TM.classification.accuracy(
-                            vad_preds.int(),
-                            vad_labels.int(),
-                            task="multiclass",
-                            num_classes=2,
-                            average="macro",
-                        )
-                        losses[f"{stage}_{data_key}+vad_bce_loss"] = vad_loss
-                        metrics[f"{stage}_{data_key}+vad_balacc"] = vad_balacc
+                argmax_amp_loss, rmse_metric = val
 
-        # Combine all losses to get total loss
-        loss = 0.0
-        for key, val in losses.items():
-            loss += val
+                loss += argmax_amp_loss
+                losses[f"{key}+argmax_amp_loss"] = argmax_amp_loss
+                losses[f"dat={dataset}+argmax_amp_loss"] = argmax_amp_loss
 
-        if loss == 0.0:
-            loss = None
+                metrics[f"{key}+argmax_amp_rmse"] = rmse_metric
+                metrics[f"dat={dataset}+argmax_amp_rmse"] = rmse_metric
 
-        # Aggregate losses and metrics over keys
-        agg_losses = self.aggregate_values(losses)
-        agg_metrics = self.aggregate_values(metrics)
-        losses.update(agg_losses)
-        metrics.update(agg_metrics)
-        
+            if key == "vad_logits":
+                vad_logits = val
+                vad_labels = batch["vad_labels"].flatten(start_dim=0, end_dim=1)
+                vad_loss = F.binary_cross_entropy_with_logits(vad_logits, vad_labels)
+
+                vad_preds = torch.round(F.sigmoid(vad_logits))
+                vad_balacc = TM.classification.accuracy(
+                    vad_preds.int(),
+                    vad_labels.int(),
+                    task="multiclass",
+                    num_classes=2,
+                    average="macro",
+                )
+
+                loss += vad_loss
+                losses[f"{key}+vad_bce_loss"] = vad_loss
+                losses[f"dat={dataset}+vad_bce_loss"] = vad_loss
+
+                metrics[f"{key}+vad_balacc"] = vad_balacc
+                metrics[f"dat={dataset}+vad_balacc"] = vad_balacc
+
         return loss, losses, metrics
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.active_models.parameters(), lr=self.lr)
-
-    def aggregate_values(self, stat_dict):
-
-        aggregate_losses = {}
-        aggregate_counts = {}
-        for key, val in stat_dict.items():
-            true_key = key.split("+")[1]
-            if true_key in aggregate_losses:
-                aggregate_losses[true_key] += val
-                aggregate_counts[true_key] += 1
-            else:
-                aggregate_losses[true_key] = val
-                aggregate_counts[true_key] = 1
-        for key in aggregate_losses.keys():
-            aggregate_losses[key] /= aggregate_counts[key]
-        
-        return aggregate_losses
 
     def compute_phase_amp(self, x):
         X_fft = torch.fft.fft(x)
@@ -381,7 +353,8 @@ if __name__ == "__main__":
             #     "input_dim": 256,
             #     "hidden_dim": 512,
             # },
-        }
+        },
+        batch_size=32,
     )
 
     def test_with_mocked_data():
@@ -404,7 +377,7 @@ if __name__ == "__main__":
                     "bad_subjects": [],
                     "bad_sessions": {"001": [], "002": [], "003": []},
                     "slice_len": 0.1,
-                    "label_type": "vad",
+                    "label_type": None,
                 },
                 "schoffelen2019": {
                     "bad_subjects": [],
@@ -414,7 +387,7 @@ if __name__ == "__main__":
                 "gwilliams2022": {
                     "bad_subjects": [],
                     "slice_len": 0.1,
-                    "label_type": None,
+                    "label_type": "vad",
                 },
             },
             dataloader_configs={

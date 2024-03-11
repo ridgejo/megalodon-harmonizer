@@ -75,16 +75,15 @@ class Gwilliams2022(Dataset):
             data_slice, times = data_utils.get_slice(
                 self.raw, idx, self.samples_per_slice, self.valid_indices
             )
-            return {
+            return_dict = {
                 "data": data_slice,
                 "times": times,
             }
-
-        if self.label_type == "voiced":
+        elif self.label_type == "voiced":
             start = self.phoneme_onsets[idx]
             data_slice, times = self.raw[:, start : start + self.samples_per_slice]
             label = self.labels[idx]
-            return {
+            return_dict = {
                 "data": data_slice,
                 "voiced_label": label,
                 "times": times,
@@ -96,11 +95,19 @@ class Gwilliams2022(Dataset):
                 idx,
                 self.samples_per_slice,
             )
-            return {
+            return_dict = {
                 "data": data_slice,
                 "vad_labels": label_slice,
                 "times": times,
             }
+
+        return_dict["identifier"] = {
+            "subject": self.subject_id,
+            "session": self.session,
+            "dataset": "gwilliams2022",
+        }
+
+        return return_dict
 
 
 if __name__ == "__main__":

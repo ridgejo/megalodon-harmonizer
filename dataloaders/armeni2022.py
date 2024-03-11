@@ -87,16 +87,15 @@ class Armeni2022(Dataset):
             data_slice, times = data_utils.get_slice(
                 self.raw, idx, self.samples_per_slice, self.valid_indices
             )
-            return {
+            return_dict = {
                 "data": data_slice,
                 "times": times,
             }
-
-        if self.label_type == "vad":
+        elif self.label_type == "vad":
             data_slice, label_slice, times = label_utils.get_slice(
                 self.raw, self.labels, idx, self.samples_per_slice
             )
-            return {
+            return_dict = {
                 "data": data_slice,
                 "vad_labels": label_slice,
                 "times": times,
@@ -107,11 +106,20 @@ class Armeni2022(Dataset):
             label = self.labels[
                 idx
             ]  # Warning: not actually a slice, just a single label.
-            return {
+            return_dict = {
                 "data": data_slice,
                 "voiced_label": label,
                 "times": times,
             }
+
+        # Extra shared information
+        return_dict["identifier"] = {
+            "subject": self.subject_id,
+            "session": self.session,
+            "dataset": "armeni2022",
+        }
+
+        return return_dict
 
 
 if __name__ == "__main__":
