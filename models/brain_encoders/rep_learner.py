@@ -268,7 +268,7 @@ class RepLearner(L.LightningModule):
         losses = {}
         metrics = {}
 
-        key = get_key_from_batch_identifier(batch["identifier"])
+        data_key = get_key_from_batch_identifier(batch["identifier"])
         dataset = batch["identifier"]["dataset"][0]
 
         return_values = self(batch)
@@ -281,11 +281,11 @@ class RepLearner(L.LightningModule):
                 argmax_amp_loss, rmse_metric = val
 
                 loss += argmax_amp_loss
-                losses[f"{key}+argmax_amp_loss"] = argmax_amp_loss
-                losses[f"dat={dataset}+argmax_amp_loss"] = argmax_amp_loss
+                losses[f"{stage}_{data_key}+argmax_amp_loss"] = argmax_amp_loss
+                losses[f"{stage}_dat={dataset}+argmax_amp_loss"] = argmax_amp_loss
 
-                metrics[f"{key}+argmax_amp_rmse"] = rmse_metric
-                metrics[f"dat={dataset}+argmax_amp_rmse"] = rmse_metric
+                metrics[f"{stage}_{data_key}+argmax_amp_rmse"] = rmse_metric
+                metrics[f"{stage}_dat={dataset}+argmax_amp_rmse"] = rmse_metric
 
             if key == "vad_logits":
                 vad_logits = val
@@ -302,11 +302,11 @@ class RepLearner(L.LightningModule):
                 )
 
                 loss += vad_loss
-                losses[f"{key}+vad_bce_loss"] = vad_loss
-                losses[f"dat={dataset}+vad_bce_loss"] = vad_loss
+                losses[f"{stage}_{data_key}+vad_bce_loss"] = vad_loss
+                losses[f"{stage}_dat={dataset}+vad_bce_loss"] = vad_loss
 
-                metrics[f"{key}+vad_balacc"] = vad_balacc
-                metrics[f"dat={dataset}+vad_balacc"] = vad_balacc
+                metrics[f"{stage}_{data_key}+vad_balacc"] = vad_balacc
+                metrics[f"{stage}_dat={dataset}+vad_balacc"] = vad_balacc
 
         return loss, losses, metrics
 
