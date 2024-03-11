@@ -1,5 +1,6 @@
 **/__pycache__/
 **/.ruff_cache/
+lightning_logs/
 images/
 wandb/
 .vscode/

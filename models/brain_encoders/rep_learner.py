@@ -7,6 +7,7 @@ import torchmetrics.functional as TM
 from dataloaders.multi_dataloader import get_key_from_batch_identifier
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.dataset_block import DatasetBlock
+from models.subject_embedding import SubjectEmbedding
 
 
 def make_phase_amp_regressor(input_dim, hidden_dim):
@@ -100,23 +101,30 @@ class RepLearner(L.LightningModule):
             )
 
         # todo: Subject embeddings only in the classifier stage so we don't need to retrain encoder for novel subjects
-        # if "subject_embedding" in rep_config:
-        #     # Create subject embedding for each dataset
-        #     nn.ModuleDict({
-        #         "armeni2022": nn.Embedding(num_subjects, embedding_dim),...
-        #     })
+        # How to implement subject embedding?
+        if "subject_embedding" in rep_config:
+            subject_embedding_dim = rep_config["subject_embedding"]["embedding_dim"]
+            active_models["subject_embedding"] = SubjectEmbedding(
+                **rep_config["subject_embedding"]
+            )
 
         if "phase_amp_regressor" in rep_config:
+            if "subject_embedding" in rep_config:
+                rep_config["phase_amp_regressor"]["input_dim"] += subject_embedding_dim
             active_models["phase_amp_regressor"] = make_phase_amp_regressor(
                 **rep_config["phase_amp_regressor"]
             )
 
         if "argmax_amp_predictor" in rep_config:
+            if "subject_embedding" in rep_config:
+                rep_config["argmax_amp_predictor"]["input_dim"] += subject_embedding_dim
             active_models["argmax_amp_predictor"] = make_argmax_amp_predictor(
                 **rep_config["argmax_amp_predictor"]
             )
 
         if "vad_classifier" in rep_config:
+            if "subject_embedding" in rep_config:
+                rep_config["vad_classifier"]["input_dim"] += subject_embedding_dim
             active_models["vad_classifier"] = make_vad_classifier(
                 **rep_config["vad_classifier"]
             )
@@ -129,6 +137,7 @@ class RepLearner(L.LightningModule):
         z = x.clone()  # Operate on a copy
 
         dataset = inputs["identifier"]["dataset"][0]
+        subject = inputs["identifier"]["subject"][0]
 
         if "dataset_block" in self.active_models:
             z = self.active_models["dataset_block"](z, dataset_id=dataset)
@@ -144,6 +153,25 @@ class RepLearner(L.LightningModule):
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
         z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
+
+        if "subject_embedding" in self.active_models:
+            subject_embedding = self.active_models["subject_embedding"](
+                dataset, subject
+            )
+            z_ind_subject_embedding = subject_embedding.unsqueeze(0).repeat(
+                z_independent.shape[0], 1
+            )
+            z_seq_subject_embedding = (
+                subject_embedding.unsqueeze(0)
+                .unsqueeze(1)
+                .repeat(z_sequence.shape[0], z_sequence.shape[1], 1)
+            )
+            z_independent = torch.cat(
+                (z_independent, z_ind_subject_embedding), dim=-1
+            )  # [B * T, E + S]
+            z_sequence = torch.cat(
+                (z_sequence, z_seq_subject_embedding), dim=-1
+            )  # [B, T, E + S]
 
         return_values = {}
 
@@ -281,6 +309,7 @@ class RepLearner(L.LightningModule):
                 argmax_amp_loss, rmse_metric = val
 
                 loss += argmax_amp_loss
+                losses[f"{stage}+argmax_amp_loss"]
                 losses[f"{stage}_{data_key}+argmax_amp_loss"] = argmax_amp_loss
                 losses[f"{stage}_dat={dataset}+argmax_amp_loss"] = argmax_amp_loss
 
@@ -302,6 +331,7 @@ class RepLearner(L.LightningModule):
                 )
 
                 loss += vad_loss
+                losses[f"{stage}+vad_bce_loss"] = vad_loss
                 losses[f"{stage}_{data_key}+vad_bce_loss"] = vad_loss
                 losses[f"{stage}_dat={dataset}+vad_bce_loss"] = vad_loss
 
