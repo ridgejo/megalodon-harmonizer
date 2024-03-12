@@ -22,8 +22,6 @@ def get_key_from_identifier(identifier: dict) -> str:
     key = f"dat={identifier['dataset']}"
     if "subject" in identifier:
         key += f"_sub={identifier['subject']}"
-    if "session" in identifier:
-        key += f"_ses={identifier['session']}"
     return key
 
 
@@ -79,14 +77,27 @@ class MultiDataLoader(L.LightningDataModule):
             # Data will be a list of datasets by subject and (possibly) session for each underlying dataset
 
             for data in datasets:
-                train_size = int(train_ratio * len(data))
-                val_size = int(val_ratio * len(data))
-                test_size = int(test_ratio * len(data))
-                pred_size = len(data) - train_size - val_size - test_size
 
-                if min([train_size, val_size, test_size, pred_size]) < batch_size:
+                if self.debug:
+                    # Fit only one batch in debug mode
+                    train_size = batch_size
+                    val_size = batch_size
+                    test_size = 1
+                    pred_size = len(data) - train_size - val_size - test_size
+                else:
+                    train_size = int(train_ratio * len(data))
+                    val_size = int(val_ratio * len(data))
+                    test_size = int(test_ratio * len(data))
+                    pred_size = len(data) - train_size - val_size - test_size
+
+                if min([train_size, val_size]) < batch_size:
                     print(
-                        f"Warning: One of train/val/test/pred smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+                        f"Warning: One of train/val smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+                    )
+
+                if min([test_size, pred_size]) < batch_size:
+                    print(
+                        f"Warning: One of pred/test smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
                     )
 
                 train_split, val_split, test_split, pred_split = random_split(
@@ -105,7 +116,7 @@ class MultiDataLoader(L.LightningDataModule):
                     test_split, batch_size=batch_size, shuffle=False, drop_last=False
                 )
                 self.pred[identifier] = DataLoader(
-                    pred_split, batch_size=batch_size, shuffle=False, drop_last=True
+                    pred_split, batch_size=batch_size, shuffle=False, drop_last=False
                 )
 
         print("Fitting scalers to datasets...")
@@ -183,6 +194,7 @@ class MultiDataLoader(L.LightningDataModule):
                 continue
 
             # Loop over sessions
+            sess_datasets = []
             for sess_no in range(1, n_sessions + 1):
                 session = "{:03d}".format(sess_no)
 
@@ -199,14 +211,16 @@ class MultiDataLoader(L.LightningDataModule):
 
                 seconds += len(data) * slice_len
 
-                datasets.append(data)
+                sess_datasets.append(data)
+
+            datasets.append(ConcatDataset(sess_datasets))
 
         return datasets, seconds
 
-    def _load_gwilliams_2022(self, config, n_subjects=27, n_sessions=1, n_tasks=3):
+    def _load_gwilliams_2022(self, config, n_subjects=27, n_sessions=2, n_tasks=3):
+
         if self.debug:
             n_subjects = 1
-            n_tasks = 0
 
         bad_subjects = config["bad_subjects"]
         slice_len = config["slice_len"]
@@ -221,10 +235,9 @@ class MultiDataLoader(L.LightningDataModule):
                 continue
 
             # Loop over sessions
-            for sess_no in range(0, n_sessions + 1):
+            sess_datasets = [] # Combine sessions in normalization as not much data available per subject
+            for sess_no in range(0, n_sessions):
                 session = str(sess_no)
-
-                task_datasets = []
 
                 for task in range(0, n_tasks + 1):
                     task = str(task)
@@ -243,10 +256,10 @@ class MultiDataLoader(L.LightningDataModule):
 
                     seconds += len(data) * slice_len
 
-                    task_datasets.append(data)
+                    sess_datasets.append(data)
 
-                if len(task_datasets) > 0:
-                    datasets.append(ConcatDataset(task_datasets))
+                if len(sess_datasets) > 0:
+                    datasets.append(ConcatDataset(sess_datasets))
 
         return datasets, seconds
 
