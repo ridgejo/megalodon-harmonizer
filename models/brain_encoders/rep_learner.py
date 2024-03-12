@@ -11,6 +11,7 @@ from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
 )
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
+from models.transformer_encoder import TransformerEncoder
 
 
 def make_phase_amp_regressor(input_dim, hidden_dim):
@@ -99,8 +100,9 @@ class RepLearner(L.LightningModule):
             active_models["encoder"] = SEANetBrainEncoder(**rep_config["encoder"])
 
         if "transformer" in rep_config:
-            active_models["transformer"] = nn.TransformerEncoder(
-                **rep_config["transformer"]
+            active_models["transformer"] = TransformerEncoder(
+                in_channels=rep_config["encoder"]["dimension"],
+                transformer_config=rep_config["transformer"]
             )
 
         # todo: Subject embeddings only in the classifier stage so we don't need to retrain encoder for novel subjects
