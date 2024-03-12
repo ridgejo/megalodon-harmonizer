@@ -77,7 +77,6 @@ class MultiDataLoader(L.LightningDataModule):
             # Data will be a list of datasets by subject and (possibly) session for each underlying dataset
 
             for data in datasets:
-
                 if self.debug:
                     # Fit only one batch in debug mode
                     train_size = batch_size
@@ -218,7 +217,6 @@ class MultiDataLoader(L.LightningDataModule):
         return datasets, seconds
 
     def _load_gwilliams_2022(self, config, n_subjects=27, n_sessions=2, n_tasks=3):
-
         if self.debug:
             n_subjects = 1
 
@@ -235,7 +233,7 @@ class MultiDataLoader(L.LightningDataModule):
                 continue
 
             # Loop over sessions
-            sess_datasets = [] # Combine sessions in normalization as not much data available per subject
+            sess_datasets = []  # Combine sessions in normalization as not much data available per subject
             for sess_no in range(0, n_sessions):
                 session = str(sess_no)
 

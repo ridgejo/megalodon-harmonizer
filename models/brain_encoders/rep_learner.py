@@ -6,6 +6,9 @@ import torchmetrics.functional as TM
 
 from dataloaders.multi_dataloader import get_key_from_batch_identifier
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
+from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
+    MaskedChannelPredictor,
+)
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
 
@@ -108,20 +111,29 @@ class RepLearner(L.LightningModule):
                 **rep_config["subject_embedding"]
             )
 
+        # Auxiliary SSL losses
         if "phase_amp_regressor" in rep_config:
             if "subject_embedding" in rep_config:
                 rep_config["phase_amp_regressor"]["input_dim"] += subject_embedding_dim
             active_models["phase_amp_regressor"] = make_phase_amp_regressor(
                 **rep_config["phase_amp_regressor"]
             )
-
         if "argmax_amp_predictor" in rep_config:
             if "subject_embedding" in rep_config:
                 rep_config["argmax_amp_predictor"]["input_dim"] += subject_embedding_dim
             active_models["argmax_amp_predictor"] = make_argmax_amp_predictor(
                 **rep_config["argmax_amp_predictor"]
             )
+        if "masked_channel_predictor" in rep_config:
+            if "subject_embedding" in rep_config:
+                rep_config["masked_channel_predictor"][
+                    "input_dim"
+                ] += subject_embedding_dim
+            active_models["masked_channel_predictor"] = MaskedChannelPredictor(
+                **rep_config["masked_channel_predictor"]
+            )
 
+        # Label losses for representation shaping
         if "vad_classifier" in rep_config:
             if "subject_embedding" in rep_config:
                 rep_config["vad_classifier"]["input_dim"] += subject_embedding_dim
@@ -132,13 +144,7 @@ class RepLearner(L.LightningModule):
         self.active_models = nn.ModuleDict(active_models)
         self.rep_config = rep_config
 
-    def forward(self, inputs):
-        x = inputs["data"]
-        z = x.clone()  # Operate on a copy
-
-        dataset = inputs["identifier"]["dataset"][0]
-        subject = inputs["identifier"]["subject"][0]
-
+    def apply_encoder(self, z, dataset, subject):
         if "dataset_block" in self.active_models:
             z = self.active_models["dataset_block"](z, dataset_id=dataset)
 
@@ -173,7 +179,26 @@ class RepLearner(L.LightningModule):
                 (z_sequence, z_seq_subject_embedding), dim=-1
             )  # [B, T, E + S]
 
+        return z_sequence, z_independent
+
+    def forward(self, inputs):
+        x = inputs["data"]
+
+        dataset = inputs["identifier"]["dataset"][0]
+        subject = inputs["identifier"]["subject"][0]
+
+        z_sequence, z_independent = self.apply_encoder(x, dataset, subject)
+
         return_values = {}
+
+        if "masked_channel_predictor" in self.active_models:
+            x_masked, mask_label = self.active_models[
+                "masked_channel_predictor"
+            ].mask_input(x)
+            z_mask_sequence, _ = self.apply_encoder(x_masked, dataset)
+            return_values["masked_channel_pred"] = self.active_models[
+                "masked_channel_predictor"
+            ](z_mask_sequence, mask_label)
 
         if "phase_amp_regressor" in self.active_models:
             pa = self.active_models["phase_amp_regressor"](z_independent)
@@ -303,13 +328,30 @@ class RepLearner(L.LightningModule):
 
         # Compute losses over this data batch
         for key, val in return_values.items():
+            if key == "masked_channel_pred":
+                masked_channel_mse, masked_channel_rmse = val
+
+                loss += masked_channel_mse
+                losses[f"{stage}+masked_channel_mse_loss"] = masked_channel_mse
+                losses[
+                    f"{stage}_{data_key}+masked_channel_mse_loss"
+                ] = masked_channel_mse
+                losses[
+                    f"{stage}_dat={dataset}+masked_channel_mse_loss"
+                ] = masked_channel_mse
+
+                metrics[f"{stage}_{data_key}+masked_channel_rmse"] = masked_channel_rmse
+                metrics[
+                    f"{stage}_dat={dataset}+maksed_channel_rmse"
+                ] = masked_channel_rmse
+
             if key == "argmax_amp":
                 # Compute max amplitude index at all time points in signal
 
                 argmax_amp_loss, rmse_metric = val
 
                 loss += argmax_amp_loss
-                losses[f"{stage}+argmax_amp_loss"]
+                losses[f"{stage}+argmax_amp_loss"] = argmax_amp_loss
                 losses[f"{stage}_{data_key}+argmax_amp_loss"] = argmax_amp_loss
                 losses[f"{stage}_dat={dataset}+argmax_amp_loss"] = argmax_amp_loss
 

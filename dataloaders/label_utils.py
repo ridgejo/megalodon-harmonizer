@@ -329,12 +329,11 @@ def get_voiced_labels(events, raw, offset=0.0):
 
 
 def get_slice(raw, labels, idx, samples_per_slice):
-
     samples_per_shift = samples_per_slice
 
     start_idx = samples_per_shift * idx
     end_idx = samples_per_shift * idx + samples_per_slice
-    data_slice, times = raw[:, start_idx : end_idx]
-    label_slice = labels[start_idx : end_idx]
+    data_slice, times = raw[:, start_idx:end_idx]
+    label_slice = labels[start_idx:end_idx]
 
     return data_slice, label_slice, times

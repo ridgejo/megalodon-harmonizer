@@ -26,7 +26,9 @@ class BatchInvariantSampler:
             self._reset()  # Generate a new random batch sampling order
         else:
             self.batch_order = self.fixed_batch_order.copy()  # Use the defined order
-            self.dataloader_iters = [iter(dataloader) for dataloader in self.dataloaders] # reset dataloaders
+            self.dataloader_iters = [
+                iter(dataloader) for dataloader in self.dataloaders
+            ]  # reset dataloaders
         return self
 
     def __next__(self):
