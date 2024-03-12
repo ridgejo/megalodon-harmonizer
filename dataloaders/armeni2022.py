@@ -108,7 +108,7 @@ class Armeni2022(Dataset):
             ]  # Warning: not actually a slice, just a single label.
             return_dict = {
                 "data": data_slice,
-                "voiced_label": label,
+                "voiced_labels": label,
                 "times": times,
             }
 

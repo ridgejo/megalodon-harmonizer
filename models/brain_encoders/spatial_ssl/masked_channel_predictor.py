@@ -41,8 +41,8 @@ class MaskedChannelPredictor(nn.Module):
         return result_tensor, random_indices
 
     def forward(self, masked_encoded, label):
-        _, (h_n, _) = self.model(masked_encoded)
-        z = self.classifier(h_n.reshape(masked_encoded.shape[0], -1)).squeeze(-1)
+        out, (_, _) = self.model(masked_encoded)
+        z = self.classifier(out[:, -1, :]).squeeze(-1)
 
         # Division to account for approx number of sensors
         return F.mse_loss(z, label.float() / 250), torch.sqrt(

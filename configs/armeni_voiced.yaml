@@ -1,0 +1,38 @@
+experiment:
+  seed: 42
+
+rep_config:
+  lr: 0.001
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+    shared_dim: 300
+    use_data_block: true
+  voiced_classifier:
+    input_dim: 300
+    hidden_dim: 512
+    num_layers: 2
+
+datamodule_config:
+  dataset_preproc_configs:
+    armeni2022:
+      bad_subjects: []
+      bad_sessions:
+        "001": []
+        "002": []
+        "003": ["008"]
+      slice_len: 3.0
+      label_type: "voiced"
+  dataloader_configs:
+    train_ratio: 0.9
+    val_ratio: 0.04
+    test_ratio: 0.04
+    pred_ratio: 0.02
+    batch_size: 32
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:

@@ -85,7 +85,7 @@ class Gwilliams2022(Dataset):
             label = self.labels[idx]
             return_dict = {
                 "data": data_slice,
-                "voiced_label": label,
+                "voiced_labels": label,
                 "times": times,
             }
         elif self.label_type == "vad":

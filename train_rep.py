@@ -15,6 +15,9 @@ parser = argparse.ArgumentParser(
     description="Learn a representation from brain data.",
 )
 parser.add_argument("--config", help="Path to config file (yaml)", required=True)
+parser.add_argument(
+    "--checkpoint", help="Path to existing weights to load representation", default=None
+)
 parser.add_argument("--name", help="Name for run", default=None)
 parser.add_argument(
     "--debug", help="Faster debug mode", action="store_true", default=False
@@ -45,10 +48,16 @@ checkpoint_callback = ModelCheckpoint(
     auto_insert_metric_name=True,
 )
 
-model = RepLearner(
-    config["rep_config"],
-    batch_size=config["datamodule_config"]["dataloader_configs"]["batch_size"],
-)
+if args.checkpoint:
+    model = RepLearner.load_from_checkpoint(args.checkpoint)
+    # model.freeze_except()
+    # todo: make sure configure_optimizer is called *after* this
+    # model.configure_optimizer() ???
+else:
+    model = RepLearner(
+        config["rep_config"],
+        batch_size=config["datamodule_config"]["dataloader_configs"]["batch_size"],
+    )
 datamodule = MultiDataLoader(**config["datamodule_config"])
 
 # Track gradients

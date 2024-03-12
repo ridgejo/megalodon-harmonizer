@@ -1,5 +1,6 @@
 import torch.nn as nn
 
+
 class TransformerEncoder(nn.Module):
     def __init__(self, in_channels, transformer_config):
         super(TransformerEncoder, self).__init__()
@@ -11,9 +12,7 @@ class TransformerEncoder(nn.Module):
         del transformer_config["encoder_layer"]
 
         self.project_in = nn.Conv1d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=1
+            in_channels=in_channels, out_channels=out_channels, kernel_size=1
         )
 
         self.transformer = nn.TransformerEncoder(

@@ -9,6 +9,7 @@ from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
 )
+from models.brain_encoders.supervised.voiced_classifier import VoicedClassifier
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
@@ -102,7 +103,7 @@ class RepLearner(L.LightningModule):
         if "transformer" in rep_config:
             active_models["transformer"] = TransformerEncoder(
                 in_channels=rep_config["encoder"]["dimension"],
-                transformer_config=rep_config["transformer"]
+                transformer_config=rep_config["transformer"],
             )
 
         # todo: Subject embeddings only in the classifier stage so we don't need to retrain encoder for novel subjects
@@ -141,6 +142,12 @@ class RepLearner(L.LightningModule):
                 rep_config["vad_classifier"]["input_dim"] += subject_embedding_dim
             active_models["vad_classifier"] = make_vad_classifier(
                 **rep_config["vad_classifier"]
+            )
+        if "voiced_classifier" in rep_config:
+            if "subject_embedding" in rep_config:
+                rep_config["voiced_classifier"]["input_dim"] += subject_embedding_dim
+            active_models["voiced_classifier"] = VoicedClassifier(
+                **rep_config["voiced_classifier"]
             )
 
         self.active_models = nn.ModuleDict(active_models)
@@ -219,6 +226,12 @@ class RepLearner(L.LightningModule):
         if "vad_classifier" in self.active_models and "vad_labels" in inputs:
             vad_logits = self.active_models["vad_classifier"](z_independent).squeeze(-1)
             return_values["vad_logits"] = vad_logits
+
+        if "voiced_classifier" in self.active_models and "voiced_labels" in inputs:
+            voiced_labels = inputs["voiced_labels"]
+            return_values["voiced"] = self.active_models["voiced_classifier"](
+                z_sequence, voiced_labels
+            )
 
         return return_values
 
@@ -382,10 +395,33 @@ class RepLearner(L.LightningModule):
                 metrics[f"{stage}_{data_key}+vad_balacc"] = vad_balacc
                 metrics[f"{stage}_dat={dataset}+vad_balacc"] = vad_balacc
 
+            if key == "voiced":
+                voiced_balacc, voiced_bce_loss = val
+
+                loss += voiced_bce_loss
+                losses[f"{stage}+voiced_bce_loss"] = voiced_bce_loss
+                losses[f"{stage}_{data_key}+voiced_bce_loss"] = voiced_bce_loss
+                losses[f"{stage}_dat={dataset}+voiced_bce_loss"] = voiced_bce_loss
+
+                metrics[f"{stage}_{data_key}+voiced_balacc"] = voiced_balacc
+                metrics[f"{stage}_dat={dataset}+voiced_balacc"] = voiced_balacc
+
         return loss, losses, metrics
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.active_models.parameters(), lr=self.lr)
+        return torch.optim.AdamW(
+            filter(
+                lambda p: p.requires_grad,
+                self.active_models.parameters(),  # Prevents unintentional unfreezing
+            ),
+            lr=self.lr,
+        )
+
+    def freeze_except(self, module_name: str):
+        for key in self.active_models.keys():
+            if module_name not in key:
+                for param in self.active_models[key].parameters():
+                    param.requires_grad = False
 
     def compute_phase_amp(self, x):
         X_fft = torch.fft.fft(x)
