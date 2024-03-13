@@ -19,9 +19,11 @@ rep_config:
     input_dim: 300
     hidden_dim: 512
     dataset_keys: ["armeni2022", "schoffelen2019", "gwilliams2022"]
+    weight: 0.1
   vad_classifier:
     input_dim: 300
     hidden_dim: 512
+    weight: 1.0
 
 datamodule_config:
   dataset_preproc_configs:

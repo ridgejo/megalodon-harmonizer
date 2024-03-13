@@ -14,6 +14,7 @@ from models.brain_encoders.supervised.vad_classifier import VADClassifier
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
+from models.vector_quantize import VectorQuantize
 
 def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
     class ArgmaxAmpPredictor(nn.Module):
@@ -63,15 +64,9 @@ class RepLearner(L.LightningModule):
         super().__init__()
 
         # Requirements:
-        # - Spatial (attention?) layer
-        # - Transformer block
-        # - Dataset-conditioned blocks
-        # - Subject-conditioned embeddings (16 to 32-dimensional vectors learned in the network)
+        # - Spatial (attention?) layer (requires sensor geometry) --- Bin into 50 (?)
         # - VQVAE usage or inclusion, and hyperparameters
-        # - (SEANet?) Encoder specification
         # - Auxiliary: decoder spec, classifier specs, pre-defined task specs, spectral losses, etc.
-
-        # Predict index of highest amplitude channel? -> needs dataset-conditioned output layer.
         # Circular shift channel and predict index?
         # etc.
 
@@ -91,6 +86,13 @@ class RepLearner(L.LightningModule):
             active_models["transformer"] = TransformerEncoder(
                 in_channels=rep_config["encoder"]["dimension"],
                 transformer_config=rep_config["transformer"],
+            )
+
+        if "quantize" in rep_config:
+            self.weightings["commit_loss"] = rep_config["quantize"].get("weight", 1.0)
+            rep_config["quantize"].pop("weight", None)
+            active_models["quantize"] = VectorQuantize(
+                rep_config["quantize"]
             )
 
         if "subject_embedding" in rep_config:
@@ -158,7 +160,10 @@ class RepLearner(L.LightningModule):
         if "transformer" in self.active_models:
             z = self.active_models["transformer"](z)
 
-        # todo: vector quantization
+        if "quantize" in self.active_models:
+            z, _, commit_loss = self.active_models["quantize"](z)
+        else:
+            commit_loss = 0.0
 
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
@@ -183,7 +188,7 @@ class RepLearner(L.LightningModule):
                 (z_sequence, z_seq_subject_embedding), dim=-1
             )  # [B, T, E + S]
 
-        return z_sequence, z_independent
+        return z_sequence, z_independent, commit_loss
 
     def forward(self, inputs):
         x = inputs["data"]
@@ -191,9 +196,9 @@ class RepLearner(L.LightningModule):
         dataset = inputs["identifier"]["dataset"][0]
         subject = inputs["identifier"]["subject"][0]
 
-        z_sequence, z_independent = self.apply_encoder(x, dataset, subject)
+        z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
-        return_values = {}
+        return_values = {"commit_loss": commit_loss}
 
         if "masked_channel_predictor" in self.active_models:
             x_masked, mask_label = self.active_models[
