@@ -35,4 +35,7 @@ class VoicedClassifier(nn.Module):
             average="macro",
         )
 
-        return balacc, bce_loss
+        return {
+            "voiced_bce_loss": bce_loss,
+            "voiced_balacc": balacc,
+        }

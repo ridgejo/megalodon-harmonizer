@@ -10,18 +10,10 @@ from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
 )
 from models.brain_encoders.supervised.voiced_classifier import VoicedClassifier
+from models.brain_encoders.supervised.vad_classifier import VADClassifier
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
-
-
-def make_phase_amp_regressor(input_dim, hidden_dim):
-    return nn.Sequential(
-        nn.Linear(in_features=input_dim, out_features=hidden_dim),
-        nn.ReLU(),
-        nn.Linear(in_features=hidden_dim, out_features=2),
-    )
-
 
 def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
     class ArgmaxAmpPredictor(nn.Module):
@@ -55,18 +47,12 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
                 F.mse_loss(z.squeeze(-1) * self.target_divisor, targets.float())
             )
 
-            return mse_loss, rmse_metric
+            return {
+                "argmax_amp_mse_loss": mse_loss,
+                "argmax_amp_rmse": rmse_metric,
+            }
 
     return ArgmaxAmpPredictor(input_dim, hidden_dim, dataset_keys)
-
-
-def make_vad_classifier(input_dim, hidden_dim):
-    return nn.Sequential(
-        nn.Linear(in_features=input_dim, out_features=hidden_dim),
-        nn.ReLU(),
-        nn.Linear(in_features=hidden_dim, out_features=1),
-    )
-
 
 class RepLearner(L.LightningModule):
     """
@@ -91,6 +77,7 @@ class RepLearner(L.LightningModule):
 
         self.lr = rep_config["lr"]
         self.batch_size = batch_size
+        self.weightings = {}
 
         active_models = {}
 
@@ -106,8 +93,6 @@ class RepLearner(L.LightningModule):
                 transformer_config=rep_config["transformer"],
             )
 
-        # todo: Subject embeddings only in the classifier stage so we don't need to retrain encoder for novel subjects
-        # How to implement subject embedding?
         if "subject_embedding" in rep_config:
             subject_embedding_dim = rep_config["subject_embedding"]["embedding_dim"]
             active_models["subject_embedding"] = SubjectEmbedding(
@@ -115,19 +100,21 @@ class RepLearner(L.LightningModule):
             )
 
         # Auxiliary SSL losses
-        if "phase_amp_regressor" in rep_config:
-            if "subject_embedding" in rep_config:
-                rep_config["phase_amp_regressor"]["input_dim"] += subject_embedding_dim
-            active_models["phase_amp_regressor"] = make_phase_amp_regressor(
-                **rep_config["phase_amp_regressor"]
-            )
         if "argmax_amp_predictor" in rep_config:
+
+            self.weightings["argmax_amp"] = rep_config["argmax_amp_predictor"].get("weight", 1.0)
+            rep_config["argmax_amp_predictor"].pop("weight", None)
+
             if "subject_embedding" in rep_config:
                 rep_config["argmax_amp_predictor"]["input_dim"] += subject_embedding_dim
             active_models["argmax_amp_predictor"] = make_argmax_amp_predictor(
                 **rep_config["argmax_amp_predictor"]
             )
         if "masked_channel_predictor" in rep_config:
+
+            self.weightings["masked_channel_pred"] = rep_config["masked_channel_predictor"].get("weight", 1.0)
+            rep_config["masked_channel_predictor"].pop("weight", None)
+
             if "subject_embedding" in rep_config:
                 rep_config["masked_channel_predictor"][
                     "input_dim"
@@ -138,12 +125,20 @@ class RepLearner(L.LightningModule):
 
         # Label losses for representation shaping
         if "vad_classifier" in rep_config:
+
+            self.weightings["vad"] = rep_config["vad_classifier"].get("weight", 1.0)
+            rep_config["vad_classifier"].pop("weight", None)
+
             if "subject_embedding" in rep_config:
                 rep_config["vad_classifier"]["input_dim"] += subject_embedding_dim
-            active_models["vad_classifier"] = make_vad_classifier(
+            active_models["vad_classifier"] = VADClassifier(
                 **rep_config["vad_classifier"]
             )
         if "voiced_classifier" in rep_config:
+
+            self.weightings["voiced"] = rep_config["voiced_classifier"].get("weight", 1.0)
+            rep_config["voiced_classifier"].pop("weight", None)
+
             if "subject_embedding" in rep_config:
                 rep_config["voiced_classifier"]["input_dim"] += subject_embedding_dim
             active_models["voiced_classifier"] = VoicedClassifier(
@@ -209,12 +204,6 @@ class RepLearner(L.LightningModule):
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
 
-        if "phase_amp_regressor" in self.active_models:
-            pa = self.active_models["phase_amp_regressor"](z_independent)
-            phase, amp = pa[:, 0], pa[:, 1]
-            return_values["phase"] = phase
-            return_values["amp"] = amp
-
         if "argmax_amp_predictor" in self.active_models:
             argmax_amp = self.active_models["argmax_amp_predictor"](
                 z_independent,
@@ -224,8 +213,8 @@ class RepLearner(L.LightningModule):
             return_values["argmax_amp"] = argmax_amp
 
         if "vad_classifier" in self.active_models and "vad_labels" in inputs:
-            vad_logits = self.active_models["vad_classifier"](z_independent).squeeze(-1)
-            return_values["vad_logits"] = vad_logits
+            vad_labels = inputs["vad_labels"]
+            return_values["vad"] = self.active_models["vad_classifier"](z_independent, vad_labels.flatten(start_dim=0, end_dim=-1))
 
         if "voiced_classifier" in self.active_models and "voiced_labels" in inputs:
             voiced_labels = inputs["voiced_labels"]
@@ -343,68 +332,22 @@ class RepLearner(L.LightningModule):
 
         # Compute losses over this data batch
         for key, val in return_values.items():
-            if key == "masked_channel_pred":
-                masked_channel_mse, masked_channel_rmse = val
 
-                loss += masked_channel_mse
-                losses[f"{stage}+masked_channel_mse_loss"] = masked_channel_mse
-                losses[
-                    f"{stage}_{data_key}+masked_channel_mse_loss"
-                ] = masked_channel_mse
-                losses[
-                    f"{stage}_dat={dataset}+masked_channel_mse_loss"
-                ] = masked_channel_mse
+            loss_weighting = self.weightings[key]
 
-                metrics[f"{stage}_{data_key}+masked_channel_rmse"] = masked_channel_rmse
-                metrics[
-                    f"{stage}_dat={dataset}+maksed_channel_rmse"
-                ] = masked_channel_rmse
-
-            if key == "argmax_amp":
-                # Compute max amplitude index at all time points in signal
-
-                argmax_amp_loss, rmse_metric = val
-
-                loss += argmax_amp_loss
-                losses[f"{stage}+argmax_amp_loss"] = argmax_amp_loss
-                losses[f"{stage}_{data_key}+argmax_amp_loss"] = argmax_amp_loss
-                losses[f"{stage}_dat={dataset}+argmax_amp_loss"] = argmax_amp_loss
-
-                metrics[f"{stage}_{data_key}+argmax_amp_rmse"] = rmse_metric
-                metrics[f"{stage}_dat={dataset}+argmax_amp_rmse"] = rmse_metric
-
-            if key == "vad_logits":
-                vad_logits = val
-                vad_labels = batch["vad_labels"].flatten(start_dim=0, end_dim=1)
-                vad_loss = F.binary_cross_entropy_with_logits(vad_logits, vad_labels)
-
-                vad_preds = torch.round(F.sigmoid(vad_logits))
-                vad_balacc = TM.classification.accuracy(
-                    vad_preds.int(),
-                    vad_labels.int(),
-                    task="multiclass",
-                    num_classes=2,
-                    average="macro",
-                )
-
-                loss += vad_loss
-                losses[f"{stage}+vad_bce_loss"] = vad_loss
-                losses[f"{stage}_{data_key}+vad_bce_loss"] = vad_loss
-                losses[f"{stage}_dat={dataset}+vad_bce_loss"] = vad_loss
-
-                metrics[f"{stage}_{data_key}+vad_balacc"] = vad_balacc
-                metrics[f"{stage}_dat={dataset}+vad_balacc"] = vad_balacc
-
-            if key == "voiced":
-                voiced_balacc, voiced_bce_loss = val
-
-                loss += voiced_bce_loss
-                losses[f"{stage}+voiced_bce_loss"] = voiced_bce_loss
-                losses[f"{stage}_{data_key}+voiced_bce_loss"] = voiced_bce_loss
-                losses[f"{stage}_dat={dataset}+voiced_bce_loss"] = voiced_bce_loss
-
-                metrics[f"{stage}_{data_key}+voiced_balacc"] = voiced_balacc
-                metrics[f"{stage}_dat={dataset}+voiced_balacc"] = voiced_balacc
+            # Each return value from a module contains a dictionary of losses and metrics
+            for k, v in val.items():
+                
+                if "loss" in k:
+                    v = v * loss_weighting
+                    loss += v
+                    losses[f"{stage}+{k}"] = v
+                    losses[f"{stage}_{data_key}+{k}"] = v
+                    losses[f"{stage}_dat={dataset}+{k}"] = v
+                else:
+                    metrics[f"{stage}+{k}"] = v
+                    metrics[f"{stage}_{data_key}+{k}"] = v
+                    metrics[f"{stage}_dat={dataset}+{k}"] = v
 
         return loss, losses, metrics
 
