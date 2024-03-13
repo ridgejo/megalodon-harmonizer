@@ -65,7 +65,6 @@ class RepLearner(L.LightningModule):
 
         # Requirements:
         # - Spatial (attention?) layer (requires sensor geometry) --- Bin into 50 (?)
-        # - VQVAE usage or inclusion, and hyperparameters
         # - Auxiliary: decoder spec, classifier specs, pre-defined task specs, spectral losses, etc.
         # Circular shift channel and predict index?
         # etc.
@@ -218,7 +217,15 @@ class RepLearner(L.LightningModule):
             return_values["argmax_amp"] = argmax_amp
 
         if "vad_classifier" in self.active_models and "vad_labels" in inputs:
-            vad_labels = inputs["vad_labels"]
+            vad_labels = inputs["vad_labels"] # [B, T]
+
+            if vad_labels.shape[-1] != z_sequence.shape[1]:
+                # Downsample labels to match number of encoder output embeddings
+                vad_labels = F.interpolate(
+                    vad_labels.unsqueeze(1), # [B, 1, T]
+                    size=z_sequence.shape[1] # T2
+                ).squeeze(1) # [B, T2]
+
             return_values["vad"] = self.active_models["vad_classifier"](z_independent, vad_labels.flatten(start_dim=0, end_dim=-1))
 
         if "voiced_classifier" in self.active_models and "voiced_labels" in inputs:
