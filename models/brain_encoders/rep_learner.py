@@ -93,6 +93,8 @@ class RepLearner(L.LightningModule):
             active_models["quantize"] = VectorQuantize(
                 rep_config["quantize"]
             )
+        else:
+            self.weighting["commit_loss"] = 0.0
 
         if "subject_embedding" in rep_config:
             subject_embedding_dim = rep_config["subject_embedding"]["embedding_dim"]
