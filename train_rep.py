@@ -56,7 +56,6 @@ if args.checkpoint:
 else:
     model = RepLearner(
         config["rep_config"],
-        batch_size=config["datamodule_config"]["dataloader_configs"]["batch_size"],
     )
 datamodule = MultiDataLoader(**config["datamodule_config"])
 

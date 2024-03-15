@@ -2,7 +2,7 @@ experiment:
   seed: 42
 
 rep_config:
-  lr: 0.00078
+  lr: 0.0002
   dataset_block:
     dataset_sizes:
       armeni2022: 269
@@ -30,7 +30,7 @@ datamodule_config:
     val_ratio: 0.1 # Bigger val required to get batches into val set
     test_ratio: 0.00
     pred_ratio: 0.00
-    batch_size: 64
+    batch_size: 16
     normalisation:
       n_sample_batches: 8
       per_channel: true

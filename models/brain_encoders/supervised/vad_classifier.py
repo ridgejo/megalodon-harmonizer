@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchmetrics.functional as TM
 
 class VADClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim):
@@ -15,7 +16,7 @@ class VADClassifier(nn.Module):
     def forward(self, x, labels):
         z = self.model(x).squeeze(-1)
 
-        bce_loss = F.binary_cross_entropy_with_logits(x, labels)
+        bce_loss = F.binary_cross_entropy_with_logits(z, labels)
 
         preds = torch.round(F.sigmoid(z))
 

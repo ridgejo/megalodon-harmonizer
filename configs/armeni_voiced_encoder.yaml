@@ -2,7 +2,7 @@ experiment:
   seed: 42
 
 rep_config:
-  lr: 0.001
+  lr: 0.000066
   dataset_block:
     dataset_sizes:
       armeni2022: 269
@@ -35,7 +35,7 @@ datamodule_config:
     val_ratio: 0.04
     test_ratio: 0.04
     pred_ratio: 0.02
-    batch_size: 32
+    batch_size: 128
     normalisation:
       n_sample_batches: 8
       per_channel: true

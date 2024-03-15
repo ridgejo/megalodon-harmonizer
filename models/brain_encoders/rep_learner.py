@@ -9,7 +9,7 @@ from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
 )
-from models.brain_encoders.supervised.voiced_classifier import VoicedClassifier
+from models.brain_encoders.supervised.voiced_classifier import VoicedClassifierLSTM, VoicedClassifierMLP
 from models.brain_encoders.supervised.vad_classifier import VADClassifier
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
@@ -60,7 +60,7 @@ class RepLearner(L.LightningModule):
     Representation learner.
     """
 
-    def __init__(self, rep_config, batch_size):
+    def __init__(self, rep_config):
         super().__init__()
 
         # Requirements:
@@ -69,8 +69,7 @@ class RepLearner(L.LightningModule):
         # Circular shift channel and predict index?
         # etc.
 
-        self.lr = rep_config["lr"]
-        self.batch_size = batch_size
+        self.learning_rate = rep_config["lr"]
         self.weightings = {}
 
         active_models = {}
@@ -88,13 +87,13 @@ class RepLearner(L.LightningModule):
             )
 
         if "quantize" in rep_config:
-            self.weightings["commit_loss"] = rep_config["quantize"].get("weight", 1.0)
+            self.weightings["quantization"] = rep_config["quantize"].get("weight", 1.0)
             rep_config["quantize"].pop("weight", None)
             active_models["quantize"] = VectorQuantize(
                 rep_config["quantize"]
             )
         else:
-            self.weighting["commit_loss"] = 0.0
+            self.weightings["quantization"] = 0.0
 
         if "subject_embedding" in rep_config:
             subject_embedding_dim = rep_config["subject_embedding"]["embedding_dim"]
@@ -144,9 +143,19 @@ class RepLearner(L.LightningModule):
 
             if "subject_embedding" in rep_config:
                 rep_config["voiced_classifier"]["input_dim"] += subject_embedding_dim
-            active_models["voiced_classifier"] = VoicedClassifier(
-                **rep_config["voiced_classifier"]
-            )
+
+            if rep_config["voiced_classifier"]["type"] == "mlp":
+                del rep_config["voiced_classifier"]["type"]
+                active_models["voiced_classifier"] = VoicedClassifierMLP(
+                    **rep_config["voiced_classifier"]
+                )
+            elif rep_config["voiced_classifier"]["type"] == "lstm":
+                del rep_config["voiced_classifier"]["type"]
+                active_models["voiced_classifier"] = VoicedClassifierLSTM(
+                    **rep_config["voiced_classifier"]
+                )
+            else:
+                raise ValueError("Voiced classifier type not recognised")
 
         self.active_models = nn.ModuleDict(active_models)
         self.rep_config = rep_config
@@ -199,7 +208,11 @@ class RepLearner(L.LightningModule):
 
         z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
-        return_values = {"commit_loss": commit_loss}
+        return_values = {
+            "quantization": {
+                "commit_loss": commit_loss
+            }
+        }
 
         if "masked_channel_predictor" in self.active_models:
             x_masked, mask_label = self.active_models[
@@ -241,6 +254,8 @@ class RepLearner(L.LightningModule):
     def training_step(self, batch, batch_idx):
         loss, losses, metrics = self._shared_step(batch, batch_idx, "train")
 
+        batch_size = len(batch["data"])
+
         if loss is not None:
             self.log(
                 "train_loss",
@@ -249,7 +264,7 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=True,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
             self.log_dict(
                 losses,
@@ -257,7 +272,7 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
             self.log_dict(
                 metrics,
@@ -265,13 +280,15 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
 
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         loss, losses, metrics = self._shared_step(batch, batch_idx, "val")
+
+        batch_size = len(batch["data"])
 
         if loss is not None:
             self.log(
@@ -281,7 +298,7 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=True,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
             self.log_dict(
                 losses,
@@ -289,7 +306,7 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
             self.log_dict(
                 metrics,
@@ -297,13 +314,15 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
 
         return loss
 
     def test_step(self, batch, batch_idx):
         loss, losses, metrics = self._shared_step(batch, batch_idx, "test")
+
+        batch_size = len(batch["data"])
 
         if loss is not None:
             self.log(
@@ -313,7 +332,7 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=True,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
             self.log_dict(
                 losses,
@@ -321,7 +340,7 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
             self.log_dict(
                 metrics,
@@ -329,7 +348,7 @@ class RepLearner(L.LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 logger=True,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
             )
 
         return loss
@@ -371,7 +390,7 @@ class RepLearner(L.LightningModule):
                 lambda p: p.requires_grad,
                 self.active_models.parameters(),  # Prevents unintentional unfreezing
             ),
-            lr=self.lr,
+            lr=self.learning_rate,
         )
 
     def freeze_except(self, module_name: str):

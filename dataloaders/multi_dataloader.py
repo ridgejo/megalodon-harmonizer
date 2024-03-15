@@ -35,6 +35,7 @@ class MultiDataLoader(L.LightningDataModule):
         debug: bool = False,
     ):
         super().__init__()
+        self.batch_size = dataloader_configs["batch_size"]
         self.dataset_preproc_configs = dataset_preproc_configs
         self.dataloader_configs = dataloader_configs
         self.debug = debug
@@ -69,7 +70,7 @@ class MultiDataLoader(L.LightningDataModule):
             self.dataloader_configs["test_ratio"],
         )
 
-        batch_size = self.dataloader_configs["batch_size"]
+        batch_size = self.batch_size
 
         self.train, self.val, self.test, self.pred = {}, {}, {}, {}
         self.scalers = {}

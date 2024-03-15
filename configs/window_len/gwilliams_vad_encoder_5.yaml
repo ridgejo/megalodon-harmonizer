@@ -2,7 +2,7 @@ experiment:
   seed: 42
 
 rep_config:
-  lr: 0.001
+  lr: 0.0002
   dataset_block:
     dataset_sizes:
       armeni2022: 269
@@ -10,27 +10,27 @@ rep_config:
       gwilliams2022: 208
     shared_dim: 300
     use_data_block: true
-  voiced_classifier:
+  encoder:
+    channels: 300
+    conv_channels: [512, 512]
+    ratios: [1]
+    dimension: 300
+  vad_classifier:
     input_dim: 300
     hidden_dim: 512
-    num_layers: 2
 
 datamodule_config:
   dataset_preproc_configs:
-    armeni2022:
+    gwilliams2022:
       bad_subjects: []
-      bad_sessions:
-        "001": []
-        "002": []
-        "003": ["008"]
-      slice_len: 3.0
-      label_type: "voiced"
+      slice_len: 5.0
+      label_type: "vad"
   dataloader_configs:
     train_ratio: 0.9
-    val_ratio: 0.04
-    test_ratio: 0.04
-    pred_ratio: 0.02
-    batch_size: 32
+    val_ratio: 0.1 # Bigger val required to get batches into val set
+    test_ratio: 0.00
+    pred_ratio: 0.00
+    batch_size: 16
     normalisation:
       n_sample_batches: 8
       per_channel: true

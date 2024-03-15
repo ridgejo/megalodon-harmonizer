@@ -240,8 +240,9 @@ def get_vad_labels_gwilliams(events, raw, offset=0.0):
     return labels
 
 
-def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
+def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=-0.02):
     sample_freq = raw.info["sfreq"]
+    offset_samples = int(sample_freq * offset)
 
     # Filter events with phoneme labels
     phoneme_events = events[
@@ -256,7 +257,7 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
         trial_type = ast.literal_eval(phoneme_event["trial_type"])
 
         phoneme = trial_type["phoneme"].split("_")[0]  # Remove BIE indicators
-        onset_samples = int(float(phoneme_event["onset"]) * sample_freq)
+        onset_samples = int(float(phoneme_event["onset"]) * sample_freq) + offset_samples
         duration_samples = int(float(phoneme_event["duration"]) * sample_freq)
         phonation = phoneme_codes[phoneme_codes["phoneme"] == phoneme][
             "phonation"
@@ -297,7 +298,7 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.0):
     return phoneme_onsets, labels
 
 
-def get_voiced_labels(events, raw, offset=0.0):
+def get_voiced_labels(events, raw, offset=-0.02):
     """Get aligned index for start of every phoneme and align to longest."""
     # Longest phoneme in Armeni: 0.8s
     # 99% are less than 0.27s however
@@ -316,7 +317,7 @@ def get_voiced_labels(events, raw, offset=0.0):
             onset = float(phoneme_event["onset"])
 
             if onset > 0:
-                t_start = int(onset * sample_freq) + offset_samples
+                t_start = int(onset * sample_freq) + offset_samples # Start 20ms *before* phoneme onset
 
                 if value in ARPABET_NEGVOICE:
                     labels.append(0.0)
