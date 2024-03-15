@@ -257,7 +257,9 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=-0.02):
         trial_type = ast.literal_eval(phoneme_event["trial_type"])
 
         phoneme = trial_type["phoneme"].split("_")[0]  # Remove BIE indicators
-        onset_samples = int(float(phoneme_event["onset"]) * sample_freq) + offset_samples
+        onset_samples = (
+            int(float(phoneme_event["onset"]) * sample_freq) + offset_samples
+        )
         duration_samples = int(float(phoneme_event["duration"]) * sample_freq)
         phonation = phoneme_codes[phoneme_codes["phoneme"] == phoneme][
             "phonation"
@@ -317,7 +319,9 @@ def get_voiced_labels(events, raw, offset=-0.02):
             onset = float(phoneme_event["onset"])
 
             if onset > 0:
-                t_start = int(onset * sample_freq) + offset_samples # Start 20ms *before* phoneme onset
+                t_start = (
+                    int(onset * sample_freq) + offset_samples
+                )  # Start 20ms *before* phoneme onset
 
                 if value in ARPABET_NEGVOICE:
                     labels.append(0.0)

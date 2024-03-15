@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as TM
 
+
 class VADClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super(VADClassifier, self).__init__()

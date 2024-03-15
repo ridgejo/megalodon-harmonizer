@@ -47,7 +47,5 @@ class MaskedChannelPredictor(nn.Module):
         # Division to account for approx number of sensors
         return {
             "masked_channel_mse_loss": F.mse_loss(z, label.float() / 250),
-            "masked_channel_rmse": torch.sqrt(
-                F.mse_loss(z * 250, label.float())
-            ),
+            "masked_channel_rmse": torch.sqrt(F.mse_loss(z * 250, label.float())),
         }

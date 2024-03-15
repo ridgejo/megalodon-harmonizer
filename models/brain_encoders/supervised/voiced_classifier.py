@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as TM
 
+
 class VoicedClassifierLSTM(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers):
         super(VoicedClassifierLSTM, self).__init__()
@@ -47,6 +48,7 @@ class VoicedClassifierLSTM(nn.Module):
             "voiced_r2": r2_score,
         }
 
+
 class VoicedClassifierMLP(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super(VoicedClassifierMLP, self).__init__()
@@ -64,8 +66,7 @@ class VoicedClassifierMLP(nn.Module):
         )
 
     def forward(self, x, labels):
-
-        x = x.flatten(start_dim=1, end_dim=-1) # [B, T, E] -> [B, T * E]
+        x = x.flatten(start_dim=1, end_dim=-1)  # [B, T, E] -> [B, T * E]
         z = self.model(x).squeeze(-1)
 
         bce_loss = F.binary_cross_entropy_with_logits(z, labels)

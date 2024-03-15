@@ -2,19 +2,22 @@ import lightning as L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchmetrics.functional as TM
 
 from dataloaders.multi_dataloader import get_key_from_batch_identifier
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
 )
-from models.brain_encoders.supervised.voiced_classifier import VoicedClassifierLSTM, VoicedClassifierMLP
 from models.brain_encoders.supervised.vad_classifier import VADClassifier
+from models.brain_encoders.supervised.voiced_classifier import (
+    VoicedClassifierLSTM,
+    VoicedClassifierMLP,
+)
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
+
 
 def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
     class ArgmaxAmpPredictor(nn.Module):
@@ -55,6 +58,7 @@ def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
 
     return ArgmaxAmpPredictor(input_dim, hidden_dim, dataset_keys)
 
+
 class RepLearner(L.LightningModule):
     """
     Representation learner.
@@ -89,9 +93,7 @@ class RepLearner(L.LightningModule):
         if "quantize" in rep_config:
             self.weightings["quantization"] = rep_config["quantize"].get("weight", 1.0)
             rep_config["quantize"].pop("weight", None)
-            active_models["quantize"] = VectorQuantize(
-                rep_config["quantize"]
-            )
+            active_models["quantize"] = VectorQuantize(rep_config["quantize"])
         else:
             self.weightings["quantization"] = 0.0
 
@@ -103,8 +105,9 @@ class RepLearner(L.LightningModule):
 
         # Auxiliary SSL losses
         if "argmax_amp_predictor" in rep_config:
-
-            self.weightings["argmax_amp"] = rep_config["argmax_amp_predictor"].get("weight", 1.0)
+            self.weightings["argmax_amp"] = rep_config["argmax_amp_predictor"].get(
+                "weight", 1.0
+            )
             rep_config["argmax_amp_predictor"].pop("weight", None)
 
             if "subject_embedding" in rep_config:
@@ -113,8 +116,9 @@ class RepLearner(L.LightningModule):
                 **rep_config["argmax_amp_predictor"]
             )
         if "masked_channel_predictor" in rep_config:
-
-            self.weightings["masked_channel_pred"] = rep_config["masked_channel_predictor"].get("weight", 1.0)
+            self.weightings["masked_channel_pred"] = rep_config[
+                "masked_channel_predictor"
+            ].get("weight", 1.0)
             rep_config["masked_channel_predictor"].pop("weight", None)
 
             if "subject_embedding" in rep_config:
@@ -127,7 +131,6 @@ class RepLearner(L.LightningModule):
 
         # Label losses for representation shaping
         if "vad_classifier" in rep_config:
-
             self.weightings["vad"] = rep_config["vad_classifier"].get("weight", 1.0)
             rep_config["vad_classifier"].pop("weight", None)
 
@@ -137,8 +140,9 @@ class RepLearner(L.LightningModule):
                 **rep_config["vad_classifier"]
             )
         if "voiced_classifier" in rep_config:
-
-            self.weightings["voiced"] = rep_config["voiced_classifier"].get("weight", 1.0)
+            self.weightings["voiced"] = rep_config["voiced_classifier"].get(
+                "weight", 1.0
+            )
             rep_config["voiced_classifier"].pop("weight", None)
 
             if "subject_embedding" in rep_config:
@@ -208,11 +212,7 @@ class RepLearner(L.LightningModule):
 
         z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
-        return_values = {
-            "quantization": {
-                "commit_loss": commit_loss
-            }
-        }
+        return_values = {"quantization": {"commit_loss": commit_loss}}
 
         if "masked_channel_predictor" in self.active_models:
             x_masked, mask_label = self.active_models[
@@ -232,16 +232,18 @@ class RepLearner(L.LightningModule):
             return_values["argmax_amp"] = argmax_amp
 
         if "vad_classifier" in self.active_models and "vad_labels" in inputs:
-            vad_labels = inputs["vad_labels"] # [B, T]
+            vad_labels = inputs["vad_labels"]  # [B, T]
 
             if vad_labels.shape[-1] != z_sequence.shape[1]:
                 # Downsample labels to match number of encoder output embeddings
                 vad_labels = F.interpolate(
-                    vad_labels.unsqueeze(1), # [B, 1, T]
-                    size=z_sequence.shape[1] # T2
-                ).squeeze(1) # [B, T2]
+                    vad_labels.unsqueeze(1),  # [B, 1, T]
+                    size=z_sequence.shape[1],  # T2
+                ).squeeze(1)  # [B, T2]
 
-            return_values["vad"] = self.active_models["vad_classifier"](z_independent, vad_labels.flatten(start_dim=0, end_dim=-1))
+            return_values["vad"] = self.active_models["vad_classifier"](
+                z_independent, vad_labels.flatten(start_dim=0, end_dim=-1)
+            )
 
         if "voiced_classifier" in self.active_models and "voiced_labels" in inputs:
             voiced_labels = inputs["voiced_labels"]
@@ -365,12 +367,10 @@ class RepLearner(L.LightningModule):
 
         # Compute losses over this data batch
         for key, val in return_values.items():
-
             loss_weighting = self.weightings[key]
 
             # Each return value from a module contains a dictionary of losses and metrics
             for k, v in val.items():
-                
                 if "loss" in k:
                     v = v * loss_weighting
                     loss += v
