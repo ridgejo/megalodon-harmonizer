@@ -1,12 +1,12 @@
-from dask.distributed import Client
-from osl import preprocessing
 import glob
 import os
 
+from osl import preprocessing
+
 from dataloaders.data_utils import DATA_PATH
 
-def preproc_schoffelen2019():
 
+def preproc_schoffelen2019():
     config = """
         preproc:
         - pick_types: {meg: true, ref_meg: false}
@@ -23,9 +23,13 @@ def preproc_schoffelen2019():
     preproc_root = root / "preproc"
     preproc_root.mkdir(parents=True, exist_ok=True)
 
-    subjects = sorted([os.path.basename(path).replace("sub-", "") for path in glob.glob(str(root) + f"/sub-*")])
+    subjects = sorted(
+        [
+            os.path.basename(path).replace("sub-", "")
+            for path in glob.glob(str(root) + "/sub-*")
+        ]
+    )
     for subject in subjects:
-
         # Find tasks
         inputs = glob.glob(str(root) + f"/sub-{subject}/meg/*_task-*_meg.ds")
 
@@ -39,8 +43,8 @@ def preproc_schoffelen2019():
             dask_client=False,
         )
 
-def preproc_gwilliams2022():
 
+def preproc_gwilliams2022():
     config = """
         preproc:
         - pick_types: {meg: true, ref_meg: false}
@@ -57,15 +61,31 @@ def preproc_gwilliams2022():
     preproc_root = root / "preproc"
     preproc_root.mkdir(parents=True, exist_ok=True)
 
-    subjects = sorted([os.path.basename(path).replace("sub-", "") for path in glob.glob(str(root) + f"/sub-*")])
+    subjects = sorted(
+        [
+            os.path.basename(path).replace("sub-", "")
+            for path in glob.glob(str(root) + "/sub-*")
+        ]
+    )
     for subject in subjects:
         # Find sessions
-        sessions = sorted([os.path.basename(path).replace("ses-", "") for path in glob.glob(str(root) + f"/sub-{subject}/ses-*")])
+        sessions = sorted(
+            [
+                os.path.basename(path).replace("ses-", "")
+                for path in glob.glob(str(root) + f"/sub-{subject}/ses-*")
+            ]
+        )
 
         inputs = []
         for session in sessions:
             # Find tasks
-            inputs.extend(sorted(glob.glob(str(root) + f"/sub-{subject}/ses-{session}/meg/*_task-*_meg.con")))
+            inputs.extend(
+                sorted(
+                    glob.glob(
+                        str(root) + f"/sub-{subject}/ses-{session}/meg/*_task-*_meg.con"
+                    )
+                )
+            )
 
         preproc_dir = preproc_root / f"sub-{subject}"
 
@@ -100,15 +120,21 @@ def preproc_armeni2022():
     preproc_root = armeni_root / "preproc"
     preproc_root.mkdir(parents=True, exist_ok=True)
 
-    subjects = sorted([os.path.basename(path).replace("sub-", "") for path in glob.glob(str(armeni_root) + f"/sub-*")])
+    subjects = sorted(
+        [
+            os.path.basename(path).replace("sub-", "")
+            for path in glob.glob(str(armeni_root) + "/sub-*")
+        ]
+    )
     for subject in subjects:
-
         inputs = []
         for session in range(1, 10 + 1):
-
             sess = "{:03d}".format(session)
             inputs.append(
-                str(armeni_root / f"sub-{subject}/ses-{sess}/meg/sub-{subject}_ses-{sess}_task-compr_meg.ds")
+                str(
+                    armeni_root
+                    / f"sub-{subject}/ses-{sess}/meg/sub-{subject}_ses-{sess}_task-compr_meg.ds"
+                )
             )
 
         preproc_dir = preproc_root / f"sub-{subject}"
@@ -121,8 +147,8 @@ def preproc_armeni2022():
             dask_client=False,
         )
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     # preproc_armeni2022()
     preproc_gwilliams2022()
     # preproc_schoffelen2019()

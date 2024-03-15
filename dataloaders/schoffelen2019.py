@@ -1,8 +1,6 @@
 """MOUS dataset dataloader."""
 
-import gc
 import mne
-
 from torch.utils.data import Dataset
 
 import dataloaders.data_utils as data_utils
@@ -295,7 +293,6 @@ class Schoffelen2019(Dataset):
         subject_id: str,
         task: str,
         slice_len: float,
-        preproc_config: dict,
         bids_root: str = data_utils.DATA_PATH / "schoffelen2019",
     ):
         """
@@ -315,15 +312,16 @@ class Schoffelen2019(Dataset):
             subject_id=subject_id,
             task=task,
             session=None,
-            preproc_config=preproc_config,
         )
 
         picks = mne.pick_types(
             raw.info, meg=True, eeg=False, stim=False, eog=False, ecg=False
-        )[:273] #[28: (28 + 273)]
+        )[:273]  # [28: (28 + 273)]
         raw = raw.pick(picks)
 
-        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(raw, slice_len)
+        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(
+            raw, slice_len
+        )
         self.num_slices = len(self.valid_indices)
 
         self.raw = raw
@@ -332,14 +330,15 @@ class Schoffelen2019(Dataset):
         return self.num_slices
 
     def __getitem__(self, idx):
-        data_slice, times = data_utils.get_slice(self.raw, idx, self.samples_per_slice, self.valid_indices)
+        data_slice, times = data_utils.get_slice(
+            self.raw, idx, self.samples_per_slice, self.valid_indices
+        )
 
-        identifiers = {
-            "dataset": self.__class__.__name__,
-            "subject": self.subject_id,
+        return {
+            "data": data_slice,
+            "times": times,
+            "identifier": {"subject": self.subject_id, "dataset": "schoffelen2019"},
         }
-
-        return data_slice, times, identifiers
 
 
 if __name__ == "__main__":

@@ -1,0 +1,56 @@
+experiment:
+  seed: 42
+
+rep_config:
+  lr: 0.001
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+    shared_dim: 300
+    use_data_block: true
+  encoder:
+    channels: 300
+    conv_channels: [512, 512]
+    ratios: [1]
+    dimension: 300
+  transformer:
+    encoder_layer:
+      d_model: 512
+      nhead: 8
+      batch_first: true
+    num_layers: 3
+  vad_classifier:
+    input_dim: 300
+    hidden_dim: 512
+  masked_channel_predictor:
+    input_dim: 300
+    hidden_dim: 256
+    num_layers: 1
+
+datamodule_config:
+  dataset_preproc_configs:
+    armeni2022:
+      bad_subjects: []
+      bad_sessions:
+        "001": []
+        "002": []
+        "003": ["008"]
+      slice_len: 3.0
+      label_type: null
+    gwilliams2022:
+      bad_subjects: []
+      slice_len: 3.0
+      label_type: "vad"
+  dataloader_configs:
+    train_ratio: 0.9
+    val_ratio: 0.1 # Bigger val required to get batches into val set
+    test_ratio: 0.00
+    pred_ratio: 0.00
+    batch_size: 32
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:
