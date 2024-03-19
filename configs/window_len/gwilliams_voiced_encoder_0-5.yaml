@@ -2,7 +2,7 @@ experiment:
   seed: 42
 
 rep_config:
-  lr: 0.0004365158322401656
+  lr: 0.000066
   dataset_block:
     dataset_sizes:
       armeni2022: 269

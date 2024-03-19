@@ -3,9 +3,9 @@ from pathlib import Path
 
 import yaml
 from lightning.pytorch import Trainer, seed_everything
-from lightning.pytorch.tuner import Tuner
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.tuner import Tuner
 
 from dataloaders.data_utils import DATA_PATH
 from dataloaders.multi_dataloader import MultiDataLoader
