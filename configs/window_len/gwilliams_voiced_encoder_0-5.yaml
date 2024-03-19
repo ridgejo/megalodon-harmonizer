@@ -2,7 +2,7 @@ experiment:
   seed: 42
 
 rep_config:
-  lr: 0.000066
+  lr: 0.0004365158322401656
   dataset_block:
     dataset_sizes:
       armeni2022: 269
@@ -16,7 +16,7 @@ rep_config:
     ratios: [5, 5, 1]
     dimension: 300
   subject_embedding:
-    dataset_keys: ["armeni2022"]
+    dataset_keys: ["gwilliams2022"]
     embedding_dim: 16
   voiced_classifier:
     type: "mlp"
@@ -25,12 +25,8 @@ rep_config:
 
 datamodule_config:
   dataset_preproc_configs:
-    armeni2022:
+    gwilliams2022:
       bad_subjects: []
-      bad_sessions:
-        "001": []
-        "002": []
-        "003": ["008"]
       slice_len: 0.5
       label_type: "voiced"
   dataloader_configs:

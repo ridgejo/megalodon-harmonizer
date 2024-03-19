@@ -3,6 +3,7 @@ from pathlib import Path
 
 import yaml
 from lightning.pytorch import Trainer, seed_everything
+from lightning.pytorch.tuner import Tuner
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 
@@ -21,6 +22,9 @@ parser.add_argument(
 parser.add_argument("--name", help="Name for run", default=None)
 parser.add_argument(
     "--debug", help="Faster debug mode", action="store_true", default=False
+)
+parser.add_argument(
+    "--lr_find", help="Find best learning rate", action="store_true", default=False
 )
 args = parser.parse_args()
 
@@ -63,4 +67,11 @@ datamodule = MultiDataLoader(**config["datamodule_config"])
 wandb_logger.watch(model)
 
 trainer = Trainer(logger=wandb_logger, callbacks=[checkpoint_callback])
+
+if args.lr_find:
+    tuner = Tuner(trainer)
+    lr_finder = tuner.lr_find(model, datamodule=datamodule)
+    print("Learning rate search results:")
+    print(lr_finder.results)
+
 trainer.fit(model, datamodule=datamodule)
