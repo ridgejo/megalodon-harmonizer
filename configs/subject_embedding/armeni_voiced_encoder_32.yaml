@@ -13,14 +13,14 @@ rep_config:
   encoder:
     channels: 300
     conv_channels: [256, 512, 768, 1024]
-    ratios: [5, 5, 4] # 500 // 5 = 100 // 5 = 20 // 4 = 5
+    ratios: [5, 5, 1]
     dimension: 300
   subject_embedding:
     dataset_keys: ["armeni2022"]
-    embedding_dim: 16
+    embedding_dim: 32
   voiced_classifier:
     type: "mlp"
-    input_dim: 1564 # 300 * 5 = 1500
+    input_dim: 1628 # 300 * 5 = 1500
     hidden_dim: 512
 
 datamodule_config:
@@ -31,7 +31,7 @@ datamodule_config:
         "001": []
         "002": []
         "003": ["008"]
-      slice_len: 2.0
+      slice_len: 0.5
       label_type: "voiced"
   dataloader_configs:
     train_ratio: 0.9

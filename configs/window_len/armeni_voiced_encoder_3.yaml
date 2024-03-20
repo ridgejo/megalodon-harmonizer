@@ -13,7 +13,7 @@ rep_config:
   encoder:
     channels: 300
     conv_channels: [256, 512, 768, 1024]
-    ratios: [5, 5, 4] # 500 // 5 = 100 // 5 = 20 // 4 = 5
+    ratios: [10, 5, 3] # 750 // 10 = 75 // 5 = 15 // 3 = 5
     dimension: 300
   subject_embedding:
     dataset_keys: ["armeni2022"]
@@ -31,7 +31,7 @@ datamodule_config:
         "001": []
         "002": []
         "003": ["008"]
-      slice_len: 2.0
+      slice_len: 3.0 # 750
       label_type: "voiced"
   dataloader_configs:
     train_ratio: 0.9
