@@ -7,24 +7,24 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class MaskedChannelPredictor(nn.Module):
     """
     Given an encoded representation of the brain signal, predict which channel was masked with zeroes
     """
 
-    def __init__(self, input_dim, hidden_dim, num_layers):
+    def __init__(self, input_dim, hidden_dim):
         super(MaskedChannelPredictor, self).__init__()
 
-        self.model = nn.LSTM(
-            input_size=input_dim,
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-        )
-        self.classifier = nn.Linear(
-            in_features=hidden_dim,
-            out_features=1,
+        self.model = nn.Sequential(
+            nn.Linear(
+                in_features=input_dim,
+                out_features=hidden_dim,
+            ),
+            nn.ReLU(),
+            nn.Linear(
+                in_features=hidden_dim,
+                out_features=1,
+            )
         )
 
     def mask_input(self, x):  # Assume x is [B, C, T]
@@ -41,11 +41,15 @@ class MaskedChannelPredictor(nn.Module):
         return result_tensor, random_indices
 
     def forward(self, masked_encoded, label):
-        out, (_, _) = self.model(masked_encoded)
-        z = self.classifier(out[:, -1, :]).squeeze(-1)
+
+        x = masked_encoded.flatten(start_dim=1, end_dim=-1) # [B, T, E] -> [B, T * E]
+        z = self.model(x).squeeze(-1)
 
         # Division to account for approx number of sensors
+        mse = F.mse_loss(z, label.float() / 250)
+        rmse = torch.sqrt(F.mse_loss(z * 250, label.float()))
+
         return {
-            "masked_channel_mse_loss": F.mse_loss(z, label.float() / 250),
-            "masked_channel_rmse": torch.sqrt(F.mse_loss(z * 250, label.float())),
+            "masked_channel_mse_loss": mse,
+            "masked_channel_rmse": rmse,
         }

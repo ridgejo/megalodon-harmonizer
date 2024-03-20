@@ -218,7 +218,8 @@ class RepLearner(L.LightningModule):
             x_masked, mask_label = self.active_models[
                 "masked_channel_predictor"
             ].mask_input(x)
-            z_mask_sequence, _ = self.apply_encoder(x_masked, dataset, subject)
+            # todo: do something with commit loss
+            z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
             return_values["masked_channel_pred"] = self.active_models[
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
