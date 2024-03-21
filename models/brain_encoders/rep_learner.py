@@ -15,6 +15,7 @@ from models.brain_encoders.supervised.voiced_classifier import (
 )
 from models.dataset_block import DatasetBlock
 from models.subject_embedding import SubjectEmbedding
+from models.subject_block import SubjectBlock
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
 
@@ -102,6 +103,10 @@ class RepLearner(L.LightningModule):
             active_models["subject_embedding"] = SubjectEmbedding(
                 **rep_config["subject_embedding"]
             )
+        elif "subject_block" in rep_config:
+            active_models["subject_block"] = SubjectBlock(
+                **rep_config["subject_block"]
+            )
 
         # Auxiliary SSL losses
         if "argmax_amp_predictor" in rep_config:
@@ -178,6 +183,9 @@ class RepLearner(L.LightningModule):
             z, _, commit_loss = self.active_models["quantize"](z)
         else:
             commit_loss = 0.0
+
+        if "subject_block" in self.active_models:
+            z = self.active_models["subject_block"](z, dataset, subject)
 
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]

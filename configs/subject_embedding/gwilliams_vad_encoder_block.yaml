@@ -15,6 +15,9 @@ rep_config:
     conv_channels: [512, 512]
     ratios: [1]
     dimension: 300
+  subject_block:
+    dataset_keys: ["gwilliams2022"]
+    block_dim: 300
   vad_classifier:
     input_dim: 300
     hidden_dim: 512
