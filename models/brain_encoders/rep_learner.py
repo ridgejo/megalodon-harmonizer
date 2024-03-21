@@ -14,8 +14,8 @@ from models.brain_encoders.supervised.voiced_classifier import (
     VoicedClassifierMLP,
 )
 from models.dataset_block import DatasetBlock
-from models.subject_embedding import SubjectEmbedding
 from models.subject_block import SubjectBlock
+from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
 
@@ -104,9 +104,7 @@ class RepLearner(L.LightningModule):
                 **rep_config["subject_embedding"]
             )
         elif "subject_block" in rep_config:
-            active_models["subject_block"] = SubjectBlock(
-                **rep_config["subject_block"]
-            )
+            active_models["subject_block"] = SubjectBlock(**rep_config["subject_block"])
 
         # Auxiliary SSL losses
         if "argmax_amp_predictor" in rep_config:

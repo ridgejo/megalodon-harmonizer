@@ -1,7 +1,6 @@
 import glob
 import os
 
-import torch
 import torch.nn as nn
 
 from dataloaders.data_utils import DATA_PATH

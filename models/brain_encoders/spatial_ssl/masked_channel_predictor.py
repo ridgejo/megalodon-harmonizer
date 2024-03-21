@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class MaskedChannelPredictor(nn.Module):
     """
     Given an encoded representation of the brain signal, predict which channel was masked with zeroes
@@ -24,7 +25,7 @@ class MaskedChannelPredictor(nn.Module):
             nn.Linear(
                 in_features=hidden_dim,
                 out_features=1,
-            )
+            ),
         )
 
     def mask_input(self, x):  # Assume x is [B, C, T]
@@ -41,8 +42,7 @@ class MaskedChannelPredictor(nn.Module):
         return result_tensor, random_indices
 
     def forward(self, masked_encoded, label):
-
-        x = masked_encoded.flatten(start_dim=1, end_dim=-1) # [B, T, E] -> [B, T * E]
+        x = masked_encoded.flatten(start_dim=1, end_dim=-1)  # [B, T, E] -> [B, T * E]
         z = self.model(x).squeeze(-1)
 
         # Division to account for approx number of sensors
