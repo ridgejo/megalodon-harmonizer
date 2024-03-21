@@ -34,6 +34,10 @@ pip install -r requirements.txt
 - `scripts/` Slurm submission scripts for ARC cluster.
 - `configs/` Configuration files for training.
 
+### Basic usage
+Train a model:
+`python train_rep.py --config configs/<> --name <>`
+
 ### Code standards
 Use ruff for linting, formatting, and organising imports. I recommend running the following inside the repository before committing:
 ```
