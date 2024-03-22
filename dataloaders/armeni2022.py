@@ -53,12 +53,12 @@ class Armeni2022(Dataset):
             task=task,
         )
 
-        textgrid = label_utils.read_textgrid(
-            bids_root=bids_root,
-            subject_id=subject_id,
-            session=session,
-            events=events,
-        )
+        # textgrid = label_utils.read_textgrid(
+        #     bids_root=bids_root,
+        #     subject_id=subject_id,
+        #     session=session,
+        #     events=events,
+        # )
 
         self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(
             raw, slice_len
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     # plt.savefig("voiced_labels.png")
     # print(np.histogram(all_labels))
 
-    return_dict = test_dataset[0] # 35-40s?
+    return_dict = test_dataset[0]  # 35-40s?
     data = return_dict["data"]
     labels = return_dict["vad_labels"]
     times = return_dict["times"]

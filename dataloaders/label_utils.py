@@ -210,7 +210,6 @@ def get_vad_labels(events, raw, offset=0.0):
     phoneme_events = events[["word_onset" in c for c in list(events["type"])]]
     labels = np.zeros(len(raw))
     for i, phoneme_event in phoneme_events.iterrows():
-
         # Decision rule: if event is an "sp" mark it explicitly as silence
 
         onset = float(phoneme_event["onset"])
@@ -220,7 +219,7 @@ def get_vad_labels(events, raw, offset=0.0):
         )  # Delay labels so they occur at same time as brain response
         t_end = int((onset + duration) * sample_freq) + offset_samples
 
-        labels[t_start : t_end + 1] = 0.0 if phoneme_event["value"] == 'sp' else 1.0
+        labels[t_start : t_end + 1] = 0.0 if phoneme_event["value"] == "sp" else 1.0
 
     return labels
 
