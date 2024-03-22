@@ -27,9 +27,9 @@ class TransformerEncoder(nn.Module):
         )
 
     def forward(self, x):
-        x = self.project_in(x)
-        x = x.permute(0, 2, 1)
+        x = self.project_in(x) # [B, E, T] -> [B, E2, T]
+        x = x.permute(0, 2, 1) # [B, E2, T] -> [B, T, E2]
         x = self.transformer(x)
-        x = x.permute(0, 2, 1)
-        x = self.project_out(x)
+        x = x.permute(0, 2, 1) # [B, E2, T] -> [B, T, E2]
+        x = self.project_out(x) # [B, E2, T] -> [B, E, T]
         return x

@@ -66,8 +66,7 @@ class Armeni2022(Dataset):
         self.num_slices = len(self.valid_indices)
 
         if label_type == "vad":
-            self.labels = label_utils.get_vad_labels_from_textgrid(textgrid, raw)
-            # self.labels = label_utils.get_vad_labels(events, raw)
+            self.labels = label_utils.get_vad_labels(events, raw)
         elif label_type == "voiced":
             self.phoneme_onsets, self.labels = label_utils.get_voiced_labels(
                 events, raw
@@ -130,13 +129,6 @@ if __name__ == "__main__":
         session="001",
         task="compr",
         slice_len=100,  # 0.3,  # 5
-        preproc_config={
-            "filtering": True,
-            "resample": 250,
-            "notch_freqs": [50, 100],
-            "bandpass_lo": 0.5,
-            "bandpass_hi": 125,
-        },
         label_type="vad",
     )
 
@@ -149,7 +141,11 @@ if __name__ == "__main__":
     # plt.savefig("voiced_labels.png")
     # print(np.histogram(all_labels))
 
-    data, labels, times, identifiers = test_dataset[0]  # 35-40s (7)
+    return_dict = test_dataset[0] # 35-40s?
+    data = return_dict["data"]
+    labels = return_dict["vad_labels"]
+    times = return_dict["times"]
+
     fig, axes = plt.subplots(nrows=2, ncols=1)
     for channel in data:
         axes[0].plot(times, channel)

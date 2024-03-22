@@ -201,7 +201,8 @@ def get_vad_labels_from_textgrid(tier, raw, offset=0.0):
 def get_vad_labels(events, raw, offset=0.0):
     """Get labels corresponding to occurrence of human speech."""
 
-    # TODO: Armeni's labels are "gapless" and therefore VAD is not a good task for this. Use Birtan's labels instead.
+    # For Armeni's labels, we use speech pauses "sp" to mark gaps in speech.
+    # TODO: Should we ignore wav file gaps as well? Are those really silences?
 
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
@@ -209,13 +210,17 @@ def get_vad_labels(events, raw, offset=0.0):
     phoneme_events = events[["word_onset" in c for c in list(events["type"])]]
     labels = np.zeros(len(raw))
     for i, phoneme_event in phoneme_events.iterrows():
+
+        # Decision rule: if event is an "sp" mark it explicitly as silence
+
         onset = float(phoneme_event["onset"])
         duration = float(phoneme_event["duration"])
         t_start = (
             int(onset * sample_freq) + offset_samples
         )  # Delay labels so they occur at same time as brain response
         t_end = int((onset + duration) * sample_freq) + offset_samples
-        labels[t_start : t_end + 1] = 1.0
+
+        labels[t_start : t_end + 1] = 0.0 if phoneme_event["value"] == 'sp' else 1.0
 
     return labels
 
