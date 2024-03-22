@@ -46,3 +46,4 @@ ruff check . --fix
 # Formatting fixes
 ruff check --select I --fix; ruff format .
 ```
+You could use a pre-commit hook for this.
