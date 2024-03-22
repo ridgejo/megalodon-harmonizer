@@ -1,11 +1,12 @@
 # Filter out a brain frequency band and predict which band was filtered
 
+import random
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio.functional as TA
 import torchmetrics.functional as TM
-import random
 
 
 class BandPredictor(nn.Module):
@@ -29,7 +30,6 @@ class BandPredictor(nn.Module):
         )
 
     def mask_input(self, x, sample_rate):  # Assume x is [B, C, T]
-
         # todo: filter different bands for each sample in batch? not possible without an intensive for-loop?
 
         B, C, T = x.shape
@@ -38,11 +38,10 @@ class BandPredictor(nn.Module):
         band = random.randrange(6)
 
         bands = [
-            (0.1, 3.0), # Delta
-            (3.0, 8.0), # Theta
-            (8.0, 12.0), # Alpha
-            (12.0, 30.0) # Beta
-            (30.0, 125.0) # Gamma
+            (0.1, 3.0),  # Delta
+            (3.0, 8.0),  # Theta
+            (8.0, 12.0),  # Alpha
+            (12.0, 30.0)(30.0, 125.0),  # Beta  # Gamma
         ]
 
         low_cutoff = bands[band][0]
@@ -72,7 +71,6 @@ class BandPredictor(nn.Module):
         accuracy = TM.classification.multiclass_accuracy(
             preds, label_tensor, num_classes=6
         )
-
 
         return {
             "band_ce_loss": loss_ce,

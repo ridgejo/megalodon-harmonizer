@@ -4,11 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dataloaders.multi_dataloader import get_key_from_batch_identifier
+from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
 )
-from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
 from models.brain_encoders.supervised.vad_classifier import VADClassifier
 from models.brain_encoders.supervised.voiced_classifier import (
     VoicedClassifierLSTM,
@@ -132,17 +132,15 @@ class RepLearner(L.LightningModule):
             active_models["masked_channel_predictor"] = MaskedChannelPredictor(
                 **rep_config["masked_channel_predictor"]
             )
-        
+
         if "band_predictor" in rep_config:
-            self.weightings["band_predictor"] = rep_config[
-                "band_predictor"
-            ].get("weight", 1.0)
+            self.weightings["band_predictor"] = rep_config["band_predictor"].get(
+                "weight", 1.0
+            )
             rep_config["band_predictor"].pop("weight", None)
 
             if "subject_embedding" in rep_config:
-                rep_config["band_predictor"][
-                    "input_dim"
-                ] += subject_embedding_dim
+                rep_config["band_predictor"]["input_dim"] += subject_embedding_dim
             active_models["band_predictor"] = BandPredictor(
                 **rep_config["band_predictor"]
             )
@@ -237,8 +235,12 @@ class RepLearner(L.LightningModule):
 
         if "band_predictor" in self.active_models:
             x_filtered, band_label = self.active_models["band_predictor"].filter_band(x)
-            z_mask_sequence, z_mask_independent, _ = self.apply_encoder(x_filtered, dataset, subject)
-            return_values["band_predictor"] = self.active_models["band_predictor"](z_mask_sequence, band_label)
+            z_mask_sequence, z_mask_independent, _ = self.apply_encoder(
+                x_filtered, dataset, subject
+            )
+            return_values["band_predictor"] = self.active_models["band_predictor"](
+                z_mask_sequence, band_label
+            )
 
         if "masked_channel_predictor" in self.active_models:
             x_masked, mask_label = self.active_models[
