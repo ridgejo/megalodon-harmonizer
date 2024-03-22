@@ -46,4 +46,26 @@ ruff check . --fix
 # Formatting fixes
 ruff check --select I --fix; ruff format .
 ```
-You could use a pre-commit hook for this.
+You could use a pre-commit hook for this instead by creating a `.git/hooks/pre-commit`:
+```
+#!/bin/bash
+
+echo "Running ruff linting and formatting pre-commit hook"
+
+ruff check . --fix
+
+# Check command success
+if [ $? -ne 0 ]; then
+  echo "Pre-commit check failed."
+  exit 1
+fi
+
+ruff check --select I --fix; ruff format .
+
+# Check command success
+if [ $? -ne 0 ]; then
+  echo "Pre-commit check failed."
+  exit 1
+fi
+```
+and making it executable with `chmod +x .git/hooks/pre-commit` to automatically do these checks.
