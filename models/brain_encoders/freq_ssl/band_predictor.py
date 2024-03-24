@@ -41,8 +41,8 @@ class BandPredictor(nn.Module):
             (0.1, 3.0),  # Delta
             (3.0, 8.0),  # Theta
             (8.0, 12.0),  # Alpha
-            (12.0, 30.0), # Beta
-            (30.0, 125.0), # Gamma
+            (12.0, 30.0),  # Beta
+            (30.0, 125.0),  # Gamma
         ]
 
         low_cutoff = bands[band][0]
