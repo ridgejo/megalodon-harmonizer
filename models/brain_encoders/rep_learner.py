@@ -234,12 +234,12 @@ class RepLearner(L.LightningModule):
         return_values = {"quantization": {"commit_loss": commit_loss}}
 
         if "band_predictor" in self.active_models:
-            x_filtered, band_label = self.active_models["band_predictor"].filter_band(x)
-            z_mask_sequence, z_mask_independent, _ = self.apply_encoder(
+            x_filtered, band_label = self.active_models["band_predictor"].filter_band(x, sample_rate=250) # warning: hardcoded
+            z_filtered_sequence, _, _ = self.apply_encoder(
                 x_filtered, dataset, subject
             )
             return_values["band_predictor"] = self.active_models["band_predictor"](
-                z_mask_sequence, band_label
+                z_filtered_sequence, band_label
             )
 
         if "masked_channel_predictor" in self.active_models:

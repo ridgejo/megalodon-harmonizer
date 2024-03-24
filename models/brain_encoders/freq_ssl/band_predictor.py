@@ -29,20 +29,20 @@ class BandPredictor(nn.Module):
             ),
         )
 
-    def mask_input(self, x, sample_rate):  # Assume x is [B, C, T]
+    def filter_band(self, x, sample_rate):  # Assume x is [B, C, T]
         # todo: filter different bands for each sample in batch? not possible without an intensive for-loop?
 
         B, C, T = x.shape
 
         # Pick band to mask at random
-        band = random.randrange(6)
+        band = random.randrange(5)
 
         bands = [
             (0.1, 3.0),  # Delta
             (3.0, 8.0),  # Theta
             (8.0, 12.0),  # Alpha
-            (12.0, 30.0),
-            (30.0, 125.0),  # Beta  # Gamma
+            (12.0, 30.0), # Beta
+            (30.0, 125.0), # Gamma
         ]
 
         low_cutoff = bands[band][0]
@@ -62,7 +62,7 @@ class BandPredictor(nn.Module):
         x = x.flatten(start_dim=1, end_dim=-1)  # [B, T, E] -> [B, T * E]
         z = self.model(x)
 
-        label_tensor = torch.full((x.shape[0],), label)
+        label_tensor = torch.full((x.shape[0],), label, device=x.device)
 
         loss_ce = F.cross_entropy(z, label_tensor)
 
