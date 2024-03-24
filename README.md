@@ -38,6 +38,9 @@ pip install -r requirements.txt
 Train a model:
 `python train_rep.py --config configs/<> --name <>`
 
+Or using one of the scripts:
+`sbatch scripts/<>.sh train_rep.py --config configs/<> --name <>`
+
 ### Code standards
 Use ruff for linting, formatting, and organising imports. I recommend running the following inside the repository before committing:
 ```
