@@ -12,7 +12,7 @@ class SubjectEmbedding(nn.Module):
     Differentiable subject-specific embeddings learned for each subject.
     """
 
-    def __init__(self, dataset_keys: list, embedding_dim):
+    def __init__(self, dataset_keys: list, embedding_dim, freeze=False):
         """
         Args:
             subject_ids: A list of all subject IDs from all datasets
@@ -39,7 +39,7 @@ class SubjectEmbedding(nn.Module):
                     {
                         subject_key: nn.Parameter(
                             data=torch.randn(embedding_dim),
-                            requires_grad=True,
+                            requires_grad=not freeze,
                         )
                         for subject_key in subject_keys[dataset_key]
                     }
