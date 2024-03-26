@@ -147,10 +147,9 @@ class RepLearner(L.LightningModule):
             )
 
         if "phase_diff_predictor" in rep_config:
-
-            self.weightings["phase_diff_predictor"] = rep_config["phase_diff_predictor"].get(
-                "weight", 1.0
-            )
+            self.weightings["phase_diff_predictor"] = rep_config[
+                "phase_diff_predictor"
+            ].get("weight", 1.0)
 
             if "subject_embedding" in rep_config:
                 rep_config["phase_diff_predictor"]["input_dim"] += subject_embedding_dim
@@ -257,13 +256,13 @@ class RepLearner(L.LightningModule):
             )
 
         if "phase_diff_predictor" in self.active_models:
-            x_shifted, phase_label = self.active_models["phase_diff_predictor"].apply_random_phase_shift(
-                x
-            )
+            x_shifted, phase_label = self.active_models[
+                "phase_diff_predictor"
+            ].apply_random_phase_shift(x)
             z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
-            return_values["phase_diff_predictor"] = self.active_models["phase_diff_predictor"](
-                z_filtered_sequence, phase_label
-            )
+            return_values["phase_diff_predictor"] = self.active_models[
+                "phase_diff_predictor"
+            ](z_filtered_sequence, phase_label)
 
         if "masked_channel_predictor" in self.active_models:
             x_masked, mask_label = self.active_models[
