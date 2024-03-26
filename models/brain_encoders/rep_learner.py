@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 from dataloaders.multi_dataloader import get_key_from_batch_identifier
 from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
+from models.brain_encoders.phase_ssl.phase_diff_predictor import PhaseDiffPredictor
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
@@ -145,6 +146,19 @@ class RepLearner(L.LightningModule):
                 **rep_config["band_predictor"]
             )
 
+        if "phase_diff_predictor" in rep_config:
+
+            self.weightings["phase_diff_predictor"] = rep_config["phase_diff_predictor"].get(
+                "weight", 1.0
+            )
+
+            if "subject_embedding" in rep_config:
+                rep_config["phase_diff_predictor"]["input_dim"] += subject_embedding_dim
+
+            active_models["phase_diff_predictor"] = PhaseDiffPredictor(
+                **rep_config["phase_diff_predictor"]
+            )
+
         # Label losses for representation shaping
         if "vad_classifier" in rep_config:
             self.weightings["vad"] = rep_config["vad_classifier"].get("weight", 1.0)
@@ -240,6 +254,15 @@ class RepLearner(L.LightningModule):
             z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
             return_values["band_predictor"] = self.active_models["band_predictor"](
                 z_filtered_sequence, band_label
+            )
+
+        if "phase_diff_predictor" in self.active_models:
+            x_shifted, phase_label = self.active_models["phase_diff_predictor"].apply_random_phase_shift(
+                x
+            )
+            z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
+            return_values["phase_diff_predictor"] = self.active_models["phase_diff_predictor"](
+                z_filtered_sequence, phase_label
             )
 
         if "masked_channel_predictor" in self.active_models:
