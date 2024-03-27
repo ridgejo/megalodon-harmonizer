@@ -2,7 +2,7 @@
 <img src="https://i.imgur.com/tvJLJ1X.png" alt="Megalodon" width="400"/>
 
 
-Let's learn powerful representations from MEG data.
+Let's learn highly generalisable deep representations from MEG data.
 
 ## Contributing
 

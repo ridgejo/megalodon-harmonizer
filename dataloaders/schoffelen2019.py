@@ -1,6 +1,7 @@
 """MOUS dataset dataloader."""
 
 import mne
+import torch
 from torch.utils.data import Dataset
 
 import dataloaders.data_utils as data_utils
@@ -326,6 +327,13 @@ class Schoffelen2019(Dataset):
 
         self.raw = raw
 
+        # Extract 3D sensor positions from raw object
+        sensor_positions = []
+        for ch in raw.info["chs"]:
+            pos = ch["loc"][:3]  # Extracts the first three elements: X, Y, Z
+            sensor_positions.append(pos)
+        self.sensor_positions = torch.tensor(sensor_positions)
+
     def __len__(self):
         return self.num_slices
 
@@ -338,6 +346,7 @@ class Schoffelen2019(Dataset):
             "data": data_slice,
             "times": times,
             "identifier": {"subject": self.subject_id, "dataset": "schoffelen2019"},
+            "sensor_pos": self.sensor_positions,  # Sensor (x, y, z) provided in [m]
         }
 
 
@@ -348,13 +357,6 @@ if __name__ == "__main__":
         subject_id="A2002",
         task="auditory",
         slice_len=3,
-        preproc_config={
-            "filtering": True,
-            "resample": 300,
-            "notch_freqs": [50, 100, 150],
-            "bandpass_lo": 0.5,
-            "bandpass_hi": 150,
-        },
     )
 
     data, times, dataset = test_dataset[0]

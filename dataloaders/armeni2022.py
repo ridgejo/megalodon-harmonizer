@@ -2,6 +2,7 @@
 
 import typing as tp
 
+import torch
 from torch.utils.data import Dataset
 
 import dataloaders.data_utils as data_utils
@@ -73,6 +74,13 @@ class Armeni2022(Dataset):
             )
             self.num_slices = len(self.phoneme_onsets)
 
+        # Extract 3D sensor positions from raw object
+        sensor_positions = []
+        for ch in raw.info["chs"]:
+            pos = ch["loc"][:3]  # Extracts the first three elements: X, Y, Z
+            sensor_positions.append(pos)
+        self.sensor_positions = torch.tensor(sensor_positions)
+
         self.raw = raw
 
         if truncate:
@@ -117,6 +125,9 @@ class Armeni2022(Dataset):
             "session": self.session,
             "dataset": "armeni2022",
         }
+
+        # Sensor (x, y, z) provided in [m]
+        return_dict["sensor_pos"] = self.sensor_positions
 
         return return_dict
 

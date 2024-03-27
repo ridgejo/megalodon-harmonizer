@@ -1,6 +1,7 @@
 """Gwilliams dataset dataloader."""
 
 import pandas as pd
+import torch
 from torch.utils.data import Dataset
 
 import dataloaders.data_utils as data_utils
@@ -67,6 +68,13 @@ class Gwilliams2022(Dataset):
 
         self.raw = raw
 
+        # Extract 3D sensor positions from raw object
+        sensor_positions = []
+        for ch in raw.info["chs"]:
+            pos = ch["loc"][:3]  # Extracts the first three elements: X, Y, Z
+            sensor_positions.append(pos)
+        self.sensor_positions = torch.tensor(sensor_positions)
+
     def __len__(self):
         return self.num_slices
 
@@ -107,6 +115,9 @@ class Gwilliams2022(Dataset):
             "dataset": "gwilliams2022",
         }
 
+        # Sensor (x, y, z) provided in [m]
+        return_dict["sensor_pos"] = self.sensor_positions
+
         return return_dict
 
 
@@ -118,13 +129,6 @@ if __name__ == "__main__":
         task="1",
         session="0",
         slice_len=100.0,
-        preproc_config={
-            "filtering": True,
-            "resample": 250,
-            "notch_freqs": [50, 100],
-            "bandpass_lo": 0.5,
-            "bandpass_hi": 125,
-        },
         label_type="vad",
     )
 
