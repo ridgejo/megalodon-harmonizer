@@ -238,6 +238,7 @@ class RepLearner(L.LightningModule):
 
     def forward(self, inputs):
         x = inputs["data"]
+        sensor_pos = inputs["sensor_pos"]
 
         dataset = inputs["identifier"]["dataset"][0]
         subject = inputs["identifier"]["subject"][0]
@@ -267,7 +268,7 @@ class RepLearner(L.LightningModule):
         if "masked_channel_predictor" in self.active_models:
             x_masked, mask_label = self.active_models[
                 "masked_channel_predictor"
-            ].mask_input(x)
+            ].mask_input(x, sensor_pos)
             # todo: do something with commit loss
             z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
             return_values["masked_channel_pred"] = self.active_models[

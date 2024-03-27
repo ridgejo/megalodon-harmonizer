@@ -17,9 +17,9 @@ rep_config:
     dimension: 300
   subject_embedding:
     dataset_keys: ["armeni2022"]
-    embedding_dim: 16
+    embedding_dim: 64
   masked_channel_predictor:
-    input_dim: 1564 # 300 * 5 = 1500
+    input_dim: 1756 # 300 * 5 = 1500
     hidden_dim: 512
 
 datamodule_config:
@@ -31,7 +31,7 @@ datamodule_config:
         "002": []
         "003": ["008"]
       slice_len: 0.5
-      label_type: null
+      label_type: "voiced"
   dataloader_configs:
     train_ratio: 0.9
     val_ratio: 0.04
