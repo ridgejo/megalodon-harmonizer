@@ -27,7 +27,6 @@ class MaskedChannelPredictor(nn.Module):
         )
 
     def mask_input(self, x, sensor_pos):  # Assume x is [B, C, T]
-
         # Randomly mask channels in signal
         B, C, T = x.shape
         random_indices = torch.randint(0, C, (B,)).to(x.device)
@@ -44,7 +43,7 @@ class MaskedChannelPredictor(nn.Module):
 
     def forward(self, masked_encoded, label):
         x = masked_encoded.flatten(start_dim=1, end_dim=-1)  # [B, T, E] -> [B, T * E]
-        z = self.model(x) # [B, 3]
+        z = self.model(x)  # [B, 3]
 
         # Division to bring sensor positions to approximately [-1, 1] range
         mse = F.mse_loss(z, label.float() / 0.15)
