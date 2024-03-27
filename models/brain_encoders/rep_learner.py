@@ -262,7 +262,7 @@ class RepLearner(L.LightningModule):
             z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
             return_values["phase_diff_predictor"] = self.active_models[
                 "phase_diff_predictor"
-            ](z_filtered_sequence, phase_label)
+            ](z_shifted_sequence, phase_label)
 
         if "masked_channel_predictor" in self.active_models:
             x_masked, mask_label = self.active_models[

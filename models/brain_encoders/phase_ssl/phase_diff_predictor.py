@@ -36,7 +36,7 @@ class PhaseDiffPredictor(nn.Module):
 
         # Randomly determine the phase shift
         possible_shifts = torch.linspace(
-            start=0, end=2 * math.pi - 0.25 * math.pi, size=8, device=x.device
+            start=0, end=2 * math.pi - 0.25 * math.pi, steps=8, device=x.device
         )
         phase_shift_label = random.randrange(len(possible_shifts))
         phase_shift = possible_shifts[phase_shift_label]
