@@ -22,47 +22,6 @@ from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
 
-
-def make_argmax_amp_predictor(input_dim, hidden_dim, dataset_keys):
-    class ArgmaxAmpPredictor(nn.Module):
-        def __init__(self, input_dim, hidden_dim, dataset_keys, target_divisor=300):
-            super(ArgmaxAmpPredictor, self).__init__()
-
-            self.target_divisor = target_divisor
-
-            self.body = nn.Sequential(
-                nn.Linear(in_features=input_dim, out_features=hidden_dim),
-                nn.ReLU(),
-            )
-
-            self.output_layer = nn.ModuleDict(
-                {
-                    dataset_key: nn.Linear(in_features=hidden_dim, out_features=1)
-                    for dataset_key in dataset_keys
-                }
-            )
-
-        def forward(self, x, dataset_key, targets):
-            z = self.body(x)
-            z = self.output_layer[dataset_key](z)
-
-            # This is much closer to a regression than a classification problem.
-            # Scale targets down to approximately [0, 1] range for stability.
-            mse_loss = F.mse_loss(z.squeeze(-1), targets.float() / self.target_divisor)
-
-            # Compute real distance to sensor prediction
-            rmse_metric = torch.sqrt(
-                F.mse_loss(z.squeeze(-1) * self.target_divisor, targets.float())
-            )
-
-            return {
-                "argmax_amp_mse_loss": mse_loss,
-                "argmax_amp_rmse": rmse_metric,
-            }
-
-    return ArgmaxAmpPredictor(input_dim, hidden_dim, dataset_keys)
-
-
 class RepLearner(L.LightningModule):
     """
     Representation learner.
@@ -110,17 +69,6 @@ class RepLearner(L.LightningModule):
             active_models["subject_block"] = SubjectBlock(**rep_config["subject_block"])
 
         # Auxiliary SSL losses
-        if "argmax_amp_predictor" in rep_config:
-            self.weightings["argmax_amp"] = rep_config["argmax_amp_predictor"].get(
-                "weight", 1.0
-            )
-            rep_config["argmax_amp_predictor"].pop("weight", None)
-
-            if "subject_embedding" in rep_config:
-                rep_config["argmax_amp_predictor"]["input_dim"] += subject_embedding_dim
-            active_models["argmax_amp_predictor"] = make_argmax_amp_predictor(
-                **rep_config["argmax_amp_predictor"]
-            )
         if "masked_channel_predictor" in rep_config:
             self.weightings["masked_channel_pred"] = rep_config[
                 "masked_channel_predictor"
@@ -297,14 +245,6 @@ class RepLearner(L.LightningModule):
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
 
-        if "argmax_amp_predictor" in self.active_models:
-            argmax_amp = self.active_models["argmax_amp_predictor"](
-                z_independent,
-                dataset_key=dataset,
-                targets=self.compute_argmax_amp(x),
-            )
-            return_values["argmax_amp"] = argmax_amp
-
         if "vad_classifier" in self.active_models and "vad_labels" in inputs:
             vad_labels = inputs["vad_labels"]  # [B, T]
 
@@ -473,17 +413,6 @@ class RepLearner(L.LightningModule):
                 for param in self.active_models[key].parameters():
                     param.requires_grad = False
 
-    def compute_phase_amp(self, x):
-        X_fft = torch.fft.fft(x)
-        amp = torch.abs(X_fft)
-        phase = torch.angle(X_fft)
-        return (phase, amp)
-
-    def compute_argmax_amp(self, x):
-        amplitude = torch.abs(x)
-        argmax = torch.argmax(amplitude, dim=1)
-        return argmax.flatten(start_dim=0, end_dim=1)
-
 
 if __name__ == "__main__":
     model = RepLearner(
@@ -504,15 +433,6 @@ if __name__ == "__main__":
                 "ratios": [1],
                 "dimension": 256,
             },
-            "argmax_amp_predictor": {
-                "input_dim": 256,
-                "hidden_dim": 512,
-                "dataset_keys": ["armeni2022", "schoffelen2019", "gwilliams2022"],
-            },
-            # "phase_amp_regressor": {
-            #     "input_dim": 256,
-            #     "hidden_dim": 512,
-            # },
         },
         batch_size=32,
     )
