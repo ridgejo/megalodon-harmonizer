@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from dataloaders.multi_dataloader import get_key_from_batch_identifier
 from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
 from models.brain_encoders.phase_ssl.phase_diff_predictor import PhaseDiffPredictor
+from models.brain_encoders.amp_ssl.amp_scale_predictor import AmpScalePredictor
 from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
@@ -158,6 +159,18 @@ class RepLearner(L.LightningModule):
                 **rep_config["phase_diff_predictor"]
             )
 
+        if "amp_scale_predictor" in rep_config:
+            self.weightings["amp_scale_predictor"] = rep_config[
+                "amp_scale_predictor"
+            ].get("weight", 1.0)
+
+            if "subject_embedding" in rep_config:
+                rep_config["amp_scale_predictor"]["input_dim"] += subject_embedding_dim
+
+            active_models["amp_scale_predictor"] = AmpScalePredictor(
+                **rep_config["amp_scale_predictor"]
+            )
+
         # Label losses for representation shaping
         if "vad_classifier" in rep_config:
             self.weightings["vad"] = rep_config["vad_classifier"].get("weight", 1.0)
@@ -274,6 +287,15 @@ class RepLearner(L.LightningModule):
             return_values["masked_channel_pred"] = self.active_models[
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
+
+        if "amp_scale_predictor" in self.active_models:
+            x_scaled, scale_label = self.active_models[
+                "amp_scale_predictor"
+            ].scale_amp(x)
+            z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
+            return_values["amp_scale_predictor"] = self.active_models[
+                "amp_scale_predictor"
+            ](z_scaled_sequence, scale_label)
 
         if "argmax_amp_predictor" in self.active_models:
             argmax_amp = self.active_models["argmax_amp_predictor"](

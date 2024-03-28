@@ -34,9 +34,6 @@ class BandPredictor(nn.Module):
 
         B, C, T = x.shape
 
-        # Pick band to mask at random
-        band = random.randrange(5)
-
         bands = [
             (0.1, 3.0),  # Delta
             (3.0, 8.0),  # Theta
@@ -44,6 +41,9 @@ class BandPredictor(nn.Module):
             (12.0, 30.0),  # Beta
             (30.0, 125.0),  # Gamma
         ]
+
+        # Pick band to mask at random
+        band = random.randrange(len(bands))
 
         low_cutoff = bands[band][0]
         high_cutoff = bands[band][1]
