@@ -5,7 +5,6 @@ import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchaudio.functional as TA
 import torchmetrics.functional as TM
 
 
@@ -32,18 +31,15 @@ class AmpScalePredictor(nn.Module):
         )
 
     def scale_amp(self, x):  # Assume x is [B, C, T]
-
         B, C, T = x.shape
 
-        possible_scales = torch.linspace(
-            start=-2, end=2, steps=8, device=x.device
-        )
+        possible_scales = torch.linspace(start=-2, end=2, steps=8, device=x.device)
         scale_label = random.randrange(len(possible_scales))
         scale = possible_scales[scale_label]
 
         # Randomly select a proportion of the channels to apply the amplitude scaling to
         channels_to_scale = torch.randperm(C)[: int(C * self.prop)]
-        
+
         x[:, channels_to_scale, :] *= scale
 
         return x, scale_label
