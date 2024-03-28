@@ -22,6 +22,7 @@ from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
 
+
 class RepLearner(L.LightningModule):
     """
     Representation learner.
