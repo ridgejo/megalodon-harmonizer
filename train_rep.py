@@ -53,10 +53,17 @@ checkpoint_callback = ModelCheckpoint(
 )
 
 if args.checkpoint:
+    # 1. Load model from the pre-trained checkpoint
     model = RepLearner.load_from_checkpoint(args.checkpoint)
-    # model.freeze_except()
+
+    # 2. Freeze all layers except the downstream classifiers (optional?)
+    model.freeze_except("classifier")
+
+    # 3. Remove other losses / predictors from the model
+    model.disable_ssl()
+
     # todo: make sure configure_optimizer is called *after* this
-    # model.configure_optimizer() ???
+    model.configure_optimizer()
 else:
     model = RepLearner(
         config["rep_config"],
@@ -66,7 +73,9 @@ datamodule = MultiDataLoader(**config["datamodule_config"])
 # Track gradients
 wandb_logger.watch(model)
 
-trainer = Trainer(logger=wandb_logger, callbacks=[checkpoint_callback])
+trainer = Trainer(
+    logger=wandb_logger, callbacks=[checkpoint_callback], detect_anomaly=args.debug
+)
 
 if args.lr_find:
     tuner = Tuner(trainer)

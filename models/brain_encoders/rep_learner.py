@@ -397,6 +397,9 @@ class RepLearner(L.LightningModule):
                     metrics[f"{stage}_{data_key}+{k}"] = v
                     metrics[f"{stage}_dat={dataset}+{k}"] = v
 
+        if loss == 0.0:
+            loss = None
+
         return loss, losses, metrics
 
     def configure_optimizers(self):
@@ -413,6 +416,11 @@ class RepLearner(L.LightningModule):
             if module_name not in key:
                 for param in self.active_models[key].parameters():
                     param.requires_grad = False
+
+    def disable_ssl(self):
+        for key in self.active_models.keys():
+            if "predictor" in key:
+                self.active_models.pop(key)
 
 
 if __name__ == "__main__":
