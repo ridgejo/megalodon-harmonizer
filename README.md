@@ -41,6 +41,14 @@ Train a model:
 Or using one of the scripts:
 `sbatch scripts/<>.sh train_rep.py --config configs/<> --name <>`
 
+Checkpoints (based on minimum validation loss) will be saved to $DATA/experiments
+
+Fine-tune or continue training a pre-trained model:
+
+`python train_rep.py --config configs/<> --checkpoint <> --name <>`
+
+If fine-tuning, make sure that the config specifies a `finetune` key as well as any downstream tasks to use for this. A good example is `configs/multi/armeni_voiced_encoder.yaml` which specifies SSL losses for pre-training and a downstream voiced classifier for fine-tuning.
+
 ### Code standards
 Use ruff for linting, formatting, and organising imports. I recommend running the following inside the repository before committing:
 ```
