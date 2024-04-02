@@ -120,39 +120,13 @@ class RepLearner(L.LightningModule):
                 **rep_config["amp_scale_predictor"]
             )
 
-        # Label losses for representation shaping
-        if "vad_classifier" in rep_config:
-            self.weightings["vad"] = rep_config["vad_classifier"].get("weight", 1.0)
-            rep_config["vad_classifier"].pop("weight", None)
-
-            if "subject_embedding" in rep_config:
-                rep_config["vad_classifier"]["input_dim"] += subject_embedding_dim
-            active_models["vad_classifier"] = VADClassifier(
-                **rep_config["vad_classifier"]
-            )
-        if "voiced_classifier" in rep_config:
-            self.weightings["voiced"] = rep_config["voiced_classifier"].get(
-                "weight", 1.0
-            )
-            rep_config["voiced_classifier"].pop("weight", None)
-
-            if "subject_embedding" in rep_config:
-                rep_config["voiced_classifier"]["input_dim"] += subject_embedding_dim
-
-            if rep_config["voiced_classifier"]["type"] == "mlp":
-                del rep_config["voiced_classifier"]["type"]
-                active_models["voiced_classifier"] = VoicedClassifierMLP(
-                    **rep_config["voiced_classifier"]
-                )
-            elif rep_config["voiced_classifier"]["type"] == "lstm":
-                del rep_config["voiced_classifier"]["type"]
-                active_models["voiced_classifier"] = VoicedClassifierLSTM(
-                    **rep_config["voiced_classifier"]
-                )
-            else:
-                raise ValueError("Voiced classifier type not recognised")
-
         self.active_models = nn.ModuleDict(active_models)
+
+        # Add classifiers if used in pre-training
+        for k, v in rep_config.items():
+            if "classifier" in k:
+                self.add_classifier(k, v)
+
         self.rep_config = rep_config
 
     def apply_encoder(self, z, dataset, subject):
@@ -418,9 +392,47 @@ class RepLearner(L.LightningModule):
                     param.requires_grad = False
 
     def disable_ssl(self):
-        for key in self.active_models.keys():
+        keys = list(self.active_models.keys())
+        for key in keys:
             if "predictor" in key:
                 self.active_models.pop(key)
+
+    def add_classifier(self, classifier_type: str, params: dict):
+        # Labeled tasks for representation shaping or downstream classification
+
+        if classifier_type == "vad_classifier":
+            self.weightings["vad"] = params.get("weight", 1.0)
+            params.pop("weight", None)
+
+            if "subject_embedding" in self.rep_config:
+                params["input_dim"] += self.rep_config["subject_embedding"][
+                    "embedding_dim"
+                ]
+
+            self.active_models.update({"vad_classifier": VADClassifier(**params)})
+
+        if classifier_type == "voiced_classifier":
+            self.weightings["voiced"] = params.get("weight", 1.0)
+            params.pop("weight", None)
+
+            if "subject_embedding" in self.rep_config:
+                params["input_dim"] += self.rep_config["subject_embedding"][
+                    "embedding_dim"
+                ]
+
+            if params["type"] == "mlp":
+                del params["type"]
+                self.active_models.update(
+                    {"voiced_classifier": VoicedClassifierMLP(**params)}
+                )
+            elif params["type"] == "lstm":
+                del params["type"]
+
+                self.active_models.update(
+                    {"voiced_classifier": VoicedClassifierLSTM(**params)}
+                )
+            else:
+                raise ValueError("Voiced classifier type not recognised")
 
 
 if __name__ == "__main__":

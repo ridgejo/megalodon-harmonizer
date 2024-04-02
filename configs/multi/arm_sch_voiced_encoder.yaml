@@ -1,13 +1,6 @@
 experiment:
   seed: 42
 
-finetune:
-  freeze_all: true
-  voiced_classifier:
-    type: "mlp"
-    input_dim: 1756 # 300 * 5 = 1500
-    hidden_dim: 512
-
 rep_config:
   lr: 0.000066
   dataset_block:
@@ -23,7 +16,7 @@ rep_config:
     ratios: [5, 5, 1]
     dimension: 300
   subject_embedding:
-    dataset_keys: ["armeni2022"]
+    dataset_keys: ["armeni2022", "schoffelen2019"]
     embedding_dim: 64
   band_predictor:
     input_dim: 1756 # 300 * 5 = 1500
@@ -47,11 +40,15 @@ datamodule_config:
         "003": ["008"]
       slice_len: 0.5
       label_type: "voiced"
+    schoffelen2019:
+      bad_subjects: []
+      slice_len: 0.5
+      label_type: null
   dataloader_configs:
     train_ratio: 0.9
-    val_ratio: 0.1
-    test_ratio: 0.0
-    pred_ratio: 0.0
+    val_ratio: 0.04
+    test_ratio: 0.04
+    pred_ratio: 0.02
     batch_size: 128
     normalisation:
       n_sample_batches: 8

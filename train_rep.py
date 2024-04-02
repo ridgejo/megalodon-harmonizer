@@ -52,18 +52,35 @@ checkpoint_callback = ModelCheckpoint(
     auto_insert_metric_name=True,
 )
 
+# How to handle checkpoints? If a checkpoint is specified, then let the config be a special fine-tuning config which
+# only specifies data and fine-tuning parameters. Everything else can be loaded directly from the checkpoint.
 if args.checkpoint:
+    # Let's support a couple of *different* modes if a checkpoint is specified:
+    # a) Resume training
+    # b) Fine-tuning
+
     # 1. Load model from the pre-trained checkpoint
-    model = RepLearner.load_from_checkpoint(args.checkpoint)
+    model = RepLearner.load_from_checkpoint(
+        args.checkpoint, rep_config=config["rep_config"]
+    )
 
-    # 2. Freeze all layers except the downstream classifiers (optional?)
-    model.freeze_except("classifier")
+    # If not fine-tuning, we can just continue from the checkpoint
+    if "finetune" in config:
+        # Fine-tuning case: use a special fine-tuning config for this.
 
-    # 3. Remove other losses / predictors from the model
-    model.disable_ssl()
+        if config["finetune"]["freeze_all"]:
+            # Freeze all layers except any downstream classifiers that are already enabled
+            model.freeze_except("classifier")
+            # Remove other losses / predictors from the model
+            model.disable_ssl()
 
-    # todo: make sure configure_optimizer is called *after* this
-    model.configure_optimizer()
+        # Add new downstream classifiers to the model
+        for k, v in config["finetune"].items():
+            if "classifier" in k:
+                model.add_classifier(k, v)
+
+        # Make sure configure_optimizer is called *after* this
+        model.configure_optimizers()
 else:
     model = RepLearner(
         config["rep_config"],

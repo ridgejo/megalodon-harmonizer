@@ -47,11 +47,15 @@ datamodule_config:
         "003": ["008"]
       slice_len: 0.5
       label_type: "voiced"
+    schoffelen2019:
+      bad_subjects: []
+      slice_len: 0.5
+      label_type: null
   dataloader_configs:
     train_ratio: 0.9
-    val_ratio: 0.1
-    test_ratio: 0.0
-    pred_ratio: 0.0
+    val_ratio: 0.04
+    test_ratio: 0.04
+    pred_ratio: 0.02
     batch_size: 128
     normalisation:
       n_sample_batches: 8
