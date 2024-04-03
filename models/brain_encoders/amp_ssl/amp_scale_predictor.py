@@ -34,7 +34,9 @@ class AmpScalePredictor(nn.Module):
     def scale_amp(self, x):  # Assume x is [B, C, T]
         B, C, T = x.shape
 
-        possible_scales = torch.linspace(start=-2, end=2, steps=self.num_steps, device=x.device)
+        possible_scales = torch.linspace(
+            start=-2, end=2, steps=self.num_steps, device=x.device
+        )
         scale_label = random.randrange(len(possible_scales))
         scale = possible_scales[scale_label]
 

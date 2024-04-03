@@ -22,8 +22,8 @@ class BandPredictor(nn.Module):
             (3.0, 8.0),  # Theta
             (8.0, 12.0),  # Alpha
             (12.0, 30.0),  # Beta
-            (30.0, 70.0), # Low Gamma
-            (70.0, 125.0), # High Gamma
+            (30.0, 70.0),  # Low Gamma
+            (70.0, 125.0),  # High Gamma
         ]
 
         self.num_bands = len(self.bands)

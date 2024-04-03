@@ -128,7 +128,6 @@ class RepLearner(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-
     def apply_encoder(self, z, dataset, subject):
         if "dataset_block" in self.active_models:
             z = self.active_models["dataset_block"](z, dataset_id=dataset)
