@@ -29,7 +29,13 @@ class VADClassifier(nn.Module):
             average="macro",
         )
 
+        # Track label distribution (as it could be affected by downsampling)
+        no_speech_labels = torch.count_nonzero(labels)
+        total_labels = torch.prod(torch.tensor(labels.shape)).item()
+        pct_speech = (total_labels - no_speech_labels) / total_labels
+
         return {
             "vad_bce_loss": bce_loss,
             "vad_balacc": balacc,
+            "vad_pct_speech_labels": pct_speech,
         }
