@@ -121,13 +121,13 @@ class RepLearner(L.LightningModule):
             )
 
         self.active_models = nn.ModuleDict(active_models)
+        self.rep_config = rep_config
 
         # Add classifiers if used in pre-training
         for k, v in rep_config.items():
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-        self.rep_config = rep_config
 
     def apply_encoder(self, z, dataset, subject):
         if "dataset_block" in self.active_models:

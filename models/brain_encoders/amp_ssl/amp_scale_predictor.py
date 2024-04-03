@@ -17,6 +17,7 @@ class AmpScalePredictor(nn.Module):
         super(AmpScalePredictor, self).__init__()
 
         self.prop = prop
+        self.num_steps = 16
 
         self.model = nn.Sequential(
             nn.Linear(
@@ -26,14 +27,14 @@ class AmpScalePredictor(nn.Module):
             nn.ReLU(),
             nn.Linear(
                 in_features=hidden_dim,
-                out_features=8,
+                out_features=self.num_steps,
             ),
         )
 
     def scale_amp(self, x):  # Assume x is [B, C, T]
         B, C, T = x.shape
 
-        possible_scales = torch.linspace(start=-2, end=2, steps=8, device=x.device)
+        possible_scales = torch.linspace(start=-2, end=2, steps=self.num_steps, device=x.device)
         scale_label = random.randrange(len(possible_scales))
         scale = possible_scales[scale_label]
 
@@ -57,7 +58,7 @@ class AmpScalePredictor(nn.Module):
         preds = torch.argmax(probs, dim=1)
 
         accuracy = TM.classification.multiclass_accuracy(
-            preds, label_tensor, num_classes=8
+            preds, label_tensor, num_classes=self.num_steps
         )
 
         return {

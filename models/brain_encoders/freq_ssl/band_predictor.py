@@ -17,6 +17,17 @@ class BandPredictor(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super(BandPredictor, self).__init__()
 
+        self.bands = [
+            (0.1, 3.0),  # Delta
+            (3.0, 8.0),  # Theta
+            (8.0, 12.0),  # Alpha
+            (12.0, 30.0),  # Beta
+            (30.0, 70.0), # Low Gamma
+            (70.0, 125.0), # High Gamma
+        ]
+
+        self.num_bands = len(self.bands)
+
         self.model = nn.Sequential(
             nn.Linear(
                 in_features=input_dim,
@@ -25,7 +36,7 @@ class BandPredictor(nn.Module):
             nn.ReLU(),
             nn.Linear(
                 in_features=hidden_dim,
-                out_features=6,
+                out_features=self.num_bands,
             ),
         )
 
@@ -34,19 +45,11 @@ class BandPredictor(nn.Module):
 
         B, C, T = x.shape
 
-        bands = [
-            (0.1, 3.0),  # Delta
-            (3.0, 8.0),  # Theta
-            (8.0, 12.0),  # Alpha
-            (12.0, 30.0),  # Beta
-            (30.0, 125.0),  # Gamma
-        ]
-
         # Pick band to mask at random
-        band = random.randrange(len(bands))
+        band = random.randrange(self.num_bands)
 
-        low_cutoff = bands[band][0]
-        high_cutoff = bands[band][1]
+        low_cutoff = self.bands[band][0]
+        high_cutoff = self.bands[band][1]
 
         # Calculate the center frequency and Q factor
         central_freq = (low_cutoff + high_cutoff) / 2.0  # Midpoint
@@ -70,7 +73,7 @@ class BandPredictor(nn.Module):
         preds = torch.argmax(probs, dim=1)
 
         accuracy = TM.classification.multiclass_accuracy(
-            preds, label_tensor, num_classes=6
+            preds, label_tensor, num_classes=self.num_bands
         )
 
         return {
