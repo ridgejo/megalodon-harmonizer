@@ -25,10 +25,9 @@ rep_config:
   subject_embedding:
     dataset_keys: ["armeni2022"]
     embedding_dim: 64
-  amp_scale_predictor:
-    input_dim: 1756 # 300 * 5 = 1500
+  vad_classifier:
+    input_dim: 300
     hidden_dim: 512
-    prop: 0.5
 
 datamodule_config:
   dataset_preproc_configs:

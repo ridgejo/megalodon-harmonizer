@@ -396,6 +396,12 @@ class RepLearner(L.LightningModule):
             if "predictor" in key:
                 self.active_models.pop(key)
 
+    def disable_classifiers(self):
+        keys = list(self.active_models.keys())
+        for key in keys:
+            if "classifier" in key:
+                self.active_models.pop(key)
+
     def add_classifier(self, classifier_type: str, params: dict):
         # Labeled tasks for representation shaping or downstream classification
 

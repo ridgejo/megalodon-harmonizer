@@ -3,9 +3,8 @@ experiment:
 
 finetune:
   freeze_all: true
-  voiced_classifier:
-    type: "mlp"
-    input_dim: 1756 # 300 * 5 = 1500
+  vad_classifier:
+    input_dim: 300
     hidden_dim: 512
 
 rep_config:

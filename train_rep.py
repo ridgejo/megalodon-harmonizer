@@ -1,4 +1,5 @@
 import argparse
+import glob
 from pathlib import Path
 
 import yaml
@@ -59,10 +60,16 @@ if args.checkpoint:
     # a) Resume training
     # b) Fine-tuning
 
+    # Get checkpoint file
+    if args.checkpoint[-5:] == ".ckpt":
+        checkpoint = args.checkpoint
+    else:
+        checkpoint = glob.glob(args.checkpoint + "/**/*.ckpt")[
+            0
+        ]  # Find first checkpoint file within the directory
+
     # 1. Load model from the pre-trained checkpoint
-    model = RepLearner.load_from_checkpoint(
-        args.checkpoint, rep_config=config["rep_config"]
-    )
+    model = RepLearner.load_from_checkpoint(checkpoint, rep_config=config["rep_config"])
 
     # If not fine-tuning, we can just continue from the checkpoint
     if "finetune" in config:
@@ -71,8 +78,12 @@ if args.checkpoint:
         if config["finetune"]["freeze_all"]:
             # Freeze all layers except any downstream classifiers that are already enabled
             model.freeze_except("classifier")
+
             # Remove other losses / predictors from the model
             model.disable_ssl()
+
+            # warning: also removes any existing classifiers from pre-training stage
+            model.disable_classifiers()
 
         # Add new downstream classifiers to the model
         for k, v in config["finetune"].items():

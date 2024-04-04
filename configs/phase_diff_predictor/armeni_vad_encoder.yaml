@@ -3,9 +3,8 @@ experiment:
 
 finetune:
   freeze_all: true
-  voiced_classifier:
-    type: "mlp"
-    input_dim: 1756 # 300 * 5 = 1500
+  vad_classifier:
+    input_dim: 300
     hidden_dim: 512
 
 rep_config:
@@ -25,7 +24,7 @@ rep_config:
   subject_embedding:
     dataset_keys: ["armeni2022"]
     embedding_dim: 64
-  amp_scale_predictor:
+  phase_diff_predictor:
     input_dim: 1756 # 300 * 5 = 1500
     hidden_dim: 512
     prop: 0.5
@@ -39,7 +38,7 @@ datamodule_config:
         "002": []
         "003": ["008"]
       slice_len: 0.5
-      label_type: "voiced"
+      label_type: "vad"
   dataloader_configs:
     train_ratio: 0.9
     val_ratio: 0.04

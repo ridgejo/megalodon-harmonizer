@@ -1,6 +1,13 @@
 experiment:
   seed: 42
 
+finetune:
+  freeze_all: true
+  voiced_classifier:
+    type: "mlp"
+    input_dim: 1756 # 300 * 5 = 1500
+    hidden_dim: 512
+
 rep_config:
   lr: 0.000066
   dataset_block:
