@@ -17,13 +17,23 @@ class BandPredictor(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super(BandPredictor, self).__init__()
 
+        # self.bands = [
+        #     (0.1, 3.0),  # Delta
+        #     (3.0, 8.0),  # Theta
+        #     (8.0, 12.0),  # Alpha
+        #     (12.0, 30.0),  # Beta
+        #     (30.0, 70.0),  # Low Gamma
+        #     (70.0, 125.0),  # High Gamma
+        # ]
+
+        # Oiwi's bands
         self.bands = [
-            (0.1, 3.0),  # Delta
-            (3.0, 8.0),  # Theta
+            (0.1, 4.0),  # Delta
+            (4.0, 8.0),  # Theta
             (8.0, 12.0),  # Alpha
             (12.0, 30.0),  # Beta
-            (30.0, 70.0),  # Low Gamma
-            (70.0, 125.0),  # High Gamma
+            (30.0, 70.0),  # Gamma
+            (70.0, 100.0)(100.0, 150.0),  # Lower High Gamma  # Higher High Gamma
         ]
 
         self.num_bands = len(self.bands)

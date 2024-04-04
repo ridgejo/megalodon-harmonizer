@@ -1,0 +1,59 @@
+experiment:
+  seed: 42
+
+finetune:
+  freeze_all: true
+  vad_classifier:
+    input_dim: 300
+    hidden_dim: 512
+
+rep_config:
+  lr: 0.000066
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+    shared_dim: 300
+    use_data_block: true
+  encoder:
+    channels: 300
+    conv_channels: [256, 512, 768, 1024]
+    ratios: [5, 5, 1]
+    dimension: 300
+  subject_embedding:
+    dataset_keys: ["armeni2022"]
+    embedding_dim: 64
+  band_predictor:
+    input_dim: 1756 # 300 * 5 = 1500
+    hidden_dim: 512
+  amp_scale_predictor:
+    input_dim: 1756 # 300 * 5 = 1500
+    hidden_dim: 512
+    prop: 0.5
+  phase_diff_predictor:
+    input_dim: 1756 # 300 * 5 = 1500
+    hidden_dim: 512
+    prop: 0.5
+
+datamodule_config:
+  dataset_preproc_configs:
+    armeni2022:
+      bad_subjects: []
+      bad_sessions:
+        "001": []
+        "002": []
+        "003": ["008"]
+      slice_len: 0.5
+      label_type: "vad"
+  dataloader_configs:
+    train_ratio: 0.9
+    val_ratio: 0.1
+    test_ratio: 0.0
+    pred_ratio: 0.0
+    batch_size: 128
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:
