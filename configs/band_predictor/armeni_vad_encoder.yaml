@@ -37,7 +37,7 @@ datamodule_config:
         "002": []
         "003": ["008"]
       slice_len: 0.5
-      label_type: "voiced"
+      label_type: "vad"
   dataloader_configs:
     train_ratio: 0.9
     val_ratio: 0.04
