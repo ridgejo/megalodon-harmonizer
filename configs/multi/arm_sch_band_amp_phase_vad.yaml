@@ -16,7 +16,7 @@ rep_config:
     ratios: [5, 5, 1]
     dimension: 300
   subject_embedding:
-    dataset_keys: ["armeni2022"]
+    dataset_keys: ["armeni2022", "schoffelen2019"]
     embedding_dim: 64
   band_predictor:
     input_dim: 1756 # 300 * 5 = 1500
