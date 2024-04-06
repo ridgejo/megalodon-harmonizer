@@ -3,12 +3,11 @@ import os
 import typing as tp
 
 import lightning as L
-import torch
 from torch.utils.data import ConcatDataset, DataLoader, random_split
 
 from dataloaders.armeni2022 import Armeni2022
 from dataloaders.batch_invariant_sampler import BatchInvariantSampler
-from dataloaders.data_utils import DATA_PATH, BatchScaler
+from dataloaders.data_utils import DATA_PATH
 from dataloaders.gwilliams2022 import Gwilliams2022
 from dataloaders.schoffelen2019 import Schoffelen2019
 
@@ -73,7 +72,6 @@ class MultiDataLoader(L.LightningDataModule):
         batch_size = self.batch_size
 
         self.train, self.val, self.test, self.pred = {}, {}, {}, {}
-        self.scalers = {}
         for dataset, datasets in self.data.items():
             # Data will be a list of datasets by subject and (possibly) session for each underlying dataset
 
@@ -119,18 +117,18 @@ class MultiDataLoader(L.LightningDataModule):
                     pred_split, batch_size=batch_size, shuffle=False, drop_last=False
                 )
 
-        print("Fitting scalers to datasets...")
+        # print("Fitting scalers to datasets...")
 
-        self.scalers = {}
-        norm_conf = self.dataloader_configs["normalisation"]
-        for identifier, train_dl in self.train.items():
-            scaler = BatchScaler(
-                n_sample_batches=norm_conf["n_sample_batches"],
-                per_channel=norm_conf["per_channel"],
-                scaler_conf=norm_conf["scaler_conf"],
-            )
-            scaler.fit(train_dl)
-            self.scalers[identifier] = scaler
+        # self.scalers = {}
+        # norm_conf = self.dataloader_configs["normalisation"]
+        # for identifier, train_dl in self.train.items():
+        #     scaler = BatchScalerTorch(
+        #         n_sample_batches=norm_conf["n_sample_batches"],
+        #         per_channel=norm_conf["per_channel"],
+        #         scaler_conf=norm_conf["scaler_conf"],
+        #     )
+        #     scaler.fit(train_dl)
+        #     self.scalers[identifier] = scaler
 
         # Construct batch-invariant samplers
         self.train = BatchInvariantSampler(
@@ -150,12 +148,33 @@ class MultiDataLoader(L.LightningDataModule):
             shuffle=False,
         )
 
-    def on_before_batch_transfer(self, batch, dataloader_idx):
-        # Get identifier from first sample
-        key = get_key_from_batch_identifier(batch["identifier"])
+    # def on_before_batch_transfer(self, batch, dataloader_idx):
+    #     # Get identifier from first sample
+    #     key = get_key_from_batch_identifier(batch["identifier"])
 
-        # Apply batch scaling transformation before transferring to device.
-        batch["data"] = torch.from_numpy(self.scalers[key](batch["data"])).float()
+    #     # Apply batch scaling transformation before transferring to device.
+    #     batch["data"] = torch.from_numpy(self.scalers[key](batch["data"])).float()
+
+    #     return batch
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        # # Get identifier from first sample
+        # key = get_key_from_batch_identifier(batch["identifier"])
+
+        # # Apply batch scaling transformation after transferring to device
+        # batch["data"] = self.scalers[key](batch["data"]).float()
+
+        # Automatically standard scale the batch before processing
+        # [B, C, T]
+        # low, high = torch.quantile(
+        #     batch["data"], torch.tensor([0.0001, 0.9999], dtype=batch["data"].dtype), dim=(0, -1)
+        # )
+        # torch.clip(batch["data"], min=low, max=high)
+        mean = batch["data"].mean(dim=(0, -1))
+        std = batch["data"].std(dim=(0, -1))
+        batch["data"] = (
+            (batch["data"] - mean[None, :, None]) / std[None, :, None]
+        ).float()
 
         return batch
 
@@ -351,7 +370,8 @@ if __name__ == "__main__":
     sample = next(iter(datamodule.train_dataloader()))
     print(sample)
 
-    sample_scaled = datamodule.on_before_batch_transfer(sample, 0)
+    # sample_scaled = datamodule.on_before_batch_transfer(sample, 0)
+    sample_scaled = datamodule.on_after_batch_transfer(sample, 0)
     print(sample_scaled)
 
     breakpoint()

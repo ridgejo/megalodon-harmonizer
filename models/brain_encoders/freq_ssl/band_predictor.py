@@ -14,28 +14,29 @@ class BandPredictor(nn.Module):
     Given an encoded representation of the brain signal, predict which channel was masked with zeroes
     """
 
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, hidden_dim, use_old_bands=False):
         super(BandPredictor, self).__init__()
 
-        # self.bands = [
-        #     (0.1, 3.0),  # Delta
-        #     (3.0, 8.0),  # Theta
-        #     (8.0, 12.0),  # Alpha
-        #     (12.0, 30.0),  # Beta
-        #     (30.0, 70.0),  # Low Gamma
-        #     (70.0, 125.0),  # High Gamma
-        # ]
-
-        # Oiwi's bands
-        self.bands = [
-            (0.1, 4.0),  # Delta
-            (4.0, 8.0),  # Theta
-            (8.0, 12.0),  # Alpha
-            (12.0, 30.0),  # Beta
-            (30.0, 70.0),  # Gamma
-            (70.0, 100.0),  # Lower High Gamma
-            (100.0, 150.0),  # Higher High Gamma
-        ]
+        if use_old_bands:
+            self.bands = [
+                (0.1, 3.0),  # Delta
+                (3.0, 8.0),  # Theta
+                (8.0, 12.0),  # Alpha
+                (12.0, 30.0),  # Beta
+                (30.0, 70.0),  # Low Gamma
+                (70.0, 125.0),  # High Gamma
+            ]
+        else:
+            # Oiwi's bands
+            self.bands = [
+                (0.1, 4.0),  # Delta
+                (4.0, 8.0),  # Theta
+                (8.0, 12.0),  # Alpha
+                (12.0, 30.0),  # Beta
+                (30.0, 70.0),  # Gamma
+                (70.0, 100.0),  # Lower High Gamma
+                (100.0, 150.0),  # Higher High Gamma
+            ]
 
         self.num_bands = len(self.bands)
 

@@ -138,6 +138,63 @@ def get_slice_stats(raw, slice_len):
     return num_slices, samples_per_slice
 
 
+class BatchScalerTorch(nn.Module):
+    """Applies Scipy's StandardScaler but using PyTorch for GPU compatibility"""
+
+    def __init__(self, n_sample_batches, per_channel, scaler_conf):
+        super(BatchScalerTorch, self).__init__()
+
+        if "standard_scaler" not in scaler_conf:
+            raise ValueError("Only standard scaler is supported.")
+
+        self.per_channel = per_channel
+        self.n_sample_batches = n_sample_batches
+
+    def fit(self, dataloader):
+        sample_batches = []
+        for i, batch in enumerate(dataloader):
+            sample_batches.append(batch["data"])
+            if i >= self.n_sample_batches:
+                break
+
+        data = torch.cat(sample_batches)
+
+        # [B, C, T] format
+
+        if self.per_channel:
+            data = data.permute(0, 2, 1).flatten(start_dim=0, end_dim=1)
+
+            self.low, self.high = torch.quantile(
+                data, torch.tensor([0.0001, 0.9999], dtype=data.dtype), dim=0
+            )
+
+            data = torch.clip(data, min=self.low, max=self.high)
+
+            # Per-channel mean and standard deviation
+            self.scale_mean = data.mean(dim=0)
+            self.scale_std = data.std(dim=0)
+
+        else:
+            raise ValueError("Only per-channel scaling is supported.")
+
+    def forward(self, batch):
+        if self.scale_mean.device != batch.device:
+            self.scale_mean = self.scale_mean.to(batch.device)
+            self.scale_std = self.scale_std.to(batch.device)
+            self.low = self.low.to(batch.device)
+            self.high = self.high.to(batch.device)
+
+        if self.per_channel:
+            batch = batch.permute(0, 2, 1)
+            shape = batch.shape
+            batch = batch.flatten(start_dim=0, end_dim=1)
+            batch = torch.clip(batch, min=self.low, max=self.high)
+            batch = (batch - self.scale_mean[None, :]) / self.scale_std[None, :]
+            return batch.reshape(*shape).permute(0, 2, 1)
+        else:
+            raise ValueError("Only per-channel scaling is supported.")
+
+
 class BatchScaler(nn.Module):
     """Applies scaling based on Defossez et al. 2023"""
 
@@ -227,3 +284,5 @@ if __name__ == "__main__":
     breakpoint()
 
     # batch_preprocess()
+
+    # Test batch scaler

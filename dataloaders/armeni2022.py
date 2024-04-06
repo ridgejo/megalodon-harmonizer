@@ -2,6 +2,7 @@
 
 import typing as tp
 
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -72,7 +73,7 @@ class Armeni2022(Dataset):
         for ch in raw.info["chs"]:
             pos = ch["loc"][:3]  # Extracts the first three elements: X, Y, Z
             sensor_positions.append(pos)
-        self.sensor_positions = torch.tensor(sensor_positions)
+        self.sensor_positions = torch.tensor(np.array(sensor_positions))
 
         self.raw = raw
 
