@@ -6,8 +6,8 @@ import yaml
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.tuner import Tuner
 from lightning.pytorch.strategies import DDPStrategy
+from lightning.pytorch.tuner import Tuner
 
 from dataloaders.data_utils import DATA_PATH
 from dataloaders.multi_dataloader import MultiDataLoader
@@ -28,9 +28,7 @@ parser.add_argument(
 parser.add_argument(
     "--lr_find", help="Find best learning rate", action="store_true", default=False
 )
-parser.add_argument(
-    "--ddp", help="Use DDP", action="store_true", default=False
-)
+parser.add_argument("--ddp", help="Use DDP", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -112,8 +110,10 @@ datamodule = MultiDataLoader(**config["datamodule_config"])
 wandb_logger.watch(model)
 
 trainer = Trainer(
-    logger=wandb_logger, callbacks=[checkpoint_callback], detect_anomaly=args.debug,
-    strategy='auto' if not args.ddp else ddp_strategy
+    logger=wandb_logger,
+    callbacks=[checkpoint_callback],
+    detect_anomaly=args.debug,
+    strategy="auto" if not args.ddp else ddp_strategy,
 )
 
 if args.lr_find:

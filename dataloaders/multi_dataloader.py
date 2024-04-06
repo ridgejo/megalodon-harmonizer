@@ -1,7 +1,7 @@
 import glob
 import os
-import typing as tp
 import random
+import typing as tp
 
 import lightning as L
 from torch.utils.data import ConcatDataset, DataLoader, random_split
@@ -74,19 +74,18 @@ class MultiDataLoader(L.LightningDataModule):
 
         self.train, self.val, self.test, self.pred = {}, {}, {}, {}
         for dataset, datasets in self.data.items():
-
             # Data will be a list of datasets by subject for each underlying dataset
 
             if self.dataloader_configs.get("leave_one_subject_out", False):
-
                 # If we decide to evaluate subject generalisation then split datasets slightly differently
                 # Ensure that one subject independent of the train set is selected per dataset for validation.
 
                 # Randomly pick a subject in datasets to select as the validation subject.
                 val_data_idx = random.randrange(len(datasets))
-                print(f"Leaving out subject {datasets[val_data_idx][0]['identifier']['subject']} in {dataset}")
+                print(
+                    f"Leaving out subject {datasets[val_data_idx][0]['identifier']['subject']} in {dataset}"
+                )
                 for idx, data in enumerate(datasets):
-                    
                     identifier = get_key_from_identifier(data[0]["identifier"])
 
                     if idx != val_data_idx:
@@ -107,7 +106,6 @@ class MultiDataLoader(L.LightningDataModule):
                         )
 
             else:
-
                 for data in datasets:
                     if self.debug:
                         # Fit only one batch in debug mode
@@ -144,10 +142,16 @@ class MultiDataLoader(L.LightningDataModule):
                         val_split, batch_size=batch_size, shuffle=False, drop_last=False
                     )
                     self.test[identifier] = DataLoader(
-                        test_split, batch_size=batch_size, shuffle=False, drop_last=False
+                        test_split,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        drop_last=False,
                     )
                     self.pred[identifier] = DataLoader(
-                        pred_split, batch_size=batch_size, shuffle=False, drop_last=False
+                        pred_split,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        drop_last=False,
                     )
 
         # print("Fitting scalers to datasets...")
