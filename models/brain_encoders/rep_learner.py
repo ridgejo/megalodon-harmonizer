@@ -255,6 +255,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=True,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
             self.log_dict(
                 losses,
@@ -263,6 +264,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=False,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
             self.log_dict(
                 metrics,
@@ -271,6 +273,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=False,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
 
         return loss
@@ -289,6 +292,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=True,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
             self.log_dict(
                 losses,
@@ -297,6 +301,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=False,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
             self.log_dict(
                 metrics,
@@ -305,6 +310,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=False,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
 
         return loss
@@ -323,6 +329,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=True,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
             self.log_dict(
                 losses,
@@ -331,6 +338,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=False,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
             self.log_dict(
                 metrics,
@@ -339,6 +347,7 @@ class RepLearner(L.LightningModule):
                 prog_bar=False,
                 logger=True,
                 batch_size=batch_size,
+                sync_dist=True,
             )
 
         return loss

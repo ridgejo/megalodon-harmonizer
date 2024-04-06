@@ -1,6 +1,7 @@
 import glob
 import os
 import typing as tp
+import random
 
 import lightning as L
 from torch.utils.data import ConcatDataset, DataLoader, random_split
@@ -73,49 +74,81 @@ class MultiDataLoader(L.LightningDataModule):
 
         self.train, self.val, self.test, self.pred = {}, {}, {}, {}
         for dataset, datasets in self.data.items():
-            # Data will be a list of datasets by subject and (possibly) session for each underlying dataset
 
-            for data in datasets:
-                if self.debug:
-                    # Fit only one batch in debug mode
-                    train_size = batch_size
-                    val_size = batch_size
-                    test_size = 1
-                    pred_size = len(data) - train_size - val_size - test_size
-                else:
-                    train_size = int(train_ratio * len(data))
-                    val_size = int(val_ratio * len(data))
-                    test_size = int(test_ratio * len(data))
-                    pred_size = len(data) - train_size - val_size - test_size
+            # Data will be a list of datasets by subject for each underlying dataset
 
-                if min([train_size, val_size]) < batch_size:
-                    print(
-                        f"Warning: One of train/val smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+            if self.dataloader_configs.get("leave_one_subject_out", False):
+
+                # If we decide to evaluate subject generalisation then split datasets slightly differently
+                # Ensure that one subject independent of the train set is selected per dataset for validation.
+
+                # Randomly pick a subject in datasets to select as the validation subject.
+                val_data_idx = random.randrange(len(datasets))
+                print(f"Leaving out subject {datasets[val_data_idx][0]['identifier']['subject']} in {dataset}")
+                for idx, data in enumerate(datasets):
+                    
+                    identifier = get_key_from_identifier(data[0]["identifier"])
+
+                    if idx != val_data_idx:
+                        self.train[identifier] = DataLoader(
+                            data, batch_size=batch_size, shuffle=True, drop_last=True
+                        )
+                    else:
+                        self.val[identifier] = DataLoader(
+                            data, batch_size=batch_size, shuffle=False, drop_last=False
+                        )
+
+                        # warning: fixme
+                        self.test[identifier] = DataLoader(
+                            data, batch_size=batch_size, shuffle=False, drop_last=False
+                        )
+                        self.pred[identifier] = DataLoader(
+                            data, batch_size=batch_size, shuffle=False, drop_last=False
+                        )
+
+            else:
+
+                for data in datasets:
+                    if self.debug:
+                        # Fit only one batch in debug mode
+                        train_size = batch_size
+                        val_size = batch_size
+                        test_size = 1
+                        pred_size = len(data) - train_size - val_size - test_size
+                    else:
+                        train_size = int(train_ratio * len(data))
+                        val_size = int(val_ratio * len(data))
+                        test_size = int(test_ratio * len(data))
+                        pred_size = len(data) - train_size - val_size - test_size
+
+                    if min([train_size, val_size]) < batch_size:
+                        print(
+                            f"Warning: One of train/val smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+                        )
+
+                    if min([test_size, pred_size]) < batch_size:
+                        print(
+                            f"Warning: One of pred/test smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+                        )
+
+                    train_split, val_split, test_split, pred_split = random_split(
+                        data, [train_size, val_size, test_size, pred_size]
                     )
 
-                if min([test_size, pred_size]) < batch_size:
-                    print(
-                        f"Warning: One of pred/test smaller than batch size {batch_size} for dataset {dataset}. Zero batches will be available."
+                    identifier = get_key_from_identifier(train_split[0]["identifier"])
+
+                    self.train[identifier] = DataLoader(
+                        train_split, batch_size=batch_size, shuffle=True, drop_last=True
                     )
-
-                train_split, val_split, test_split, pred_split = random_split(
-                    data, [train_size, val_size, test_size, pred_size]
-                )
-
-                identifier = get_key_from_identifier(train_split[0]["identifier"])
-
-                self.train[identifier] = DataLoader(
-                    train_split, batch_size=batch_size, shuffle=True, drop_last=True
-                )
-                self.val[identifier] = DataLoader(
-                    val_split, batch_size=batch_size, shuffle=False, drop_last=False
-                )
-                self.test[identifier] = DataLoader(
-                    test_split, batch_size=batch_size, shuffle=False, drop_last=False
-                )
-                self.pred[identifier] = DataLoader(
-                    pred_split, batch_size=batch_size, shuffle=False, drop_last=False
-                )
+                    self.val[identifier] = DataLoader(
+                        val_split, batch_size=batch_size, shuffle=False, drop_last=False
+                    )
+                    self.test[identifier] = DataLoader(
+                        test_split, batch_size=batch_size, shuffle=False, drop_last=False
+                    )
+                    self.pred[identifier] = DataLoader(
+                        pred_split, batch_size=batch_size, shuffle=False, drop_last=False
+                    )
 
         # print("Fitting scalers to datasets...")
 
@@ -276,8 +309,8 @@ class MultiDataLoader(L.LightningDataModule):
 
                     sess_datasets.append(data)
 
-                if len(sess_datasets) > 0:
-                    datasets.append(ConcatDataset(sess_datasets))
+            if len(sess_datasets) > 0:
+                datasets.append(ConcatDataset(sess_datasets))
 
         return datasets, seconds
 
@@ -333,7 +366,7 @@ if __name__ == "__main__":
     datamodule = MultiDataLoader(
         dataset_preproc_configs={
             "armeni2022": {
-                "bad_subjects": [],
+                "bad_subjects": ["003"],
                 "bad_sessions": {"001": [], "002": [], "003": []},
                 "slice_len": 0.1,
                 "label_type": "vad",
@@ -354,6 +387,7 @@ if __name__ == "__main__":
             "val_ratio": 0.04,
             "test_ratio": 0.04,
             "pred_ratio": 0.02,
+            "leave_one_subject_out": True,
             "batch_size": 32,
             "normalisation": {
                 "n_sample_batches": 8,

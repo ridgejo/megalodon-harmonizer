@@ -7,6 +7,7 @@ from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.tuner import Tuner
+from lightning.pytorch.strategies import DDPStrategy
 
 from dataloaders.data_utils import DATA_PATH
 from dataloaders.multi_dataloader import MultiDataLoader
@@ -26,6 +27,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--lr_find", help="Find best learning rate", action="store_true", default=False
+)
+parser.add_argument(
+    "--ddp", help="Use DDP", action="store_true", default=False
 )
 args = parser.parse_args()
 
@@ -52,6 +56,8 @@ checkpoint_callback = ModelCheckpoint(
     mode="min",
     auto_insert_metric_name=True,
 )
+
+ddp_strategy = DDPStrategy()
 
 # How to handle checkpoints? If a checkpoint is specified, then let the config be a special fine-tuning config which
 # only specifies data and fine-tuning parameters. Everything else can be loaded directly from the checkpoint.
@@ -92,6 +98,10 @@ if args.checkpoint:
 
         # Make sure configure_optimizer is called *after* this
         model.configure_optimizers()
+
+        # There can be unused parameters, but these remain fixed throughout training
+        ddp_strategy = DDPStrategy(find_unused_parameters=True, static_graph=True)
+
 else:
     model = RepLearner(
         config["rep_config"],
@@ -102,7 +112,8 @@ datamodule = MultiDataLoader(**config["datamodule_config"])
 wandb_logger.watch(model)
 
 trainer = Trainer(
-    logger=wandb_logger, callbacks=[checkpoint_callback], detect_anomaly=args.debug
+    logger=wandb_logger, callbacks=[checkpoint_callback], detect_anomaly=args.debug,
+    strategy='auto' if not args.ddp else ddp_strategy
 )
 
 if args.lr_find:
