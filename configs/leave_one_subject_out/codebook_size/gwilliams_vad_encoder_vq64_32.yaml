@@ -1,0 +1,43 @@
+experiment:
+  seed: 42
+
+rep_config:
+  lr: 0.000066
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+    shared_dim: 300
+    use_data_block: true
+  encoder:
+    channels: 300
+    conv_channels: [256, 512, 768, 1024]
+    ratios: [5, 5, 1]
+    dimension: 300
+  quantize:
+    dim: 300
+    codebook_size: 32
+    codebook_dim: 64
+  vad_classifier:
+    input_dim: 300
+    hidden_dim: 512
+
+datamodule_config:
+  dataset_preproc_configs:
+    gwilliams2022:
+      bad_subjects: []
+      slice_len: 0.5
+      label_type: "vad"
+  dataloader_configs:
+    leave_one_subject_out: true
+    train_ratio: 0.9
+    val_ratio: 0.04
+    test_ratio: 0.04
+    pred_ratio: 0.02
+    batch_size: 128
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:

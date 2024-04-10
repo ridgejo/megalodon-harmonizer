@@ -1,6 +1,12 @@
 experiment:
   seed: 42
 
+finetune:
+  freeze_all: false
+  vad_classifier:
+    input_dim: 300
+    hidden_dim: 512
+
 rep_config:
   lr: 0.000066
   dataset_block:
@@ -15,27 +21,36 @@ rep_config:
     conv_channels: [256, 512, 768, 1024]
     ratios: [5, 5, 1]
     dimension: 300
-  quantize:
-    dim: 300
-    codebook_size: 256
-    codebook_dim: ## ???
-    use_cosine_sim: true
-  vad_classifier:
-    input_dim: 300
+  subject_embedding:
+    dataset_keys: ["armeni2022", "schoffelen2019"]
+    embedding_dim: 64
+  band_predictor:
+    input_dim: 1756 # 300 * 5 = 1500
     hidden_dim: 512
+  amp_scale_predictor:
+    input_dim: 1756 # 300 * 5 = 1500
+    hidden_dim: 512
+    prop: 0.5
+  phase_diff_predictor:
+    input_dim: 1756 # 300 * 5 = 1500
+    hidden_dim: 512
+    prop: 0.5
 
 datamodule_config:
   dataset_preproc_configs:
-    gwilliams2022:
+    armeni2022:
       bad_subjects: []
+      bad_sessions:
+        "001": []
+        "002": []
+        "003": ["008"]
       slice_len: 0.5
       label_type: "vad"
   dataloader_configs:
-    leave_one_subject_out: true
     train_ratio: 0.9
-    val_ratio: 0.04
-    test_ratio: 0.04
-    pred_ratio: 0.02
+    val_ratio: 0.1
+    test_ratio: 0.0
+    pred_ratio: 0.0
     batch_size: 128
     normalisation:
       n_sample_batches: 8
