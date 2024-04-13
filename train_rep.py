@@ -75,7 +75,6 @@ if args.checkpoint:
 
     # If not fine-tuning, we can just continue from the checkpoint
     if "finetune" in config:
-
         # Fine-tuning case: use a special fine-tuning config for this.
 
         # Get checkpoint file
@@ -87,7 +86,9 @@ if args.checkpoint:
             ]  # Find first validation checkpoint file within the directory
 
         # Load model from the pre-trained checkpoint
-        model = RepLearner.load_from_checkpoint(checkpoint, rep_config=config["rep_config"])
+        model = RepLearner.load_from_checkpoint(
+            checkpoint, rep_config=config["rep_config"]
+        )
 
         if config["finetune"]["freeze_all"]:
             # Freeze all layers except any downstream classifiers that are already enabled
@@ -120,9 +121,11 @@ if args.checkpoint:
             checkpoint = glob.glob(args.checkpoint + "/**/latest*.ckpt")[
                 0
             ]  # Find latest checkpoint file within the directory
-        
+
         # Load model from the pre-trained checkpoint and resume training
-        model = RepLearner.load_from_checkpoint(checkpoint, rep_config=config["rep_config"])
+        model = RepLearner.load_from_checkpoint(
+            checkpoint, rep_config=config["rep_config"]
+        )
 
 else:
     model = RepLearner(
