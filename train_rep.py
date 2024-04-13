@@ -49,35 +49,45 @@ wandb_logger = WandbLogger(
 wandb_logger.experiment.config.update(config)
 
 # Checkpoint model only when validation loss improves
-checkpoint_callback = ModelCheckpoint(
+val_checkpoint = ModelCheckpoint(
     monitor="val_loss",
     mode="min",
     auto_insert_metric_name=True,
 )
 
+latest_checkpoint = ModelCheckpoint(
+    filename="latest-checkpoint",
+    every_n_epochs=1,
+    save_top_k=1,
+)
+
+datamodule = MultiDataLoader(**config["datamodule_config"])
+
 ddp_strategy = DDPStrategy()
 
 # How to handle checkpoints? If a checkpoint is specified, then let the config be a special fine-tuning config which
 # only specifies data and fine-tuning parameters. Everything else can be loaded directly from the checkpoint.
+resume_training = False
 if args.checkpoint:
     # Let's support a couple of *different* modes if a checkpoint is specified:
     # a) Resume training
     # b) Fine-tuning
 
-    # Get checkpoint file
-    if args.checkpoint[-5:] == ".ckpt":
-        checkpoint = args.checkpoint
-    else:
-        checkpoint = glob.glob(args.checkpoint + "/**/*.ckpt")[
-            0
-        ]  # Find first checkpoint file within the directory
-
-    # 1. Load model from the pre-trained checkpoint
-    model = RepLearner.load_from_checkpoint(checkpoint, rep_config=config["rep_config"])
-
     # If not fine-tuning, we can just continue from the checkpoint
     if "finetune" in config:
+
         # Fine-tuning case: use a special fine-tuning config for this.
+
+        # Get checkpoint file
+        if args.checkpoint[-5:] == ".ckpt":
+            checkpoint = args.checkpoint
+        else:
+            checkpoint = glob.glob(args.checkpoint + "/**/epoch*.ckpt")[
+                0
+            ]  # Find first validation checkpoint file within the directory
+
+        # Load model from the pre-trained checkpoint
+        model = RepLearner.load_from_checkpoint(checkpoint, rep_config=config["rep_config"])
 
         if config["finetune"]["freeze_all"]:
             # Freeze all layers except any downstream classifiers that are already enabled
@@ -100,18 +110,31 @@ if args.checkpoint:
         # There can be unused parameters, but these remain fixed throughout training
         ddp_strategy = DDPStrategy(find_unused_parameters=True, static_graph=True)
 
+    else:
+        resume_training = True
+
+        # Get checkpoint file
+        if args.checkpoint[-5:] == ".ckpt":
+            checkpoint = args.checkpoint
+        else:
+            checkpoint = glob.glob(args.checkpoint + "/**/latest*.ckpt")[
+                0
+            ]  # Find latest checkpoint file within the directory
+        
+        # Load model from the pre-trained checkpoint and resume training
+        model = RepLearner.load_from_checkpoint(checkpoint, rep_config=config["rep_config"])
+
 else:
     model = RepLearner(
         config["rep_config"],
     )
-datamodule = MultiDataLoader(**config["datamodule_config"])
 
 # Track gradients
 wandb_logger.watch(model)
 
 trainer = Trainer(
     logger=wandb_logger,
-    callbacks=[checkpoint_callback],
+    callbacks=[latest_checkpoint, val_checkpoint],
     detect_anomaly=args.debug,
     strategy="auto" if not args.ddp else ddp_strategy,
 )
@@ -122,4 +145,7 @@ if args.lr_find:
     print("Learning rate search results:")
     print(lr_finder.results)
 
-trainer.fit(model, datamodule=datamodule)
+if resume_training:
+    trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint)
+else:
+    trainer.fit(model, datamodule=datamodule)
