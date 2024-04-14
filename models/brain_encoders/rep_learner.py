@@ -17,9 +17,9 @@ from models.brain_encoders.supervised.voiced_classifier import (
     VoicedClassifierMLP,
 )
 from models.dataset_block import DatasetBlock
+from models.film import FiLM
 from models.subject_block import SubjectBlock
 from models.subject_embedding import SubjectEmbedding
-from models.film import FiLM
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
 
@@ -74,7 +74,9 @@ class RepLearner(L.LightningModule):
             active_models["subject_film_embedding"] = SubjectEmbedding(
                 **rep_config["subject_film"]["subject_embedding"]
             )
-            active_models["subject_film_module"] = FiLM(**rep_config["subject_film"]["film_module"])
+            active_models["subject_film_module"] = FiLM(
+                **rep_config["subject_film"]["film_module"]
+            )
 
         # Auxiliary SSL losses
         if "masked_channel_predictor" in rep_config:
@@ -157,13 +159,8 @@ class RepLearner(L.LightningModule):
             subject_embedding = self.active_models["subject_film_embedding"](
                 dataset, subject
             )
-            subject_embedding = subject_embedding.unsqueeze(0).repeat(
-                z.shape[0], 1
-            )
-            z = self.active_models["subject_film_module"](
-                z,
-                subject_embedding
-            )
+            subject_embedding = subject_embedding.unsqueeze(0).repeat(z.shape[0], 1)
+            z = self.active_models["subject_film_module"](z, subject_embedding)
 
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
