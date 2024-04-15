@@ -1,10 +1,10 @@
 import torch.nn as nn
 
+
 class Projector(nn.Module):
     """SSL projector (used in training, discarded during fine-tuning)"""
 
     def __init__(self, input_dim, hidden_dim):
-
         super(Projector, self).__init__()
 
         self.ssl_projector = nn.Sequential(
