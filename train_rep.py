@@ -26,6 +26,9 @@ parser.add_argument(
     "--debug", help="Faster debug mode", action="store_true", default=False
 )
 parser.add_argument(
+    "--anomaly_detect", help="Detect anomalies", action="store_true", default=False
+)
+parser.add_argument(
     "--lr_find", help="Find best learning rate", action="store_true", default=False
 )
 parser.add_argument("--ddp", help="Use DDP", action="store_true", default=False)
@@ -138,7 +141,7 @@ wandb_logger.watch(model)
 trainer = Trainer(
     logger=wandb_logger,
     callbacks=[latest_checkpoint, val_checkpoint],
-    detect_anomaly=args.debug,
+    detect_anomaly=args.anomaly_detect,
     strategy="auto" if not args.ddp else ddp_strategy,
 )
 

@@ -20,8 +20,18 @@ from models.dataset_block import DatasetBlock
 from models.film import FiLM
 from models.subject_block import SubjectBlock
 from models.subject_embedding import SubjectEmbedding
+from models.attach_subject import AttachSubject
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
+from models.projector import Projector
+
+class LambdaModule(nn.Module):
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+    def forward(self, *args):
+        return self.func(*args)
 
 
 class RepLearner(L.LightningModule):
@@ -32,28 +42,29 @@ class RepLearner(L.LightningModule):
     def __init__(self, rep_config):
         super().__init__()
 
-        # Requirements:
-        # - Spatial (attention?) layer (requires sensor geometry) --- Bin into 50 (?)
-        # - Auxiliary: decoder spec, classifier specs, pre-defined task specs, spectral losses, etc.
-        # Circular shift channel and predict index?
-        # etc.
-
         self.learning_rate = rep_config["lr"]
         self.weightings = {}
 
         active_models = {}
 
+        # ---- Core encoder ----
         if "dataset_block" in rep_config:
             active_models["dataset_block"] = DatasetBlock(**rep_config["dataset_block"])
+        else:
+            active_models["dataset_block"] = nn.Identity()
 
         if "encoder" in rep_config:
             active_models["encoder"] = SEANetBrainEncoder(**rep_config["encoder"])
+        else:
+            active_models["encoder"] = nn.Identity()
 
         if "transformer" in rep_config:
             active_models["transformer"] = TransformerEncoder(
                 in_channels=rep_config["encoder"]["dimension"],
                 transformer_config=rep_config["transformer"],
             )
+        else:
+            active_models["transformer"] = nn.Identity()
 
         if "quantize" in rep_config:
             self.weightings["quantization"] = rep_config["quantize"].get("weight", 1.0)
@@ -61,24 +72,53 @@ class RepLearner(L.LightningModule):
             active_models["quantize"] = VectorQuantize(rep_config["quantize"])
         else:
             self.weightings["quantization"] = 0.0
+            dummy_module = nn.Identity()
+            active_models["quantize"] = LambdaModule(lambda z : (dummy_module(z), None, 0.0))
+            
+        # ---- Subject conditioning ----
+        assert sum(
+            [x in rep_config for x in ["subject_embedding", "subject_block", "subject_film"]]
+            ) <= 1, "Can't have multiple subject conditioning methods"
+
+        if "subject_block" in rep_config:
+            active_models["subject_block"] = SubjectBlock(**rep_config["subject_block"])
+        else:
+            dummy_module = nn.Identity()
+            active_models["subject_block"] = LambdaModule(lambda z, ds, sb : dummy_module(z))
 
         if "subject_embedding" in rep_config:
             subject_embedding_dim = rep_config["subject_embedding"]["embedding_dim"]
             active_models["subject_embedding"] = SubjectEmbedding(
                 **rep_config["subject_embedding"]
             )
-        elif "subject_block" in rep_config:
-            active_models["subject_block"] = SubjectBlock(**rep_config["subject_block"])
-        elif "subject_film" in rep_config:
+            active_models["attach_subject"] = AttachSubject()
+        else:
+            active_models["subject_embedding"] = LambdaModule(lambda ds, sb : None)
+            active_models["attach_subject"] = LambdaModule(lambda z, sb : z)
+
+        if "subject_film" in rep_config:
             # In this case, we have subject embeddings which condition the film module
-            active_models["subject_film_embedding"] = SubjectEmbedding(
+            active_models["subject_embedding"] = SubjectEmbedding(
                 **rep_config["subject_film"]["subject_embedding"]
             )
             active_models["subject_film_module"] = FiLM(
                 **rep_config["subject_film"]["film_module"]
             )
+        else:
+            if "subject_embedding" not in active_models:
+                active_models["subject_embedding"] = LambdaModule(lambda ds, sb : None)
+            active_models["subject_film_module"] = LambdaModule(lambda z, sb : z)
 
-        # Auxiliary SSL losses
+        # ---- SSL Projector ----
+        if "projector" in rep_config:
+            if "subject_embedding" in rep_config:
+                rep_config["projector"]["input_dim"] += subject_embedding_dim
+            active_models["projector"] = Projector(**rep_config["projector"])
+        else:
+            active_models["projector"] = nn.Identity()
+
+
+        # ---- Auxiliary SSL losses ----
         if "masked_channel_predictor" in rep_config:
             self.weightings["masked_channel_pred"] = rep_config[
                 "masked_channel_predictor"
@@ -138,52 +178,37 @@ class RepLearner(L.LightningModule):
                 self.add_classifier(k, v)
 
     def apply_encoder(self, z, dataset, subject):
-        if "dataset_block" in self.active_models:
-            z = self.active_models["dataset_block"](z, dataset_id=dataset)
 
-        if "encoder" in self.active_models:
-            z = self.active_models["encoder"](z)
+        z = self.active_models["dataset_block"](z, dataset_id=dataset)
+        z = self.active_models["encoder"](z)
+        z = self.active_models["transformer"](z)
+        z, _, commit_loss = self.active_models["quantize"](z)
 
-        if "transformer" in self.active_models:
-            z = self.active_models["transformer"](z)
+        # Generic subject embedding
+        subject_embedding = self.active_models["subject_embedding"](
+            dataset, subject
+        )
 
-        if "quantize" in self.active_models:
-            z, _, commit_loss = self.active_models["quantize"](z)
-        else:
-            commit_loss = 0.0
+        # Subject block
+        z = self.active_models["subject_block"](z, dataset, subject)
 
-        if "subject_block" in self.active_models:
-            z = self.active_models["subject_block"](z, dataset, subject)
+        # Subject FiLM conditioning
+        z = self.active_models["subject_film_module"](z, subject_embedding)
 
-        if "subject_film_embedding" in self.active_models:
-            subject_embedding = self.active_models["subject_film_embedding"](
-                dataset, subject
-            )
-            subject_embedding = subject_embedding.unsqueeze(0).repeat(z.shape[0], 1)
-            z = self.active_models["subject_film_module"](z, subject_embedding)
+        # Subject embedding concatentation
+        z = self.active_models["attach_subject"](z, subject_embedding)
 
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
         z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
 
-        if "subject_embedding" in self.active_models:
-            subject_embedding = self.active_models["subject_embedding"](
-                dataset, subject
-            )
-            z_ind_subject_embedding = subject_embedding.unsqueeze(0).repeat(
-                z_independent.shape[0], 1
-            )
-            z_seq_subject_embedding = (
-                subject_embedding.unsqueeze(0)
-                .unsqueeze(1)
-                .repeat(z_sequence.shape[0], z_sequence.shape[1], 1)
-            )
-            z_independent = torch.cat(
-                (z_independent, z_ind_subject_embedding), dim=-1
-            )  # [B * T, E + S]
-            z_sequence = torch.cat(
-                (z_sequence, z_seq_subject_embedding), dim=-1
-            )  # [B, T, E + S]
+        # Apply SSL projector to z_sequence
+        T, E = z_sequence.shape[1:]
+        z_sequence = torch.unflatten(
+            self.active_models["projector"](z_sequence.flatten(start_dim=1, end_dim=-1)),
+            dim=-1,
+            sizes=(T, E),
+        )
 
         return z_sequence, z_independent, commit_loss
 
@@ -420,6 +445,9 @@ class RepLearner(L.LightningModule):
         for key in keys:
             if "predictor" in key:
                 self.active_models.pop(key)
+        
+        # Also remove the SSL projector for fine-tuning
+        self.active_models["projector"] = nn.Identity()
 
     def disable_classifiers(self):
         keys = list(self.active_models.keys())

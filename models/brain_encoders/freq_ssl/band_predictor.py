@@ -14,7 +14,7 @@ class BandPredictor(nn.Module):
     Given an encoded representation of the brain signal, predict which channel was masked with zeroes
     """
 
-    def __init__(self, input_dim, hidden_dim, use_old_bands=False):
+    def __init__(self, input_dim, use_old_bands=False):
         super(BandPredictor, self).__init__()
 
         if use_old_bands:
@@ -43,11 +43,6 @@ class BandPredictor(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(
                 in_features=input_dim,
-                out_features=hidden_dim,
-            ),
-            nn.ReLU(),
-            nn.Linear(
-                in_features=hidden_dim,
                 out_features=self.num_bands,
             ),
         )

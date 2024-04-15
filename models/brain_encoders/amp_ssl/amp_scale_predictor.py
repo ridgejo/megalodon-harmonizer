@@ -13,7 +13,7 @@ class AmpScalePredictor(nn.Module):
     Given an encoded representation of the brain signal, predict which channel was masked with zeroes
     """
 
-    def __init__(self, input_dim, hidden_dim, prop):
+    def __init__(self, input_dim, prop):
         super(AmpScalePredictor, self).__init__()
 
         self.prop = prop
@@ -22,11 +22,6 @@ class AmpScalePredictor(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(
                 in_features=input_dim,
-                out_features=hidden_dim,
-            ),
-            nn.ReLU(),
-            nn.Linear(
-                in_features=hidden_dim,
                 out_features=self.num_steps,
             ),
         )

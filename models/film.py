@@ -25,6 +25,8 @@ class FiLM(nn.Module):
         cond_embedding : conditional embedding
         """
 
+        cond_embedding = cond_embedding.unsqueeze(0).repeat(x.shape[0], 1)
+
         # Get Film conditioning factors
         # warning: Does not need batching as conditioning should be the same for the entire batch
         out = self.film_projector(cond_embedding)
