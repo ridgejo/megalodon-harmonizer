@@ -49,7 +49,7 @@ wandb_logger = WandbLogger(
     name=args.name,
     project=parser.prog,
     save_dir=DATA_PATH / "experiments",
-    log_model=True, # Log checkpoint only at the end of training (to stop my wandb running out of storage!)
+    log_model=True,  # Log checkpoint only at the end of training (to stop my wandb running out of storage!)
     dir=DATA_PATH / "wandb",
 )
 
@@ -147,7 +147,9 @@ trainer = Trainer(
     callbacks=[latest_checkpoint, val_checkpoint],
     detect_anomaly=args.anomaly_detect,
     strategy="auto" if not args.ddp else ddp_strategy,
-    max_epochs=config["experiment"]["epochs"] if "epochs" in config["experiment"] else 1000,
+    max_epochs=config["experiment"]["epochs"]
+    if "epochs" in config["experiment"]
+    else 1000,
 )
 
 if args.lr_find:
