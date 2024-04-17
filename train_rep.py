@@ -32,6 +32,7 @@ parser.add_argument(
     "--lr_find", help="Find best learning rate", action="store_true", default=False
 )
 parser.add_argument("--ddp", help="Use DDP", action="store_true", default=False)
+parser.add_argument("--seed", help="Override experiment seed", type=int, default=None)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -39,13 +40,16 @@ config = yaml.safe_load(Path(args.config).read_text())
 if args.debug:
     config["datamodule_config"]["debug"] = True
 
+if args.seed is not None:
+    config["experiment"]["seed"] = args.seed
+
 seed_everything(config["experiment"]["seed"], workers=True)
 
 wandb_logger = WandbLogger(
     name=args.name,
     project=parser.prog,
     save_dir=DATA_PATH / "experiments",
-    log_model="all",
+    log_model=True, # Log checkpoint only at the end of training (to stop my wandb running out of storage!)
     dir=DATA_PATH / "wandb",
 )
 
@@ -143,6 +147,7 @@ trainer = Trainer(
     callbacks=[latest_checkpoint, val_checkpoint],
     detect_anomaly=args.anomaly_detect,
     strategy="auto" if not args.ddp else ddp_strategy,
+    max_epochs=config["experiment"]["epochs"] if "epochs" in config["experiment"] else 1000,
 )
 
 if args.lr_find:
@@ -155,3 +160,6 @@ if resume_training:
     trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint)
 else:
     trainer.fit(model, datamodule=datamodule)
+
+# Automatically tests model with best weights from training/fitting
+trainer.test(model, datamodule=datamodule)
