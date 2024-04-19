@@ -1,6 +1,6 @@
 experiment:
   seed: 42
-  epochs: 150
+  epochs: 100
 
 finetune:
   freeze_all: true

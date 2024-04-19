@@ -1,12 +1,6 @@
 experiment:
   seed: 42
-  epochs: 100
-
-finetune:
-  freeze_all: true
-  vad_classifier:
-    input_dim: 300
-    hidden_dim: 512
+  epochs: 500
 
 rep_config:
   lr: 0.000066
@@ -15,19 +9,24 @@ rep_config:
       armeni2022: 269
       schoffelen2019: 273
       gwilliams2022: 208
-    shared_dim: 300
+    shared_dim: 2048
     use_data_block: true
   encoder:
-    channels: 300
+    channels: 2048
     conv_channels: [256, 512, 768, 1024]
     ratios: [5, 5, 1]
-    dimension: 300
+    dimension: 2048
   projector:
-    input_dim: 1500
+    input_dim: 10240
     hidden_dim: 2048
+  band_predictor:
+    input_dim: 10240 # 300 * 5 = 1500
   amp_scale_predictor:
-    input_dim: 1500 # 300 * 5 = 1500
+    input_dim: 10240 # 300 * 5 = 1500
     prop: 0.4
+  phase_diff_predictor:
+    input_dim: 10240 # 300 * 5 = 1500
+    prop: 0.5
 
 datamodule_config:
   dataset_preproc_configs:

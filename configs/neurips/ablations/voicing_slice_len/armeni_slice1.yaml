@@ -1,12 +1,6 @@
 experiment:
   seed: 42
-  epochs: 100
-
-finetune:
-  freeze_all: true
-  vad_classifier:
-    input_dim: 300
-    hidden_dim: 512
+  epochs: 500
 
 rep_config:
   lr: 0.000066
@@ -23,11 +17,16 @@ rep_config:
     ratios: [5, 5, 1]
     dimension: 300
   projector:
-    input_dim: 1500
+    input_dim: 3000
     hidden_dim: 2048
+  band_predictor:
+    input_dim: 3000 # 300 * 5 = 1500
   amp_scale_predictor:
-    input_dim: 1500 # 300 * 5 = 1500
+    input_dim: 3000 # 300 * 5 = 1500
     prop: 0.4
+  phase_diff_predictor:
+    input_dim: 3000 # 300 * 5 = 1500
+    prop: 0.5
 
 datamodule_config:
   dataset_preproc_configs:
@@ -37,7 +36,7 @@ datamodule_config:
         "001": []
         "002": []
         "003": ["008"]
-      slice_len: 0.5
+      slice_len: 1.0
       label_type: "vad"
   dataloader_configs:
     train_ratio: 0.8

@@ -164,4 +164,5 @@ else:
     trainer.fit(model, datamodule=datamodule)
 
 # Automatically tests model with best weights from training/fitting
-trainer.test(model, datamodule=datamodule)
+print("Testing model")
+trainer.test(datamodule=datamodule)
