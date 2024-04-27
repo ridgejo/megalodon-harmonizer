@@ -2,6 +2,13 @@ experiment:
   seed: 42
   epochs: 500
 
+finetune:
+  freeze_all: false
+  voiced_classifier:
+    type: "mlp"
+    input_dim: 1500
+    hidden_dim: 512
+
 rep_config:
   lr: 0.000066
   dataset_block:
@@ -17,15 +24,15 @@ rep_config:
     ratios: [5, 5, 1]
     dimension: 300
   projector:
-    input_dim: 600
+    input_dim: 1500
     hidden_dim: 2048
   band_predictor:
-    input_dim: 600 # 300 * 2 = 600
+    input_dim: 1500 # 300 * 5 = 1500
   amp_scale_predictor:
-    input_dim: 600 # 300 * 5 = 1500
-    prop: 0.4
+    input_dim: 1500 # 300 * 5 = 1500
+    prop: 0.2
   phase_diff_predictor:
-    input_dim: 600 # 300 * 5 = 1500
+    input_dim: 1500 # 300 * 5 = 1500
     prop: 0.5
 
 datamodule_config:
@@ -36,8 +43,8 @@ datamodule_config:
         "001": []
         "002": []
         "003": ["008"]
-      slice_len: 0.2
-      label_type: "vad"
+      slice_len: 0.5
+      label_type: "voiced"
   dataloader_configs:
     train_ratio: 0.8
     val_ratio: 0.1

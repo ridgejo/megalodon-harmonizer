@@ -52,7 +52,7 @@ class RepLearner(L.LightningModule):
         if "dataset_block" in rep_config:
             active_models["dataset_block"] = DatasetBlock(**rep_config["dataset_block"])
         else:
-            active_models["dataset_block"] = nn.Identity()
+            active_models["dataset_block"] = LambdaModule(lambda z, ds : z)
 
         if "encoder" in rep_config:
             active_models["encoder"] = SEANetBrainEncoder(**rep_config["encoder"])
@@ -188,7 +188,7 @@ class RepLearner(L.LightningModule):
                 self.add_classifier(k, v)
 
     def apply_encoder(self, z, dataset, subject):
-        z = self.active_models["dataset_block"](z, dataset_id=dataset)
+        z = self.active_models["dataset_block"](z, dataset)
         z = self.active_models["encoder"](z)
         z = self.active_models["transformer"](z)
         z, _, commit_loss = self.active_models["quantize"](z)

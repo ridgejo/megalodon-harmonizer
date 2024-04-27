@@ -100,12 +100,14 @@ if args.checkpoint:
         if config["finetune"]["freeze_all"]:
             # Freeze all layers except any downstream classifiers that are already enabled
             model.freeze_except("classifier")
-
             # Remove other losses / predictors from the model
             model.disable_ssl()
-
             # warning: also removes any existing classifiers from pre-training stage
             model.disable_classifiers()
+        else:
+            model.disable_ssl()
+            model.disable_classifiers()
+
 
         # Add new downstream classifiers to the model
         for k, v in config["finetune"].items():

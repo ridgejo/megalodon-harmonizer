@@ -1,0 +1,32 @@
+experiment:
+  seed: 42
+  epochs: 150
+
+rep_config:
+  lr: 0.000066
+  voiced_classifier:
+    type: "mlp"
+    input_dim: 33625
+    hidden_dim: 512
+
+datamodule_config:
+  dataset_preproc_configs:
+    armeni2022:
+      bad_subjects: ["002", "003"]
+      bad_sessions:
+        "001": []
+        "002": []
+        "003": ["008"]
+      slice_len: 0.5
+      label_type: "vad"
+  dataloader_configs:
+    train_ratio: 0.8
+    val_ratio: 0.1
+    test_ratio: 0.1
+    pred_ratio: 0.0
+    batch_size: 128
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:

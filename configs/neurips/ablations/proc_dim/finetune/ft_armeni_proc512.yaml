@@ -2,6 +2,12 @@ experiment:
   seed: 42
   epochs: 500
 
+finetune:
+  freeze_all: true
+  vad_classifier:
+    input_dim: 512
+    hidden_dim: 512
+
 rep_config:
   lr: 0.000066
   dataset_block:
