@@ -52,7 +52,7 @@ class RepLearner(L.LightningModule):
         if "dataset_block" in rep_config:
             active_models["dataset_block"] = DatasetBlock(**rep_config["dataset_block"])
         else:
-            active_models["dataset_block"] = LambdaModule(lambda z, ds : z)
+            active_models["dataset_block"] = LambdaModule(lambda z, ds: z)
 
         if "encoder" in rep_config:
             active_models["encoder"] = SEANetBrainEncoder(**rep_config["encoder"])

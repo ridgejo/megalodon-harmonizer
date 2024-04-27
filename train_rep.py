@@ -108,7 +108,6 @@ if args.checkpoint:
             model.disable_ssl()
             model.disable_classifiers()
 
-
         # Add new downstream classifiers to the model
         for k, v in config["finetune"].items():
             if "classifier" in k:
