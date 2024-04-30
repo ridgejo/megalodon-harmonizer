@@ -321,10 +321,9 @@ class Schoffelen2019(Dataset):
         )[:273]  # [28: (28 + 273)]
         raw = raw.pick(picks)
 
-        self.valid_indices, self.samples_per_slice = data_utils.get_valid_indices(
-            raw, slice_len
-        )
-        self.num_slices = len(self.valid_indices)
+        sfreq = float(raw.info["sfreq"])
+        self.samples_per_slice = int(sfreq * slice_len)
+        self.num_slices = int(len(raw) / self.samples_per_slice)
 
         self.raw = raw
 
@@ -339,15 +338,14 @@ class Schoffelen2019(Dataset):
         return self.num_slices
 
     def __getitem__(self, idx):
-        data_slice, times = data_utils.get_slice(
-            self.raw, idx, self.samples_per_slice, self.valid_indices
-        )
+
+        data_slice, times = self.raw[:, idx * self.samples_per_slice : (idx + 1) * self.samples_per_slice]
 
         return {
             "data": data_slice,
             "times": times,
             "identifier": {"subject": self.subject_id, "dataset": "schoffelen2019"},
-            "sensor_pos": self.sensor_positions,  # Sensor (x, y, z) provided in [m]
+            # "sensor_pos": self.sensor_positions,  # Sensor (x, y, z) provided in [m]
         }
 
 

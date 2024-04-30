@@ -223,7 +223,9 @@ class RepLearner(L.LightningModule):
 
     def forward(self, inputs):
         x = inputs["data"]
-        sensor_pos = inputs["sensor_pos"]
+        
+        # sensor_pos = inputs["sensor_pos"]
+        sensor_pos = None
 
         dataset = inputs["identifier"]["dataset"][0]
         subject = inputs["identifier"]["subject"][0]
@@ -443,11 +445,16 @@ class RepLearner(L.LightningModule):
             lr=self.learning_rate,
         )
 
-    def freeze_except(self, module_name: str):
+    def freeze_except(self, module_names):
+
+        if isinstance(module_names, str):
+            module_names = [module_names]
+
         for key in self.active_models.keys():
-            if module_name not in key:
-                for param in self.active_models[key].parameters():
-                    param.requires_grad = False
+            for module_name in module_names:
+                if module_name not in key:
+                    for param in self.active_models[key].parameters():
+                        param.requires_grad = False
 
     def disable_ssl(self):
         keys = list(self.active_models.keys())

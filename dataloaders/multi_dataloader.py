@@ -136,22 +136,26 @@ class MultiDataLoader(L.LightningDataModule):
                     identifier = get_key_from_identifier(train_split[0]["identifier"])
 
                     self.train[identifier] = DataLoader(
-                        train_split, batch_size=batch_size, shuffle=True, drop_last=True
+                        train_split, batch_size=batch_size, shuffle=True, drop_last=True,
+                        pin_memory=True, persistent_workers=True, num_workers=1, # Will lead to one worker per subject
                     )
                     self.val[identifier] = DataLoader(
-                        val_split, batch_size=batch_size, shuffle=False, drop_last=False
+                        val_split, batch_size=batch_size, shuffle=False, drop_last=False,
+                        pin_memory=True, persistent_workers=True, num_workers=1,
                     )
                     self.test[identifier] = DataLoader(
                         test_split,
                         batch_size=batch_size,
                         shuffle=False,
                         drop_last=False,
+                        pin_memory=True,
                     )
                     self.pred[identifier] = DataLoader(
                         pred_split,
                         batch_size=batch_size,
                         shuffle=False,
                         drop_last=False,
+                        pin_memory=True,
                     )
 
         print("Fitting scalers to datasets...")
@@ -339,6 +343,9 @@ class MultiDataLoader(L.LightningDataModule):
         for subject in subjects:
             if subject in bad_subjects:
                 continue  # ignore incomplete subject data
+
+            if ("include_subjects" in config) and (subject not in config["include_subjects"]):
+                continue
 
             task_datasets = []
             for task in tasks:

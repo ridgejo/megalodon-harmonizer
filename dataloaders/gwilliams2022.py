@@ -117,7 +117,7 @@ class Gwilliams2022(Dataset):
         }
 
         # Sensor (x, y, z) provided in [m]
-        return_dict["sensor_pos"] = self.sensor_positions
+        # return_dict["sensor_pos"] = self.sensor_positions
 
         return return_dict
 

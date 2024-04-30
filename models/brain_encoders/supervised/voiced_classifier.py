@@ -37,6 +37,18 @@ class VoicedClassifierLSTM(nn.Module):
             average="macro",
         )
 
+        # Computes tensor of shape (5,) of 
+        # (true positives, false positives, true negatives, false negatives, support)
+        stat_scores = TM.classification.binary_stat_scores(
+            preds.int(),
+            labels.int(),
+        )
+        tp = stat_scores[0]
+        fp = stat_scores[1]
+        tn = stat_scores[2]
+        fn = stat_scores[3]
+        support = stat_scores[4]
+
         r2_score = TM.r2_score(
             preds=probs,
             target=labels,
@@ -46,6 +58,11 @@ class VoicedClassifierLSTM(nn.Module):
             "voiced_bce_loss": bce_loss,
             "voiced_balacc": balacc,
             "voiced_r2": r2_score,
+            "voiced_tp": tp,
+            "voiced_fp": fp,
+            "voiced_tn": tn,
+            "voiced_fn": fn,
+            "voiced_support": support,
         }
 
 
