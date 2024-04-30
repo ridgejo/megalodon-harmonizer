@@ -1,9 +1,8 @@
 import argparse
 import glob
+import os
 from pathlib import Path
 
-import os
-import torch
 import yaml
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
@@ -37,7 +36,9 @@ parser.add_argument(
     "--lr_find", help="Find best learning rate", action="store_true", default=False
 )
 parser.add_argument("--ddp", help="Use DDP", action="store_true", default=False)
-parser.add_argument("--profile", help="Use profiling", action="store_true", default=False)
+parser.add_argument(
+    "--profile", help="Use profiling", action="store_true", default=False
+)
 parser.add_argument("--seed", help="Override experiment seed", type=int, default=None)
 args = parser.parse_args()
 
@@ -119,7 +120,7 @@ if args.checkpoint:
             # warning: also removes any existing classifiers from pre-training stage
             model.disable_classifiers()
         elif "new_subject" in config["finetune"]:
-            model.freeze_except("subject_") # Leave any subject conditioning unfrozen
+            model.freeze_except("subject_")  # Leave any subject conditioning unfrozen
             # Do not disable SSL
             model.disable_classifiers()
         else:

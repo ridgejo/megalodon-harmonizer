@@ -37,7 +37,7 @@ class VoicedClassifierLSTM(nn.Module):
             average="macro",
         )
 
-        # Computes tensor of shape (5,) of 
+        # Computes tensor of shape (5,) of
         # (true positives, false positives, true negatives, false negatives, support)
         stat_scores = TM.classification.binary_stat_scores(
             preds.int(),

@@ -338,8 +338,9 @@ class Schoffelen2019(Dataset):
         return self.num_slices
 
     def __getitem__(self, idx):
-
-        data_slice, times = self.raw[:, idx * self.samples_per_slice : (idx + 1) * self.samples_per_slice]
+        data_slice, times = self.raw[
+            :, idx * self.samples_per_slice : (idx + 1) * self.samples_per_slice
+        ]
 
         return {
             "data": data_slice,

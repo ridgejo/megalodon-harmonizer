@@ -223,7 +223,7 @@ class RepLearner(L.LightningModule):
 
     def forward(self, inputs):
         x = inputs["data"]
-        
+
         # sensor_pos = inputs["sensor_pos"]
         sensor_pos = None
 
@@ -446,7 +446,6 @@ class RepLearner(L.LightningModule):
         )
 
     def freeze_except(self, module_names):
-
         if isinstance(module_names, str):
             module_names = [module_names]
 
