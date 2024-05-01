@@ -42,7 +42,7 @@ class VoicedClassifierLSTM(nn.Module):
         stat_scores = TM.classification.binary_stat_scores(
             preds.int(),
             labels.int(),
-        )
+        ).float() / len(preds.flatten())
         tp = stat_scores[0]
         fp = stat_scores[1]
         tn = stat_scores[2]
