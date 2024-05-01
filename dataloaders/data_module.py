@@ -1,10 +1,9 @@
-import lightning as L
-import torch
 import typing as tp
 
-from pnpl.datasets import Armeni2022, Gwilliams2022, Schoffelen2019
+import lightning as L
+import torch
 from pnpl.dataloaders import MultiDataLoader
-
+from pnpl.datasets import Armeni2022, Gwilliams2022, Schoffelen2019
 from torch.utils.data import DataLoader, random_split
 
 DATASET_CLASSES = {
@@ -13,12 +12,15 @@ DATASET_CLASSES = {
     "schoffelen2019": Schoffelen2019,
 }
 
-class MEGDataModule(L.LightningDataModule):
 
-    def __init__(self, dataset_preproc_configs: tp.Dict,
+class MEGDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        dataset_preproc_configs: tp.Dict,
         dataloader_configs: tp.Dict,
         seed: int,
-        debug: bool = False,):
+        debug: bool = False,
+    ):
         super().__init__()
         self.batch_size = dataloader_configs["batch_size"]
         self.dataset_preproc_configs = dataset_preproc_configs
@@ -27,12 +29,9 @@ class MEGDataModule(L.LightningDataModule):
         self.debug = debug
 
     def setup(self, stage: str):
-
         train_loaders, val_loaders, test_loaders = [], [], []
         for dataset, config in self.dataset_preproc_configs.items():
-            data = DATASET_CLASSES[dataset](
-                **config
-            )
+            data = DATASET_CLASSES[dataset](**config)
             train, val, test = random_split(
                 data,
                 [
@@ -40,7 +39,7 @@ class MEGDataModule(L.LightningDataModule):
                     self.dataloader_configs["val_ratio"],
                     self.dataloader_configs["test_ratio"],
                 ],
-                generator=torch.Generator().manual_seed(self.seed)
+                generator=torch.Generator().manual_seed(self.seed),
             )
 
             # No pinning, no workers, not persistent: 0.3 it/s (4.0 again after cache hit)
@@ -53,14 +52,35 @@ class MEGDataModule(L.LightningDataModule):
             # Conclusion: pinning is all you need? NO. Caches are all you need ;)
             # Also: for much larger datasets, workers actually become useful
 
-            train_loaders.append(DataLoader(train, batch_size=self.batch_size, shuffle=True, pin_memory=True, num_workers=8, persistent_workers=False))
-            val_loaders.append(DataLoader(val, batch_size=self.batch_size, shuffle=False, pin_memory=True, num_workers=2, persistent_workers=False))
-            test_loaders.append(DataLoader(test, batch_size=self.batch_size, shuffle=False, pin_memory=True))
+            train_loaders.append(
+                DataLoader(
+                    train,
+                    batch_size=self.batch_size,
+                    shuffle=True,
+                    pin_memory=True,
+                    num_workers=8,
+                    persistent_workers=False,
+                )
+            )
+            val_loaders.append(
+                DataLoader(
+                    val,
+                    batch_size=self.batch_size,
+                    shuffle=False,
+                    pin_memory=True,
+                    num_workers=2,
+                    persistent_workers=False,
+                )
+            )
+            test_loaders.append(
+                DataLoader(
+                    test, batch_size=self.batch_size, shuffle=False, pin_memory=True
+                )
+            )
 
         self.train_loader = MultiDataLoader(train_loaders, shuffle=True)
         self.val_loader = MultiDataLoader(val_loaders, shuffle=False)
         self.test_loader = MultiDataLoader(test_loaders, shuffle=False)
-
 
     def on_after_batch_transfer(self, batch, dataloader_idx):
         # Standard scale the batch before training

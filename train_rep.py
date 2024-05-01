@@ -10,8 +10,8 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.tuner import Tuner
 
-from dataloaders.data_utils import DATA_PATH
 from dataloaders.data_module import MEGDataModule
+from dataloaders.data_utils import DATA_PATH
 from models.brain_encoders.rep_learner import RepLearner
 
 # Increase wandb waiting time to avoid timeouts

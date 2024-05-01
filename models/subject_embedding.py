@@ -1,10 +1,5 @@
-import glob
-import os
-
-import torch
 import torch.nn as nn
 
-from dataloaders.data_utils import DATA_PATH
 from dataloaders.data_module import DATASET_CLASSES
 
 
