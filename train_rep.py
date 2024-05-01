@@ -11,7 +11,7 @@ from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.tuner import Tuner
 
 from dataloaders.data_utils import DATA_PATH
-from dataloaders.multi_dataloader import MultiDataLoader
+from dataloaders.data_module import MEGDataModule
 from models.brain_encoders.rep_learner import RepLearner
 
 # Increase wandb waiting time to avoid timeouts
@@ -75,7 +75,10 @@ latest_checkpoint = ModelCheckpoint(
     save_top_k=1,
 )
 
-datamodule = MultiDataLoader(**config["datamodule_config"])
+datamodule = MEGDataModule(
+    **config["datamodule_config"],
+    seed=config["experiment"]["seed"],
+)
 
 ddp_strategy = DDPStrategy(find_unused_parameters=True, static_graph=True)
 

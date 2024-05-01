@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataloaders.multi_dataloader import get_key_from_batch_identifier
+from dataloaders.data_utils import get_key_from_batch_identifier
 from models.attach_subject import AttachSubject
 from models.brain_encoders.amp_ssl.amp_scale_predictor import AmpScalePredictor
 from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
@@ -227,8 +227,8 @@ class RepLearner(L.LightningModule):
         # sensor_pos = inputs["sensor_pos"]
         sensor_pos = None
 
-        dataset = inputs["identifier"]["dataset"][0]
-        subject = inputs["identifier"]["subject"][0]
+        dataset = inputs["info"]["dataset"][0]
+        subject = inputs["info"]["subject_id"]
 
         z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
@@ -409,8 +409,8 @@ class RepLearner(L.LightningModule):
         losses = {}
         metrics = {}
 
-        data_key = get_key_from_batch_identifier(batch["identifier"])
-        dataset = batch["identifier"]["dataset"][0]
+        data_key = get_key_from_batch_identifier(batch["info"])
+        dataset = batch["info"]["dataset"][0]
 
         return_values = self(batch)
 
