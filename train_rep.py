@@ -83,7 +83,9 @@ datamodule = MEGDataModule(
     seed=config["experiment"]["seed"],
 )
 
-ddp_strategy = DDPStrategy(find_unused_parameters=True, static_graph=False) # find_unused_parameters is not necessary here
+ddp_strategy = DDPStrategy(
+    find_unused_parameters=True, static_graph=False
+)  # find_unused_parameters is not necessary here
 
 # How to handle checkpoints? If a checkpoint is specified, then let the config be a special fine-tuning config which
 # only specifies data and fine-tuning parameters. Everything else can be loaded directly from the checkpoint.
