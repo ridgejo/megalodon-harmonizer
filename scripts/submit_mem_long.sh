@@ -1,7 +1,7 @@
 #! /bin/bash
 #SBATCH --nodes=1
 #SBATCH --mem=256G
-#SBATCH --qos=system
+#SBATCH --qos=standard
 #SBATCH --clusters=htc
 #SBATCH --job-name=megalodon
 #SBATCH --time=168:59:00

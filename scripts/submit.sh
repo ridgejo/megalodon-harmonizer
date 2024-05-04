@@ -1,7 +1,7 @@
 #! /bin/bash
 #SBATCH --nodes=1
 #SBATCH --mem=64G
-#SBATCH --qos=system
+#SBATCH --qos=standard
 #SBATCH --clusters=htc
 #SBATCH --job-name=megalodon
 #SBATCH --time=11:59:00
@@ -14,4 +14,4 @@ conda activate MEGalodon
 
 export WANDB_CACHE_DIR=$DATA/wandb_cache
 
-python $@
+srun python $@
