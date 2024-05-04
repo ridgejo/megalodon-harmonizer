@@ -26,7 +26,7 @@ def _string_hash(text):
     return int(hashlib.md5(text.encode("utf-8")).hexdigest(), 16)
 
 
-def load_dataset(bids_root, subject_id, task, session, cache_path=None):
+def load_dataset(bids_root, subject_id, task, session, preload, cache_path=None):
     """Loads a dataset. First checks if a preprocessed version already exists in cache and loads it."""
 
     if not cache_path:
@@ -50,7 +50,7 @@ def load_dataset(bids_root, subject_id, task, session, cache_path=None):
     # Load cached dataset if it exists
     if os.path.exists(cache_path):
         print("Cache found. Loading cached dataset.")
-        raw = mne.io.read_raw_fif(cache_path, preload=False)  # Ensures lazy loading
+        raw = mne.io.read_raw_fif(cache_path, preload=preload)  # Ensures lazy loading
         return raw, True, cache_path
     else:
         raise FileNotFoundError(

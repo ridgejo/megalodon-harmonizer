@@ -242,7 +242,7 @@ class MultiDataLoader(L.LightningDataModule):
     def predict_dataloader(self):
         return self.pred
 
-    def _load_armeni_2022(self, config, n_subjects=3, n_sessions=10):
+    def _load_armeni_2022(self, config, preload=False, n_subjects=3, n_sessions=10):
         # Return list of datasets. Each dataset should correspond to a single subject and session.
 
         if self.debug:
@@ -278,6 +278,7 @@ class MultiDataLoader(L.LightningDataModule):
                     task="compr",
                     slice_len=slice_len,
                     label_type=label_type,
+                    preload=preload,
                 )
 
                 seconds += len(data) * slice_len
@@ -288,7 +289,9 @@ class MultiDataLoader(L.LightningDataModule):
 
         return datasets, seconds
 
-    def _load_gwilliams_2022(self, config, n_subjects=27, n_sessions=2, n_tasks=3):
+    def _load_gwilliams_2022(
+        self, config, preload=False, n_subjects=27, n_sessions=2, n_tasks=3
+    ):
         if self.debug:
             n_subjects = 1
 
@@ -319,6 +322,7 @@ class MultiDataLoader(L.LightningDataModule):
                             task=task,
                             slice_len=slice_len,
                             label_type=label_type,
+                            preload=preload,
                         )
                     except Exception as e:
                         print("Skipping: ", e)
@@ -333,7 +337,9 @@ class MultiDataLoader(L.LightningDataModule):
 
         return datasets, seconds
 
-    def _load_schoffelen_2019(self, config, tasks=["auditory", "rest", "visual"]):
+    def _load_schoffelen_2019(
+        self, config, preload=False, tasks=["auditory", "rest", "visual"]
+    ):
         subjects = sorted(
             [
                 os.path.basename(path).replace("sub-", "")
@@ -371,6 +377,7 @@ class MultiDataLoader(L.LightningDataModule):
                         subject_id=subject,
                         task=task,
                         slice_len=slice_len,
+                        preload=preload,
                     )
                 except Exception as e:
                     print("Skipping: ", e)

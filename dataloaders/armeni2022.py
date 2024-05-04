@@ -23,6 +23,7 @@ class Armeni2022(Dataset):
         session: str,
         slice_len: float,
         label_type: str,
+        preload: bool,
         bids_root: str = data_utils.DATA_PATH / "armeni2022",
         truncate: tp.Optional[int] = None,
     ):
@@ -46,6 +47,7 @@ class Armeni2022(Dataset):
             subject_id=subject_id,
             task=task,
             session=session,
+            preload=preload,
         )
 
         events = label_utils.read_events_file(

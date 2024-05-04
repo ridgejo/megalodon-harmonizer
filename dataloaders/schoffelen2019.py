@@ -295,6 +295,7 @@ class Schoffelen2019(Dataset):
         subject_id: str,
         task: str,
         slice_len: float,
+        preload: bool,
         bids_root: str = data_utils.DATA_PATH / "schoffelen2019",
     ):
         """
@@ -314,6 +315,7 @@ class Schoffelen2019(Dataset):
             subject_id=subject_id,
             task=task,
             session=None,
+            preload=preload,
         )
 
         picks = mne.pick_types(

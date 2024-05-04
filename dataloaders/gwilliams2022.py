@@ -22,6 +22,7 @@ class Gwilliams2022(Dataset):
         session: str,
         slice_len: float,
         label_type: str,
+        preload: bool,
         bids_root: str = data_utils.DATA_PATH / "gwilliams2022",
     ):
         """
@@ -43,6 +44,7 @@ class Gwilliams2022(Dataset):
             subject_id=subject_id,
             task=task,
             session=session,
+            preload=preload,
         )
 
         phoneme_codes = pd.read_csv(bids_root / "phoneme_info.csv")
