@@ -58,8 +58,8 @@ class MEGDataModule(L.LightningDataModule):
                     batch_size=self.batch_size,
                     shuffle=True,
                     pin_memory=True,
-                    num_workers=8,
-                    persistent_workers=False,
+                    # num_workers=8,
+                    # persistent_workers=True,
                 )
             )
             val_loaders.append(
@@ -68,8 +68,8 @@ class MEGDataModule(L.LightningDataModule):
                     batch_size=self.batch_size,
                     shuffle=False,
                     pin_memory=True,
-                    num_workers=2,
-                    persistent_workers=False,
+                    # num_workers=8,
+                    # persistent_workers=True,
                 )
             )
             test_loaders.append(

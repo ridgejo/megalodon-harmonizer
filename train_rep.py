@@ -60,7 +60,10 @@ wandb_logger = WandbLogger(
     dir=DATA_PATH / "wandb",
 )
 
-wandb_logger.experiment.config.update(config)
+try:
+    wandb_logger.experiment.config.update(config)
+except Exception as _:
+    print("Skipping rank > 0 wandb logging")
 
 # Checkpoint model only when validation loss improves
 val_checkpoint = ModelCheckpoint(
@@ -80,7 +83,7 @@ datamodule = MEGDataModule(
     seed=config["experiment"]["seed"],
 )
 
-ddp_strategy = DDPStrategy(find_unused_parameters=True, static_graph=True)
+ddp_strategy = DDPStrategy(find_unused_parameters=True, static_graph=False) # find_unused_parameters is not necessary here
 
 # How to handle checkpoints? If a checkpoint is specified, then let the config be a special fine-tuning config which
 # only specifies data and fine-tuning parameters. Everything else can be loaded directly from the checkpoint.
@@ -175,6 +178,7 @@ trainer = Trainer(
     strategy="auto" if not args.ddp else ddp_strategy,
     max_epochs=epochs,
     profiler="simple" if args.profile else None,
+    devices=4 if args.ddp else 1,
 )
 
 if args.lr_find:

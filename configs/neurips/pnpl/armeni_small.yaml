@@ -3,7 +3,7 @@ experiment:
   epochs: 200
 
 rep_config:
-  lr: 0.000264 # = 0.000066 * (512 / 128) using linear lr scaling rule (alternatively: 0.000132 with sqrt rule)
+  lr: 0.000066
   dataset_block:
     dataset_sizes:
       armeni2022: 269
@@ -48,22 +48,18 @@ datamodule_config:
       window_len: 0.5
       label: "speech"
       info: ["subject", "subject_id", "dataset"]
-    schoffelen2019:
-      data_path: "/data/engs-pnpl/lina4368/schoffelen2019"
-      preproc_path: "/data/engs-pnpl/lina4368/schoffelen2019"
-      l_freq: 0.5
-      h_freq: 125
-      resample_freq: 250
-      notch_freq: 50
-      interpolate_bad_channels: true
-      window_len: 0.5
-      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ["001", "002", "003"]
+      include_sessions:
+        "001": ["001"]
+        "002": ["001"]
+        "003": ["001"]
+      preload: true
   dataloader_configs:
     train_ratio: 0.8
     val_ratio: 0.1
     test_ratio: 0.1
     pred_ratio: 0.0
-    batch_size: 512
+    batch_size: 128
     normalisation:
       n_sample_batches: 8
       per_channel: true
