@@ -198,7 +198,7 @@ def get_vad_labels_from_textgrid(tier, raw, offset=0.0):
     return labels
 
 
-def get_vad_labels(events, raw, offset=0.0):
+def get_vad_labels(events, raw, offset=0.02):
     """Get labels corresponding to occurrence of human speech."""
 
     # For Armeni's labels, we use speech pauses "sp" to mark gaps in speech.
@@ -224,7 +224,7 @@ def get_vad_labels(events, raw, offset=0.0):
     return labels
 
 
-def get_vad_labels_gwilliams(events, raw, offset=0.0):
+def get_vad_labels_gwilliams(events, raw, offset=0.02):
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
 
@@ -244,7 +244,7 @@ def get_vad_labels_gwilliams(events, raw, offset=0.0):
     return labels
 
 
-def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=-0.02):
+def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=0.02):
     sample_freq = raw.info["sfreq"]
     offset_samples = int(sample_freq * offset)
 
@@ -256,7 +256,6 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=-0.02):
     phoneme_onsets = []
     labels = []
 
-    bad_segments = 0
     for i, phoneme_event in phoneme_events.iterrows():
         trial_type = ast.literal_eval(phoneme_event["trial_type"])
 
@@ -264,30 +263,9 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=-0.02):
         onset_samples = (
             int(float(phoneme_event["onset"]) * sample_freq) + offset_samples
         )
-        duration_samples = int(float(phoneme_event["duration"]) * sample_freq)
         phonation = phoneme_codes[phoneme_codes["phoneme"] == phoneme][
             "phonation"
         ].item()
-
-        # Check that we're not in a bad segment
-        bad_phoneme = False
-        for annot in raw.annotations:
-            if "bad_segment" in annot["description"]:
-                bad_onset = int(sample_freq * annot["onset"])
-                bad_samples = int(sample_freq * annot["duration"])
-                phone_end = onset_samples + duration_samples
-                # Check phoneme onset is not in a bad segment
-                if (onset_samples >= bad_onset) and (
-                    onset_samples <= (bad_onset + bad_samples)
-                ):
-                    bad_phoneme = True
-                elif (phone_end >= bad_onset) and (
-                    phone_end <= (bad_onset + bad_samples)
-                ):
-                    bad_phoneme = True
-        if bad_phoneme:
-            bad_segments += 1
-            continue
 
         # Label as voiced or unvoiced
         if phonation == "v":
@@ -297,14 +275,10 @@ def get_voiced_labels_gwilliams(events, phoneme_codes, raw, offset=-0.02):
             labels.append(0.0)
             phoneme_onsets.append(onset_samples)
 
-    print(
-        f"Found {bad_segments} (out of {len(phoneme_onsets) + bad_segments}) phonemes in bad segments while computing phoneme label onsets"
-    )
-
     return phoneme_onsets, labels
 
 
-def get_voiced_labels(events, raw, offset=-0.02):
+def get_voiced_labels(events, raw, offset=0.02):
     """Get aligned index for start of every phoneme and align to longest."""
     # Longest phoneme in Armeni: 0.8s
     # 99% are less than 0.27s however
