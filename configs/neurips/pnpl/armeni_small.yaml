@@ -54,6 +54,7 @@ datamodule_config:
         "002": ["001"]
         "003": ["001"]
       preload: true
+      label_delay: 0.02
   dataloader_configs:
     train_ratio: 0.8
     val_ratio: 0.1

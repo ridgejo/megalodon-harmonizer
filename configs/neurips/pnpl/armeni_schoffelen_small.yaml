@@ -54,6 +54,7 @@ datamodule_config:
         "002": ["001"]
         "003": ["001"]
       preload: true
+      label_delay: 0.02
     schoffelen2019:
       data_path: "/data/engs-pnpl/lina4368/schoffelen2019"
       preproc_path: "/data/engs-pnpl/lina4368/schoffelen2019"
