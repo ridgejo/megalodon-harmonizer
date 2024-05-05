@@ -271,8 +271,8 @@ class RepLearner(L.LightningModule):
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
 
-        if "vad_classifier" in self.active_models and "vad_labels" in inputs:
-            vad_labels = inputs["vad_labels"]  # [B, T]
+        if "vad_classifier" in self.active_models and "speech" in inputs:
+            vad_labels = inputs["speech"]  # [B, T]
 
             if vad_labels.shape[-1] != z_sequence.shape[1]:
                 # Downsample labels to match number of encoder output embeddings
@@ -285,8 +285,8 @@ class RepLearner(L.LightningModule):
                 z_independent, vad_labels.flatten(start_dim=0, end_dim=-1)
             )
 
-        if "voiced_classifier" in self.active_models and "voiced_labels" in inputs:
-            voiced_labels = inputs["voiced_labels"]
+        if "voiced_classifier" in self.active_models and "voicing" in inputs:
+            voiced_labels = inputs["voicing"]
             return_values["voiced"] = self.active_models["voiced_classifier"](
                 z_sequence, voiced_labels
             )
