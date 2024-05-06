@@ -1,12 +1,11 @@
 experiment:
   seed: 42
-  epochs: 200
+  epochs: 5
 
 finetune:
-  freeze_all: false
-  voiced_classifier:
-    type: "mlp"
-    input_dim: 2560
+  freeze_all: true
+  vad_classifier:
+    input_dim: 512
     hidden_dim: 512
 
 rep_config:
@@ -53,7 +52,7 @@ datamodule_config:
       notch_freq: 50
       interpolate_bad_channels: true
       window_len: 0.5
-      label: "voicing"
+      label: "speech"
       info: ["subject", "subject_id", "dataset"]
       include_subjects: ["001", "002", "003"]
       include_sessions:
