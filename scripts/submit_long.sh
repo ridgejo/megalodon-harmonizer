@@ -14,4 +14,4 @@ conda activate MEGalodon
 
 export WANDB_CACHE_DIR=$DATA/wandb_cache
 
-python $@
+srun python $@
