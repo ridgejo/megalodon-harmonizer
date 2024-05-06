@@ -121,12 +121,13 @@ if args.checkpoint:
             )
 
         if config["finetune"]["freeze_all"]:
-            # Freeze all layers except any downstream classifiers that are already enabled
-            model.freeze_except("classifier")
-            # Remove other losses / predictors from the model
-            model.disable_ssl()
-            # warning: also removes any existing classifiers from pre-training stage
-            model.disable_classifiers()
+            model.finetuning_mode()
+            # # Freeze all layers except any downstream classifiers that are already enabled
+            # model.freeze_except("classifier")
+            # # Remove other losses / predictors from the model
+            # model.disable_ssl()
+            # # warning: also removes any existing classifiers from pre-training stage
+            # model.disable_classifiers()
         elif "new_subject" in config["finetune"]:
             model.freeze_except("subject_")  # Leave any subject conditioning unfrozen
             # Do not disable SSL

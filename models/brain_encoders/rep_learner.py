@@ -445,6 +445,13 @@ class RepLearner(L.LightningModule):
             lr=self.learning_rate,
         )
 
+    def finetuning_mode(self):
+        self.freeze_except(
+            ["dataset_block", "subject_"]
+        )  # Keep these weights open to fine-tune with new datasets
+        self.disable_ssl()
+        self.disable_classifiers()
+
     def freeze_except(self, module_names):
         if isinstance(module_names, str):
             module_names = [module_names]
