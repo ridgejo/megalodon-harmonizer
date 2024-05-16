@@ -1,9 +1,9 @@
 experiment:
   seed: 42
-  epochs: 100
+  epochs: 30
 
 finetune:
-  freeze_all: true
+  freeze_all: false
   voiced_classifier:
     type: "mlp"
     input_dim: 2560
