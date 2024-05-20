@@ -178,6 +178,7 @@ trainer = Trainer(
     max_epochs=epochs,
     profiler="simple" if args.profile else None,
     devices=4 if args.ddp else 1,
+    default_root_dir="/data/engs-pnpl/lina4368/experiments",
 )
 
 if args.lr_find:
