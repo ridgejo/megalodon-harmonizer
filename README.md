@@ -11,18 +11,18 @@ Let's learn highly generalisable deep representations from MEG data.
 - Have installed miniconda (pro tip: install miniconda in $DATA and not $HOME)
 
 ```
-# 1. Setup conda environment
-conda create --name megalodon python=3.10.13
-conda activate megalodon
+# 1. Setup and activate conda environment
+conda create --name megalodon python=3.10.13 && conda activate megalodon
 
-# 2. Install OSL into environment
-cd ~
-git clone https://github.com/OHBA-analysis/osl.git
-cd osl
-pip install -e .
+# 2. Install our fork of OSL into the environment
+git clone --single-branch --branch feature/fix_kit git@github.com:neural-processing-lab/osl.git
+pip install -e ./osl
 
-# 3. Clone MEGalodon and install requirements
-cd ~
+# 3. Install PNPL into environment
+git clone git@github.com:neural-processing-lab/pnpl.git
+pip install -e ./pnpl
+
+# 4. Clone MEGalodon and install requirements
 git clone git@github.com:neural-processing-lab/MEGalodon.git
 cd MEGalodon
 pip install -r requirements.txt
