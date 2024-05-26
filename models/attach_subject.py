@@ -11,9 +11,6 @@ class AttachSubject(nn.Module):
         super(AttachSubject, self).__init__()
 
     def forward(self, z, subject_embedding):
-        subject_embedding = subject_embedding.unsqueeze(0).repeat(
-            z.shape[0], 1
-        )  # [B, S]
         subject_embedding = subject_embedding.unsqueeze(-1).expand(
             -1, -1, z.shape[-1]
         )  # [B, S, T]

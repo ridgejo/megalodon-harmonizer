@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataloaders.multi_dataloader import get_key_from_batch_identifier
+from dataloaders.data_utils import get_key_from_batch_identifier
 from models.attach_subject import AttachSubject
 from models.brain_encoders.amp_ssl.amp_scale_predictor import AmpScalePredictor
 from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
@@ -227,8 +227,8 @@ class RepLearner(L.LightningModule):
         # sensor_pos = inputs["sensor_pos"]
         sensor_pos = None
 
-        dataset = inputs["identifier"]["dataset"][0]
-        subject = inputs["identifier"]["subject"][0]
+        dataset = inputs["info"]["dataset"][0]
+        subject = inputs["info"]["subject_id"]
 
         z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
@@ -271,8 +271,8 @@ class RepLearner(L.LightningModule):
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
 
-        if "vad_classifier" in self.active_models and "vad_labels" in inputs:
-            vad_labels = inputs["vad_labels"]  # [B, T]
+        if "vad_classifier" in self.active_models and "speech" in inputs:
+            vad_labels = inputs["speech"]  # [B, T]
 
             if vad_labels.shape[-1] != z_sequence.shape[1]:
                 # Downsample labels to match number of encoder output embeddings
@@ -285,8 +285,8 @@ class RepLearner(L.LightningModule):
                 z_independent, vad_labels.flatten(start_dim=0, end_dim=-1)
             )
 
-        if "voiced_classifier" in self.active_models and "voiced_labels" in inputs:
-            voiced_labels = inputs["voiced_labels"]
+        if "voiced_classifier" in self.active_models and "voicing" in inputs:
+            voiced_labels = inputs["voicing"]
             return_values["voiced"] = self.active_models["voiced_classifier"](
                 z_sequence, voiced_labels
             )
@@ -409,8 +409,8 @@ class RepLearner(L.LightningModule):
         losses = {}
         metrics = {}
 
-        data_key = get_key_from_batch_identifier(batch["identifier"])
-        dataset = batch["identifier"]["dataset"][0]
+        data_key = get_key_from_batch_identifier(batch["info"])
+        dataset = batch["info"]["dataset"][0]
 
         return_values = self(batch)
 
@@ -444,6 +444,13 @@ class RepLearner(L.LightningModule):
             ),
             lr=self.learning_rate,
         )
+
+    def finetuning_mode(self):
+        self.freeze_except(
+            ["dataset_block", "subject_"]
+        )  # Keep these weights open to fine-tune with new datasets
+        self.disable_ssl()
+        self.disable_classifiers()
 
     def freeze_except(self, module_names):
         if isinstance(module_names, str):

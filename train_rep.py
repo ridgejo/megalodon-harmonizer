@@ -10,8 +10,8 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.tuner import Tuner
 
+from dataloaders.data_module import MEGDataModule
 from dataloaders.data_utils import DATA_PATH
-from dataloaders.multi_dataloader import MultiDataLoader
 from models.brain_encoders.rep_learner import RepLearner
 
 # Increase wandb waiting time to avoid timeouts
@@ -60,7 +60,10 @@ wandb_logger = WandbLogger(
     dir=DATA_PATH / "wandb",
 )
 
-wandb_logger.experiment.config.update(config)
+try:
+    wandb_logger.experiment.config.update(config)
+except Exception as _:
+    print("Skipping rank > 0 wandb logging")
 
 # Checkpoint model only when validation loss improves
 val_checkpoint = ModelCheckpoint(
@@ -75,9 +78,14 @@ latest_checkpoint = ModelCheckpoint(
     save_top_k=1,
 )
 
-datamodule = MultiDataLoader(**config["datamodule_config"])
+datamodule = MEGDataModule(
+    **config["datamodule_config"],
+    seed=config["experiment"]["seed"],
+)
 
-ddp_strategy = DDPStrategy(find_unused_parameters=True, static_graph=True)
+ddp_strategy = DDPStrategy(
+    find_unused_parameters=True, static_graph=False
+)  # find_unused_parameters is not necessary here
 
 # How to handle checkpoints? If a checkpoint is specified, then let the config be a special fine-tuning config which
 # only specifies data and fine-tuning parameters. Everything else can be loaded directly from the checkpoint.
@@ -113,16 +121,13 @@ if args.checkpoint:
             )
 
         if config["finetune"]["freeze_all"]:
-            # Freeze all layers except any downstream classifiers that are already enabled
-            model.freeze_except("classifier")
-            # Remove other losses / predictors from the model
-            model.disable_ssl()
-            # warning: also removes any existing classifiers from pre-training stage
-            model.disable_classifiers()
-        elif "new_subject" in config["finetune"]:
-            model.freeze_except("subject_")  # Leave any subject conditioning unfrozen
-            # Do not disable SSL
-            model.disable_classifiers()
+            model.finetuning_mode()
+            # # Freeze all layers except any downstream classifiers that are already enabled
+            # model.freeze_except("classifier")
+            # # Remove other losses / predictors from the model
+            # model.disable_ssl()
+            # # warning: also removes any existing classifiers from pre-training stage
+            # model.disable_classifiers()
         else:
             model.disable_ssl()
             model.disable_classifiers()
@@ -172,6 +177,8 @@ trainer = Trainer(
     strategy="auto" if not args.ddp else ddp_strategy,
     max_epochs=epochs,
     profiler="simple" if args.profile else None,
+    devices=4 if args.ddp else 1,
+    default_root_dir="/data/engs-pnpl/lina4368/experiments",
 )
 
 if args.lr_find:

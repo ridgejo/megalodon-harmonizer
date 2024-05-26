@@ -1,10 +1,6 @@
-import glob
-import os
-
-import torch
 import torch.nn as nn
 
-from dataloaders.data_utils import DATA_PATH
+from dataloaders.data_module import DATASET_CLASSES
 
 
 class SubjectEmbedding(nn.Module):
@@ -22,32 +18,13 @@ class SubjectEmbedding(nn.Module):
 
         super(SubjectEmbedding, self).__init__()
 
-        # Automatically find dataset subjects
-        subject_keys = {}
-        for dataset_key in dataset_keys:
-            subjects = sorted(
-                [
-                    os.path.basename(path).replace("sub-", "")
-                    for path in glob.glob(str(DATA_PATH) + f"/{dataset_key}/sub-*")
-                ]
+        dataset_embeddings = {}
+        for key in dataset_keys:
+            dataset_embeddings[key] = nn.Embedding(
+                num_embeddings=len(DATASET_CLASSES[key].subjects),
+                embedding_dim=embedding_dim,
             )
-            subject_keys[dataset_key] = subjects
+        self.dataset_embeddings = nn.ModuleDict(dataset_embeddings)
 
-        self.subject_embeddings = nn.ParameterDict(
-            {
-                dataset_key: nn.ParameterDict(
-                    {
-                        subject_key: nn.Parameter(
-                            data=torch.randn(embedding_dim),
-                            requires_grad=not freeze,
-                        )
-                        for subject_key in subject_keys[dataset_key]
-                    }
-                )
-                for dataset_key in dataset_keys
-            }
-        )
-
-    def forward(self, dataset_key, subject_key):
-        # Return embedding after expanding to batch size
-        return self.subject_embeddings[dataset_key][subject_key]
+    def forward(self, dataset_key, subject_ids):
+        return self.dataset_embeddings[dataset_key](subject_ids)
