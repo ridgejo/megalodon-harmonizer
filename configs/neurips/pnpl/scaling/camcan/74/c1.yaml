@@ -1,0 +1,63 @@
+experiment:
+  seed: 1
+  epochs: 200
+
+rep_config:
+  lr: 0.000066
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+      shafto2014: 306
+    shared_dim: 512
+    use_data_block: true
+  encoder:
+    channels: 512
+    conv_channels: [512, 512, 512, 512]
+    ratios: [5, 5, 1]
+    dimension: 512
+  subject_film:
+    subject_embedding:
+      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019", "shafto2014"]
+      embedding_dim: 16
+    film_module:
+      feature_dim: 512
+      embedding_dim: 16
+  projector:
+    input_dim: 2560
+    hidden_dim: 2048
+  band_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+  amp_scale_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.2
+  phase_diff_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.5
+
+datamodule_config:
+  dataset_preproc_configs:
+    shafto2014:
+      data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ['CC220419', 'CC320861', 'CC120184', 'CC720774', 'CC320202', 'CC221511', 'CC321137', 'CC610308', 'CC710037', 'CC520395', 'CC321073', 'CC711245', 'CC321069', 'CC610076', 'CC410323', 'CC320616', 'CC510395', 'CC620793', 'CC221031', 'CC722651', 'CC410097', 'CC520584', 'CC520562', 'CC120065', 'CC510208', 'CC420493', 'CC112141', 'CC420261', 'CC510534', 'CC610028', 'CC420566', 'CC310051', 'CC722536', 'CC110087', 'CC620005', 'CC410094', 'CC710462', 'CC722542', 'CC410287', 'CC120727', 'CC221980', 'CC620610', 'CC121200', 'CC320661', 'CC410119', 'CC510329', 'CC721519', 'CC610227', 'CC620659', 'CC710350', 'CC721377', 'CC222258', 'CC620164', 'CC420100', 'CC610653', 'CC320417', 'CC220567', 'CC220843', 'CC121411', 'CC410432', 'CC710429', 'CC710982', 'CC221595', 'CC510284', 'CC710548', 'CC222326', 'CC420729', 'CC610146', 'CC420075', 'CC610058', 'CC420364', 'CC710664', 'CC520279', 'CC621199']
+      preload: true
+  dataloader_configs:
+    train_ratio: 0.8
+    val_ratio: 0.1
+    test_ratio: 0.1
+    pred_ratio: 0.0
+    batch_size: 512
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:
