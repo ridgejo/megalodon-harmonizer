@@ -12,7 +12,7 @@ Let's learn highly generalisable deep representations from MEG data.
 
 ```
 # 1. Setup and activate conda environment
-conda create --name megalodon python=3.10.13 && conda activate megalodon
+conda create --name pnpl_base python=3.10.13 && conda activate pnpl_base
 
 # 2. Install our fork of OSL into the environment
 git clone --single-branch --branch feature/fix_kit git@github.com:neural-processing-lab/osl.git

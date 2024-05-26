@@ -12,10 +12,11 @@ from models.brain_encoders.seanet.seanet import SEANetBrainEncoder
 from models.brain_encoders.spatial_ssl.masked_channel_predictor import (
     MaskedChannelPredictor,
 )
-from models.brain_encoders.supervised.vad_classifier import VADClassifier
+from models.brain_encoders.supervised.vad_classifier import VADClassifier, VADClassifierLinear
 from models.brain_encoders.supervised.voiced_classifier import (
     VoicedClassifierLSTM,
     VoicedClassifierMLP,
+    VoicedClassifierLinear,
 )
 from models.dataset_block import DatasetBlock
 from models.film import FiLM
@@ -483,13 +484,19 @@ class RepLearner(L.LightningModule):
         if classifier_type == "vad_classifier":
             self.weightings["vad"] = params.get("weight", 1.0)
             params.pop("weight", None)
-
             if "subject_embedding" in self.rep_config:
                 params["input_dim"] += self.rep_config["subject_embedding"][
                     "embedding_dim"
                 ]
-
             self.active_models.update({"vad_classifier": VADClassifier(**params)})
+        elif classifier_type == "vad_classifier_linear":
+            self.weightings["vad"] = params.get("weight", 1.0)
+            params.pop("weight", None)
+            if "subject_embedding" in self.rep_config:
+                params["input_dim"] += self.rep_config["subject_embedding"][
+                    "embedding_dim"
+                ]
+            self.active_models.update({"vad_classifier": VADClassifierLinear(**params)})
 
         if classifier_type == "voiced_classifier":
             self.weightings["voiced"] = params.get("weight", 1.0)
@@ -507,9 +514,13 @@ class RepLearner(L.LightningModule):
                 )
             elif params["type"] == "lstm":
                 del params["type"]
-
                 self.active_models.update(
                     {"voiced_classifier": VoicedClassifierLSTM(**params)}
+                )
+            elif params["type"] == "linear":
+                del params["type"]
+                self.active_models.update(
+                    {"voiced_classifier": VoicedClassifierLinear(**params)}
                 )
             else:
                 raise ValueError("Voiced classifier type not recognised")

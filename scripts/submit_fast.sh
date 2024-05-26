@@ -11,7 +11,7 @@
 #SBATCH --output=slurm_out/%j.out
 
 source ~/.init_conda.sh
-conda activate MEGalodon
+conda activate pnpl_base
 
 export WANDB_CACHE_DIR=$DATA/wandb_cache
 

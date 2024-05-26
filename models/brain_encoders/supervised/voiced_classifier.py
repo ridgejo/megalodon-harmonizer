@@ -109,3 +109,42 @@ class VoicedClassifierMLP(nn.Module):
             "voiced_balacc": balacc,
             "voiced_r2": r2_score,
         }
+
+class VoicedClassifierLinear(nn.Module):
+    def __init__(self, input_dim, hidden_dim):
+        super(VoicedClassifierLinear, self).__init__()
+
+        self.model = nn.Sequential(
+            nn.Linear(
+                in_features=input_dim,
+                out_features=1,
+            ),
+        )
+
+    def forward(self, x, labels):
+        x = x.flatten(start_dim=1, end_dim=-1)  # [B, T, E] -> [B, T * E]
+        z = self.model(x).squeeze(-1)
+
+        bce_loss = F.binary_cross_entropy_with_logits(z, labels)
+
+        probs = F.sigmoid(z)
+        preds = torch.round(probs)
+
+        balacc = TM.classification.accuracy(
+            preds.int(),
+            labels.int(),
+            task="multiclass",
+            num_classes=2,
+            average="macro",
+        )
+
+        r2_score = TM.r2_score(
+            preds=probs,
+            target=labels,
+        )
+
+        return {
+            "voiced_bce_loss": bce_loss,
+            "voiced_balacc": balacc,
+            "voiced_r2": r2_score,
+        }
