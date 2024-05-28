@@ -1,0 +1,84 @@
+experiment:
+  seed: 1
+  epochs: 200
+
+rep_config:
+  lr: 0.000066
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+      shafto2014: 306
+    shared_dim: 512
+    use_data_block: true
+  encoder:
+    channels: 512
+    conv_channels: [512, 512, 512, 512]
+    ratios: [5, 5, 1]
+    dimension: 512
+  subject_film:
+    subject_embedding:
+      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019", "shafto2014"]
+      embedding_dim: 16
+    film_module:
+      feature_dim: 512
+      embedding_dim: 16
+  projector:
+    input_dim: 2560
+    hidden_dim: 2048
+  band_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+  amp_scale_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.2
+  phase_diff_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.5
+  vad_classifier_linear:
+    input_dim: 512
+    hidden_dim: 512
+
+datamodule_config:
+  dataset_preproc_configs:
+    armeni2022:
+      data_path: "/data/engs-pnpl/lina4368/armeni2022"
+      preproc_path: "/data/engs-pnpl/lina4368/armeni2022"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      label: "speech"
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ["001", "002", "003"]
+      include_sessions:
+        "001": ["001", "002", "003", "004"]
+        "002": ["001", "002", "003", "004"]
+        "003": ["001", "002", "003", "004"]
+      preload: true
+      label_delay: 0.02
+    shafto2014:
+      data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ['CC711244', 'CC222125', 'CC221107', 'CC120319', 'CC120182', 'CC420260', 'CC710088', 'CC220920', 'CC221527', 'CC620785', 'CC420060', 'CC420464', 'CC220203', 'CC221977', 'CC312058', 'CC510243', 'CC420004', 'CC222367', 'CC310142', 'CC510392', 'CC610071', 'CC520147', 'CC420089', 'CC420075', 'CC610308', 'CC420217', 'CC510342', 'CC721888', 'CC720670', 'CC520390', 'CC320651', 'CC120309', 'CC121479', 'CC520868', 'CC420061', 'CC721224', 'CC310391', 'CC310160', 'CC620515', 'CC410289', 'CC620454', 'CC410169', 'CC620193', 'CC420322', 'CC120049', 'CC410325', 'CC510050', 'CC321880', 'CC510237', 'CC221220', 'CC510163', 'CC310414', 'CC510433', 'CC410179', 'CC221033', 'CC221031', 'CC610101', 'CC510043', 'CC420100', 'CC120313', 'CC320429', 'CC520436', 'CC710176', 'CC721114', 'CC721532', 'CC420392', 'CC310256', 'CC320680', 'CC110069', 'CC320759', 'CC710548', 'CC723197', 'CC610051', 'CC221244', 'CC321331', 'CC510473', 'CC410094', 'CC221935', 'CC510534', 'CC610285', 'CC620262', 'CC710342', 'CC710462', 'CC711158', 'CC221511', 'CC121397', 'CC410129', 'CC321428', 'CC710131', 'CC320575', 'CC420396', 'CC720774', 'CC120764', 'CC220223', 'CC620619', 'CC222496', 'CC720290', 'CC320568', 'CC410113', 'CC410032', 'CC520239', 'CC410084', 'CC620793', 'CC221755', 'CC720646', 'CC121106', 'CC710551', 'CC321203', 'CC420241', 'CC720622', 'CC320325', 'CC220526', 'CC410432', 'CC510648', 'CC620121', 'CC320160', 'CC610099', 'CC320297', 'CC320861', 'CC610469', 'CC220511', 'CC420167', 'CC610052', 'CC510256', 'CC120212', 'CC420383', 'CC310203', 'CC620085', 'CC420204', 'CC220999', 'CC410248', 'CC210174', 'CC420137', 'CC321464', 'CC310331', 'CC310214', 'CC420236', 'CC620499', 'CC710223', 'CC222326', 'CC510076', 'CC210148', 'CC320776', 'CC120409', 'CC420720', 'CC520215', 'CC620152', 'CC621184', 'CC520552', 'CC210657', 'CC210088', 'CC120469']
+      preload: true
+  dataloader_configs:
+    train_ratio: 0.8
+    val_ratio: 0.1
+    test_ratio: 0.1
+    pred_ratio: 0.0
+    batch_size: 512
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:

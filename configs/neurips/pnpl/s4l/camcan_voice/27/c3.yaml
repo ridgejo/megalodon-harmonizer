@@ -1,0 +1,85 @@
+experiment:
+  seed: 3
+  epochs: 200
+
+rep_config:
+  lr: 0.000066
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+      shafto2014: 306
+    shared_dim: 512
+    use_data_block: true
+  encoder:
+    channels: 512
+    conv_channels: [512, 512, 512, 512]
+    ratios: [5, 5, 1]
+    dimension: 512
+  subject_film:
+    subject_embedding:
+      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019", "shafto2014"]
+      embedding_dim: 16
+    film_module:
+      feature_dim: 512
+      embedding_dim: 16
+  projector:
+    input_dim: 2560
+    hidden_dim: 2048
+  band_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+  amp_scale_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.2
+  phase_diff_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.5
+  voiced_classifier:
+    type: "linear"
+    input_dim: 2560
+    hidden_dim: 512
+
+datamodule_config:
+  dataset_preproc_configs:
+    armeni2022:
+      data_path: "/data/engs-pnpl/lina4368/armeni2022"
+      preproc_path: "/data/engs-pnpl/lina4368/armeni2022"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      label: "voicing"
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ["001", "002", "003"]
+      include_sessions:
+        "001": ["001", "002", "003", "004", "006", "007", "008", "009", "010"]
+        "002": ["001", "002", "003", "004", "006", "007", "008", "009", "010"]
+        "003": ["001", "002", "003", "004", "006", "007", "008", "009", "010"]
+      preload: true
+      label_delay: 0.02
+    shafto2014:
+      data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ['CC710982', 'CC120727', 'CC320002', 'CC520607', 'CC520042', 'CC510284', 'CC610405', 'CC520239', 'CC420060', 'CC710591', 'CC221977', 'CC520197', 'CC220234', 'CC310473', 'CC610039', 'CC320576', 'CC610028', 'CC711027', 'CC320321', 'CC112141', 'CC722536', 'CC620152', 'CC721392', 'CC620720', 'CC220323', 'CC420582', 'CC510163', 'CC320888', 'CC610496', 'CC410040', 'CC420222', 'CC320325', 'CC510208', 'CC720330', 'CC510551', 'CC620193', 'CC620793', 'CC320445', 'CC210172', 'CC420493', 'CC720774', 'CC110182', 'CC120550', 'CC221886', 'CC320448', 'CC510050', 'CC321203', 'CC120120', 'CC721374', 'CC510393', 'CC321069', 'CC621248', 'CC720290', 'CC310256', 'CC420433', 'CC721292', 'CC520395', 'CC610071', 'CC710214', 'CC520398', 'CC620919', 'CC320160', 'CC221775', 'CC220372', 'CC510395', 'CC220107', 'CC721052', 'CC711244', 'CC321000', 'CC720685', 'CC220999', 'CC410091', 'CC320022', 'CC223085', 'CC310410', 'CC121479', 'CC520122', 'CC520254', 'CC711245', 'CC221209', 'CC221033', 'CC221527', 'CC110069', 'CC520584', 'CC610101', 'CC420286', 'CC420776', 'CC510242', 'CC321087', 'CC410015', 'CC210250', 'CC520011', 'CC420173', 'CC410248', 'CC210124', 'CC620354', 'CC620479', 'CC520562', 'CC420091', 'CC220567', 'CC510323', 'CC510629', 'CC420004', 'CC410354', 'CC721449', 'CC121144', 'CC320621', 'CC520136', 'CC520377', 'CC222120', 'CC620444', 'CC222652', 'CC420236', 'CC420261', 'CC210526', 'CC320206', 'CC420462', 'CC320616', 'CC221324', 'CC610575', 'CC420720', 'CC410243', 'CC621011', 'CC321291', 'CC120182', 'CC420204', 'CC721532', 'CC420157', 'CC620490', 'CC510548', 'CC610344', 'CC722542', 'CC420396', 'CC710462', 'CC620935', 'CC721434', 'CC620026', 'CC120313', 'CC620619', 'CC520552', 'CC410226', 'CC121317', 'CC120764', 'CC620090', 'CC410094', 'CC510639', 'CC420412', 'CC720407', 'CC320861', 'CC711035', 'CC520391', 'CC410323']
+      preload: true
+  dataloader_configs:
+    train_ratio: 0.8
+    val_ratio: 0.1
+    test_ratio: 0.1
+    pred_ratio: 0.0
+    batch_size: 512
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:

@@ -1,5 +1,5 @@
 experiment:
-  seed: 42
+  seed: 1
   epochs: 200
 
 rep_config:
@@ -9,6 +9,7 @@ rep_config:
       armeni2022: 269
       schoffelen2019: 273
       gwilliams2022: 208
+      shafto2014: 306
     shared_dim: 512
     use_data_block: true
   encoder:
@@ -18,7 +19,7 @@ rep_config:
     dimension: 512
   subject_film:
     subject_embedding:
-      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019"]
+      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019", "shafto2014"]
       embedding_dim: 16
     film_module:
       feature_dim: 512
@@ -53,7 +54,7 @@ datamodule_config:
     val_ratio: 0.1
     test_ratio: 0.1
     pred_ratio: 0.0
-    batch_size: 128
+    batch_size: 512
     normalisation:
       n_sample_batches: 8
       per_channel: true

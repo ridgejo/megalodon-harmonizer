@@ -1,0 +1,83 @@
+experiment:
+  seed: 2
+  epochs: 200
+
+rep_config:
+  lr: 0.000066
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 273
+      gwilliams2022: 208
+      shafto2014: 306
+    shared_dim: 512
+    use_data_block: true
+  encoder:
+    channels: 512
+    conv_channels: [512, 512, 512, 512]
+    ratios: [5, 5, 1]
+    dimension: 512
+  subject_film:
+    subject_embedding:
+      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019", "shafto2014"]
+      embedding_dim: 16
+    film_module:
+      feature_dim: 512
+      embedding_dim: 16
+  projector:
+    input_dim: 2560
+    hidden_dim: 2048
+  band_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+  amp_scale_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.2
+  phase_diff_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.5
+  voiced_classifier:
+    type: "linear"
+    input_dim: 2560
+    hidden_dim: 512
+
+datamodule_config:
+  dataset_preproc_configs:
+    armeni2022:
+      data_path: "/data/engs-pnpl/lina4368/armeni2022"
+      preproc_path: "/data/engs-pnpl/lina4368/armeni2022"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      label: "voicing"
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ["001"]
+      include_sessions:
+        "001": ["001"]
+      preload: true
+      label_delay: 0.02
+    shafto2014:
+      data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ['CC520097', 'CC222367', 'CC520134', 'CC310391', 'CC320379', 'CC420435', 'CC420383', 'CC410287', 'CC420162', 'CC420566', 'CC320206', 'CC520377', 'CC210422', 'CC720774', 'CC710486', 'CC510609', 'CC620515', 'CC321137', 'CC310224', 'CC420143', 'CC310203', 'CC711245', 'CC221487', 'CC420180', 'CC721377', 'CC110174', 'CC210526', 'CC222797', 'CC620085', 'CC610671', 'CC510226', 'CC410086', 'CC120212', 'CC310051', 'CC122405', 'CC320429', 'CC120276', 'CC520597', 'CC221565', 'CC710037', 'CC610101', 'CC420433', 'CC410015', 'CC621184', 'CC620262', 'CC420204', 'CC120166', 'CC220526', 'CC721585', 'CC510395', 'CC520517', 'CC520624', 'CC220198', 'CC410091', 'CC220506', 'CC221828', 'CC710591', 'CC620451', 'CC620413', 'CC620405', 'CC420173', 'CC221886', 'CC710462', 'CC420236', 'CC610146', 'CC710088', 'CC320160', 'CC221244', 'CC220223', 'CC220635', 'CC620436', 'CC320342', 'CC320680', 'CC721224', 'CC720685', 'CC120376', 'CC420348', 'CC510415', 'CC321174', 'CC320621', 'CC720407', 'CC722651', 'CC721532', 'CC510639', 'CC220843', 'CC710446', 'CC410182', 'CC420148', 'CC420392', 'CC320325', 'CC120470', 'CC221002', 'CC720071', 'CC520011', 'CC510321', 'CC420229', 'CC220098', 'CC412021', 'CC222956', 'CC410387', 'CC321431', 'CC320202', 'CC711128', 'CC520253', 'CC520147', 'CC520390', 'CC210172', 'CC221775', 'CC520215', 'CC510255', 'CC620005', 'CC210617', 'CC621128', 'CC320575', 'CC410032', 'CC710313', 'CC721707', 'CC120409', 'CC620527', 'CC410179', 'CC212153', 'CC321073', 'CC620121', 'CC420202', 'CC221740', 'CC520083', 'CC210657', 'CC221220', 'CC221336', 'CC410177', 'CC310252', 'CC410432', 'CC222652', 'CC221054', 'CC510304', 'CC220335', 'CC122620', 'CC520175', 'CC121685', 'CC710664', 'CC510393', 'CC721704', 'CC120061', 'CC520042', 'CC610462', 'CC410297', 'CC420729', 'CC420075', 'CC420137', 'CC320870', 'CC110187', 'CC621284']
+      preload: true
+  dataloader_configs:
+    train_ratio: 0.8
+    val_ratio: 0.1
+    test_ratio: 0.1
+    pred_ratio: 0.0
+    batch_size: 512
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:
