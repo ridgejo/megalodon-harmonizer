@@ -43,36 +43,44 @@ class MEGDataModule(L.LightningDataModule):
                 generator=torch.Generator().manual_seed(self.seed),
             )
 
-            # No pinning, no workers, not persistent: 0.3 it/s (4.0 again after cache hit)
-            # Pinning, 16 workers, persistent: X
-            # Pinning, 8 workers, persistent: 3.45 it/s
-            # Pinning, 4 workers, persistent: 3.98 it/s
-            # Pinning, 2 workers, persistent: 4.02 it/s
-            # Pinning, 1 workers, persistent: 3.98 it/s
-            # Pinning, 0 workers: 4.10 it/s
-            # Conclusion: pinning is all you need? NO. Caches are all you need ;)
-            # Also: for much larger datasets, workers actually become useful
-
-            train_loaders.append(
-                DataLoader(
-                    train,
-                    batch_size=self.batch_size,
-                    shuffle=True,
-                    pin_memory=True,
-                    # num_workers=8,
-                    # persistent_workers=True,
+            if self.dataloader_configs.get("use_workers", False):
+                train_loaders.append(
+                    DataLoader(
+                        train,
+                        batch_size=self.batch_size,
+                        shuffle=True,
+                        pin_memory=True,
+                        num_workers=8,
+                        persistent_workers=True,
+                    )
                 )
-            )
-            val_loaders.append(
-                DataLoader(
-                    val,
-                    batch_size=self.batch_size,
-                    shuffle=False,
-                    pin_memory=True,
-                    # num_workers=8,
-                    # persistent_workers=True,
+                val_loaders.append(
+                    DataLoader(
+                        val,
+                        batch_size=self.batch_size,
+                        shuffle=False,
+                        pin_memory=True,
+                        num_workers=8,
+                        persistent_workers=True,
+                    )
                 )
-            )
+            else:
+                train_loaders.append(
+                    DataLoader(
+                        train,
+                        batch_size=self.batch_size,
+                        shuffle=True,
+                        pin_memory=True,
+                    )
+                )
+                val_loaders.append(
+                    DataLoader(
+                        val,
+                        batch_size=self.batch_size,
+                        shuffle=False,
+                        pin_memory=True,
+                    )
+                )
             test_loaders.append(
                 DataLoader(
                     test, batch_size=self.batch_size, shuffle=False, pin_memory=True
