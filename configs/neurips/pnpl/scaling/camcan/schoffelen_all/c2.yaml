@@ -7,7 +7,7 @@ rep_config:
   dataset_block:
     dataset_sizes:
       armeni2022: 269
-      schoffelen2019: 272
+      schoffelen2019: 270
       gwilliams2022: 208
       shafto2014: 306
     shared_dim: 512
