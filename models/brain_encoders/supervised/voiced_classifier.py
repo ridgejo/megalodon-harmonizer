@@ -49,15 +49,15 @@ class VoicedClassifierLSTM(nn.Module):
         fn = stat_scores[3]
         support = stat_scores[4]
 
-        r2_score = TM.r2_score(
-            preds=probs,
-            target=labels,
-        )
+        # r2_score = TM.r2_score(
+        #     preds=probs,
+        #     target=labels,
+        # )
 
         return {
             "voiced_bce_loss": bce_loss,
             "voiced_balacc": balacc,
-            "voiced_r2": r2_score,
+            # "voiced_r2": r2_score,
             "voiced_tp": tp,
             "voiced_fp": fp,
             "voiced_tn": tn,
