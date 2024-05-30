@@ -1,6 +1,6 @@
 #! /bin/bash
 #SBATCH --nodes=1
-#SBATCH --mem=480G
+#SBATCH --mem=500G
 #SBATCH --qos=system
 #SBATCH --clusters=htc
 #SBATCH --job-name=megalodon

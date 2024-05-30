@@ -1,8 +1,8 @@
 #! /bin/bash
 
-declare -a labels=("speech" "voice")
+declare -a labels=("voice")
 declare -a seeds=("1" "2" "3")
-declare -a scale=("1" "3" "6" "12" "27")
+declare -a scale=("12")
 
 for i in "${!labels[@]}"
 do

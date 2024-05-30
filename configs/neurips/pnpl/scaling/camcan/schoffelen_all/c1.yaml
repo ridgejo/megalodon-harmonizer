@@ -49,9 +49,8 @@ datamodule_config:
       window_len: 0.5
       info: ["subject", "subject_id", "dataset"]
       exclude_subjects: ['V1002', 'V1006', 'A2011', 'V1005', 'A2119', 'A2084', 'A2063', 'A2076', 'V1090', 'A2036', 'V1001', 'V1003', 'A2062']
-      preload: false
+      preload: true
   dataloader_configs:
-    use_workers: true
     train_ratio: 0.8
     val_ratio: 0.1
     test_ratio: 0.1

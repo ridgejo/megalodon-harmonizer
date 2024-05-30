@@ -99,15 +99,15 @@ class VoicedClassifierMLP(nn.Module):
             average="macro",
         )
 
-        r2_score = TM.r2_score(
-            preds=probs,
-            target=labels,
-        )
+        # r2_score = TM.r2_score(
+        #     preds=probs,
+        #     target=labels,
+        # )
 
         return {
             "voiced_bce_loss": bce_loss,
             "voiced_balacc": balacc,
-            "voiced_r2": r2_score,
+            # "voiced_r2": r2_score,
         }
 
 class VoicedClassifierLinear(nn.Module):
@@ -138,13 +138,13 @@ class VoicedClassifierLinear(nn.Module):
             average="macro",
         )
 
-        r2_score = TM.r2_score(
-            preds=probs,
-            target=labels,
-        )
+        # r2_score = TM.r2_score(
+        #     preds=probs,
+        #     target=labels,
+        # )
 
         return {
             "voiced_bce_loss": bce_loss,
             "voiced_balacc": balacc,
-            "voiced_r2": r2_score,
+            # "voiced_r2": r2_score,
         }

@@ -1,10 +1,10 @@
 #! /bin/bash
 #SBATCH --nodes=1
-#SBATCH --mem=480G
+#SBATCH --mem=500G
 #SBATCH --qos=system
 #SBATCH --clusters=htc
 #SBATCH --job-name=megalodon
-#SBATCH --time=100:00:00
+#SBATCH --time=60:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --partition=long
 #SBATCH --output=slurm_out/%j.out
