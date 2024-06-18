@@ -32,9 +32,13 @@
 # declare -a seeds=("1" "2" "3")
 # declare -a scale=("152" "152" "152")
 
-declare -a ckpts=("miokw8n6" "w1s7rdps" "jveuvcwt")
+# declare -a ckpts=("miokw8n6" "w1s7rdps" "jveuvcwt")
+# declare -a seeds=("1" "2" "3")
+# declare -a scale=("312" "312" "312")
+
+declare -a ckpts=("2up4w3u4" "xnegk86q" "15ld22le")
 declare -a seeds=("1" "2" "3")
-declare -a scale=("312" "312" "312")
+declare -a scale=("641" "641" "641")
 
 for i in "${!ckpts[@]}"
 do

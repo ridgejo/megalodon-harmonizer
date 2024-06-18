@@ -18,9 +18,8 @@ rep_config:
     film_module:
       feature_dim: 512
       embedding_dim: 16
-  voiced_classifier:
-    type: "linear"
-    input_dim: 64000
+  vad_classifier_linear:
+    input_dim: 512
     hidden_dim: 512
 
 datamodule_config:
@@ -34,7 +33,7 @@ datamodule_config:
       notch_freq: 50
       interpolate_bad_channels: true
       window_len: 0.5
-      label: "voicing"
+      label: "speech"
       info: ["subject", "subject_id", "dataset"]
       preload: true
       label_delay: 0.02
