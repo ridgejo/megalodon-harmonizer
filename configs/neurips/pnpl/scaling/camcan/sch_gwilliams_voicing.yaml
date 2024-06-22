@@ -14,7 +14,7 @@ rep_config:
   dataset_block:
     dataset_sizes:
       armeni2022: 269
-      schoffelen2019: 273
+      schoffelen2019: 270
       gwilliams2022: 208
       shafto2014: 306
     shared_dim: 512
@@ -42,6 +42,7 @@ rep_config:
   phase_diff_predictor:
     input_dim: 2560 # 300 * 5 = 1500
     prop: 0.5
+
 datamodule_config:
   dataset_preproc_configs:
     gwilliams2022:
@@ -57,39 +58,10 @@ datamodule_config:
       info: ["subject", "subject_id", "dataset"]
       preload: true
       label_delay: 0.02
-      exclude_subjects: ["01", "02", "03"]
   dataloader_configs:
     train_ratio: 0.8
     val_ratio: 0.1
     test_ratio: 0.1
-    pred_ratio: 0.0
-    batch_size: 128
-    normalisation:
-      n_sample_batches: 8
-      per_channel: true
-      scaler_conf:
-        standard_scaler:
-
-test_datamodule_config:
-  dataset_preproc_configs:
-    gwilliams2022:
-      data_path: "/data/engs-pnpl/lina4368/gwilliams2022"
-      preproc_path: "/data/engs-pnpl/lina4368/gwilliams2022"
-      l_freq: 0.5
-      h_freq: 125
-      resample_freq: 250
-      notch_freq: 50
-      interpolate_bad_channels: true
-      window_len: 0.5
-      label: "voicing"
-      info: ["subject", "subject_id", "dataset"]
-      preload: true
-      label_delay: 0.02
-      include_subjects: ["01", "02", "03"]
-  dataloader_configs:
-    train_ratio: 0.1
-    val_ratio: 0.1
-    test_ratio: 0.8
     pred_ratio: 0.0
     batch_size: 128
     normalisation:

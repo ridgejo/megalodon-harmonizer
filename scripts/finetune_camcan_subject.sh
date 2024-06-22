@@ -44,9 +44,9 @@ for i in "${!ckpts[@]}"
 do
 
     # Gwilliams voicing
-    sbatch scripts/submit_short_256G.sh train_rep.py --config configs/neurips/pnpl/scaling/camcan/subject/gwilliams_voicing.yaml --checkpoint /data/engs-pnpl/lina4368/experiments/MEGalodon-representation/${ckpts[i]} --name neurips_camcan_subject_${scale[i]}_gwilliams_voicing_seed${seeds[i]}
+    sbatch scripts/submit_short_256G.sh train_rep.py --config configs/neurips/pnpl/scaling/camcan/subject/gwilliams_voicing.yaml --checkpoint /data/engs-pnpl/lina4368/experiments/MEGalodon-representation/${ckpts[i]} --name neurips_camcan_subject_${scale[i]}_gwilliams_voicing_seed${seeds[i]} --seed ${seeds[i]}
 
     # Gwilliams speech
-    sbatch scripts/submit_short_256G.sh train_rep.py --config configs/neurips/pnpl/scaling/camcan/subject/gwilliams_speech.yaml --checkpoint /data/engs-pnpl/lina4368/experiments/MEGalodon-representation/${ckpts[i]} --name neurips_camcan_subject_${scale[i]}_gwilliams_speech_seed${seeds[i]}
+    sbatch scripts/submit_short_256G.sh train_rep.py --config configs/neurips/pnpl/scaling/camcan/subject/gwilliams_speech.yaml --checkpoint /data/engs-pnpl/lina4368/experiments/MEGalodon-representation/${ckpts[i]} --name neurips_camcan_subject_${scale[i]}_gwilliams_speech_seed${seeds[i]} --seed ${seeds[i]}
 
 done

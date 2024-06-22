@@ -14,6 +14,6 @@ for i in "${!labels[@]}"
 do
     for j in "${!scale[@]}"
     do
-        sbatch scripts/submit_short_128G.sh train_rep.py --config configs/neurips/pnpl/s4l/camcan_${labels[i]}/${task[i]}.yaml --checkpoint /data/engs-pnpl/lina4368/experiments/MEGalodon-representation/${ckpts[j]} --name neurips_camcan_s4l+${labels[i]}_${scale[j]}_task_${task[i]}_seed${seeds[j]}
+        sbatch scripts/submit_short_128G.sh train_rep.py --config configs/neurips/pnpl/s4l/camcan_${labels[i]}/${task[i]}.yaml --checkpoint /data/engs-pnpl/lina4368/experiments/MEGalodon-representation/${ckpts[j]} --name neurips_camcan_s4l+${labels[i]}_${scale[j]}_task_${task[i]}_seed${seeds[j]} --seed ${seeds[j]}
     done
 done

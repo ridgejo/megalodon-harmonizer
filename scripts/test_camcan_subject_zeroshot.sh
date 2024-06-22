@@ -1,6 +1,6 @@
 #! /bin/bash
 
-declare -a ckpts=("oqrms1av" "nxmlpg0w" "g5z9sfth" "yoz3dt80" "0uvfxdfi" "ya0lfmtz" "xkafozc6" "ij0z3cxf" "9l2y3og7" "gnqz6ox7" "4h2dg35s" "acy2rs4g" "8af6wxr7" "po5qp79h" "uar8x3ak")
+declare -a ckpts=("oqrms1av" "nxmlpg0w" "g5z9sfth" "yoz3dt80" "0uvfxdfi" "ya0lfmtz" "xkafozc6" "ij0z3cxf" "9l2y3og7" "gnqz6ox7" "4h2dg35s" "acy2rs4g" "8af6wxr7" "po5qp79h" "uar8x3ak" "bwdrk3yv" "rfo81xud" "w6tc09ru" "u2mn8zf0" "7lzzi7h4" "ws5cnycw" "d6n5dpmc" "rcx151o5" "q6ecb66m" "nhgmouhx" "higj2ni0" "a1dt8m3z" "9oxmdq74" "yeli8c4z" "anyr9e8a")
 declare -a seeds=("1" "2" "3" "1" "2" "3" "1" "2" "3" "1" "2" "3" "1" "2" "3" "1" "2" "3" "1" "2" "3" "1" "2" "3" "1" "2" "3" "1" "2" "3")
 declare -a scale=("641" "641" "641" "312" "312" "312" "152" "152" "152" "74" "74" "74" "36" "36" "36" "17" "17" "17" "8" "8" "8" "4" "4" "4" "2" "2" "2" "1" "1" "1")
 

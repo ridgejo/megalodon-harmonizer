@@ -194,4 +194,14 @@ else:
 
 # Automatically tests model with best weights from training/fitting
 print("Testing model")
-trainer.test(datamodule=datamodule)
+
+if "test_datamodule_config" in config:
+    del datamodule
+    test_datamodule = MEGDataModule(
+        **config["test_datamodule_config"],
+        seed=config["experiment"]["seed"],
+    )
+else:
+    test_datamodule = datamodule
+
+trainer.test(datamodule=test_datamodule)
