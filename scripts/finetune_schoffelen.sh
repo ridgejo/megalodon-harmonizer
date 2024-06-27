@@ -1,12 +1,12 @@
 #! /bin/bash
 
-# declare -a ckpts=("uahsvoaw" "lwxbsduq")
-# declare -a seeds=("1" "2")
-# declare -a scale=("schmax" "schmax")
+# declare -a ckpts=("uahsvoaw" "lwxbsduq" "4mx0hhs3")
+# declare -a seeds=("1" "2" "3")
+# declare -a scale=("schmax" "schmax" "schmax")
 
 
-declare -a ckpts=("lwxbsduq")
-declare -a seeds=("2")
+declare -a ckpts=("4mx0hhs3")
+declare -a seeds=("3")
 declare -a scale=("schmax")
 
 for i in "${!ckpts[@]}"

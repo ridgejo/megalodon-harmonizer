@@ -4,9 +4,9 @@
 #SBATCH --qos=system
 #SBATCH --clusters=htc
 #SBATCH --job-name=megalodon
-#SBATCH --time=199:59:00
+#SBATCH --time=150:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --partition=long
+#SBATCH --partition=test
 #SBATCH --output=slurm_out/%j.out
 
 source ~/.init_conda.sh
