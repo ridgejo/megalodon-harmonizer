@@ -17,6 +17,8 @@ from models.brain_encoders.rep_learner import RepLearner
 # Increase wandb waiting time to avoid timeouts
 os.environ["WANDB__SERVICE_WAIT"] = "300"
 
+SAVE_PATH = Path("/data/engs-pnpl/wolf6942")
+
 parser = argparse.ArgumentParser(
     prog="MEGalodon-representation",
     description="Learn a representation from brain data.",
@@ -55,9 +57,9 @@ seed_everything(config["experiment"]["seed"], workers=True)
 wandb_logger = WandbLogger(
     name=args.name,
     project=parser.prog,
-    save_dir=DATA_PATH / "experiments",
+    save_dir=SAVE_PATH / "experiments" / "MEGalodon",
     log_model=True,  # Log checkpoint only at the end of training (to stop my wandb running out of storage!)
-    dir=DATA_PATH / "wandb",
+    dir=SAVE_PATH / "wandb" / "MEGalodon",
 )
 
 try:
@@ -178,7 +180,7 @@ trainer = Trainer(
     max_epochs=epochs,
     profiler="simple" if args.profile else None,
     devices=4 if args.ddp else 1,
-    default_root_dir="/data/engs-pnpl/lina4368/experiments",
+    default_root_dir= SAVE_PATH / "experiments" / "MEGalodon",
 )
 
 if args.lr_find:
