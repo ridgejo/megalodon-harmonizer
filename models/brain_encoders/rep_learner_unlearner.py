@@ -189,7 +189,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
-        self.domain_classifier = DomainClassifier(nodes=3)
+        self.domain_classifier = DomainClassifier(nodes=2) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss()
         self.conf_criterion = ConfusionLoss()
