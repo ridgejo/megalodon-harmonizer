@@ -548,17 +548,17 @@ class RepLearnerUnlearner(L.LightningModule):
         return loss, losses, metrics, features
 
     def configure_optimizers(self):
-        encoder_params = filter(lambda p: p.requires_grad, self.encoder_models.parameters())
-        predictor_params = filter(lambda p: p.requires_grad, self.predictor_models.parameters())
-        domain_classifier_params = filter(lambda p: p.requires_grad, self.domain_classifier.parameters())
+        encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
+        predictor_params = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))
+        domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
 
         step1_optim = torch.optim.AdamW(
-            list(encoder_params) + list(predictor_params) + list(domain_classifier_params), 
+            encoder_params + predictor_params + domain_classifier_params, 
             lr=self.learning_rate
         )
-        optim = torch.optim.Adam(list(encoder_params) + list(predictor_params), lr=1e-4)
-        conf_optim = torch.optim.Adam(list(encoder_params), lr=1e-4)
-        dm_optim = torch.optim.Adam(list(domain_classifier_params), lr=1e-4)
+        optim = torch.optim.Adam(encoder_params + predictor_params, lr=1e-4)
+        conf_optim = torch.optim.Adam(encoder_params, lr=1e-4)
+        dm_optim = torch.optim.Adam(domain_classifier_params, lr=1e-4)
         
         return step1_optim, optim, conf_optim, dm_optim
     
