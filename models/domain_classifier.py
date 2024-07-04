@@ -8,6 +8,7 @@ class DomainClassifier(nn.Module):
         super(DomainClassifier, self).__init__()
         self.nodes = nodes
         self.domain = nn.Sequential()
+        # 512 is the size output by the final layer of the encoder, 32 is the batch size (from og study)
         self.domain.add_module('d_fc2', nn.Linear(512, 32)) #TODO investigate whether this is too big of a reduction
         self.domain.add_module('d_relu2', nn.ReLU(True))
         self.domain.add_module('r_dropout', nn.Dropout3d(p=0.2))
