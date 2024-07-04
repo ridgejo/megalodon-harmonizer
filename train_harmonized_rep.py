@@ -20,7 +20,7 @@ os.environ["WANDB__SERVICE_WAIT"] = "300"
 SAVE_PATH = Path("/data/engs-pnpl/wolf6942")
 
 parser = argparse.ArgumentParser(
-    prog="MEGalodon-representation",
+    prog="MEGalodon-rep-harmonization",
     description="Learn a representation from brain data.",
 )
 parser.add_argument("--config", help="Path to config file (yaml)", required=True)
