@@ -10,7 +10,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.tuner import Tuner
 
-from dataloaders.data_module import MEGDataModule
+from dataloaders.data_module import HarmonizationDataModule
 from dataloaders.data_utils import DATA_PATH
 from models.brain_encoders.rep_learner_unlearner import RepLearnerUnlearner
 
@@ -80,7 +80,7 @@ latest_checkpoint = ModelCheckpoint(
     save_top_k=1,
 )
 
-datamodule = MEGDataModule(
+datamodule = HarmonizationDataModule(
     **config["datamodule_config"],
     seed=config["experiment"]["seed"],
 )
@@ -199,7 +199,7 @@ print("Testing model")
 
 if "test_datamodule_config" in config:
     del datamodule
-    test_datamodule = MEGDataModule(
+    test_datamodule = HarmonizationDataModule(
         **config["test_datamodule_config"],
         seed=config["experiment"]["seed"],
     )
