@@ -112,3 +112,108 @@ class MEGDataModule(L.LightningDataModule):
 
     def predict_dataloader(self):
         return self.test_loader
+    
+class HarmonizationDataModule(L.LightningModule):
+    def __init__(
+        self,
+        dataset_preproc_configs: tp.Dict,
+        dataloader_configs: tp.Dict,
+        seed: int,
+        debug: bool = False,
+    ):
+        super().__init__()
+        self.batch_size = dataloader_configs["batch_size"]
+        self.dataset_preproc_configs = dataset_preproc_configs
+        self.dataloader_configs = dataloader_configs
+        self.seed = seed
+        self.debug = debug
+
+    def setup(self, stage: str):
+        train_loaders, val_loaders, test_loaders = [], [], []
+        for dataset, config in self.dataset_preproc_configs.items():
+            data = DATASET_CLASSES[dataset](**config)
+            train, val, test = random_split(
+                data,
+                [
+                    self.dataloader_configs["train_ratio"],
+                    self.dataloader_configs["val_ratio"],
+                    self.dataloader_configs["test_ratio"],
+                ],
+                generator=torch.Generator().manual_seed(self.seed),
+            )
+
+            if self.dataloader_configs.get("use_workers", False):
+                train_loaders.append(
+                    DataLoader(
+                        train,
+                        batch_size=self.batch_size,
+                        shuffle=True,
+                        pin_memory=True,
+                        num_workers=8,
+                        persistent_workers=True,
+                    )
+                )
+                val_loaders.append(
+                    DataLoader(
+                        val,
+                        batch_size=self.batch_size,
+                        shuffle=False,
+                        pin_memory=True,
+                        num_workers=8,
+                        persistent_workers=True,
+                    )
+                )
+            else:
+                train_loaders.append(
+                    DataLoader(
+                        train,
+                        batch_size=self.batch_size,
+                        shuffle=True,
+                        pin_memory=True,
+                    )
+                )
+                val_loaders.append(
+                    DataLoader(
+                        val,
+                        batch_size=self.batch_size,
+                        shuffle=False,
+                        pin_memory=True,
+                    )
+                )
+            test_loaders.append(
+                DataLoader(
+                    test, batch_size=self.batch_size, shuffle=False, pin_memory=True
+                )
+            )
+
+        self.train_loaders = train_loaders
+        self.val_loaders = val_loaders
+        self.test_loaders = test_loaders
+
+    def _combo_loader(self, loaders):
+        for batches in zip(*loaders):
+            yield tuple(batches)
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        # Standard scale the batch before training
+        batches = list(batch)
+        for batch_i in batches:
+            mean = batch_i["data"].mean(dim=(0, -1))
+            std = batch_i["data"].std(dim=(0, -1))
+            batch_i["data"] = (
+                (batch_i["data"] - mean[None, :, None]) / std[None, :, None]
+            ).float()
+
+        return tuple(batches)
+
+    def train_dataloader(self):
+        return self._combo_loader(self.train_loaders)
+
+    def val_dataloader(self):
+        return self._combo_loader(self.val_loaders)
+    
+    def test_dataloader(self):
+        return self._combo_loader(self.test_loaders)
+
+    def predict_dataloader(self):
+        return self._combo_loader(self.test_loaders)

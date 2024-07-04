@@ -2,8 +2,10 @@ import lightning as L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+from sklearn.metrics import accuracy_score
 
-from dataloaders.data_utils import get_key_from_batch_identifier
+from dataloaders.data_utils import get_key_from_batch_identifier, get_dset_encoding
 from models.attach_subject import AttachSubject
 from models.brain_encoders.amp_ssl.amp_scale_predictor import AmpScalePredictor
 from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
@@ -26,6 +28,7 @@ from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
 from models.domain_classifier import DomainClassifier
+from models.confusion_loss import ConfusionLoss
 
 
 class LambdaModule(nn.Module):
@@ -44,6 +47,8 @@ class RepLearnerUnlearner(L.LightningModule):
 
     def __init__(self, rep_config):
         super().__init__()
+        self.automatic_optimization = False
+        self.epoch_stage_1 = rep_config["epoch_stage_1"]
 
         self.learning_rate = rep_config["lr"]
         self.weightings = {}
@@ -186,6 +191,8 @@ class RepLearnerUnlearner(L.LightningModule):
         self.predictor_models = nn.ModuleDict(predictor_models)
         self.domain_classifier = DomainClassifier(nodes=3)
         self.rep_config = rep_config
+        self.domain_criterion = nn.CrossEntropyLoss()
+        self.conf_criterion = ConfusionLoss()
 
         # Add classifiers if used in pre-training
         for k, v in rep_config.items():
@@ -237,7 +244,8 @@ class RepLearnerUnlearner(L.LightningModule):
 
         z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
-        return_values = {"quantization": {"commit_loss": commit_loss}}
+        return_values = {"quantization": {"commit_loss": commit_loss},
+                         "features": z_sequence}
 
         if "band_predictor" in self.predictor_models:
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
@@ -298,15 +306,37 @@ class RepLearnerUnlearner(L.LightningModule):
 
         return return_values
 
-    #TODO implement domain unlearning iterative training scheme 
+    # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
-        loss, losses, metrics = self._shared_step(batch, batch_idx, "train")
+        step1_optim, optim, conf_optim, dm_optim = self.optimizers()
+        alpha = self.rep_config["alpha"]
+        beta = self.rep_config["beta"]
 
-        batch_size = len(batch["data"])
+        ## train main encoder
+        if self.current_epoch < self.epoch_stage_1:
+            #TODO implement normalizing total batch size across all 3 dataloaders to 32
+            # skipping for now to get the framework up and running
+            # also using MEGalodon loss instead of regressor loss criterion
+            step1_optim.zero_grad()
+            task_loss = 0
+            domain_loss = 0
+            batch_size = 0
+            for batch_i in batch:
+                batch_size += len(batch_i["data"])
+                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                d_pred = self.domain_classifier(features)
+                d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+                d_loss = self.domain_criterion(d_pred, d_target)
+                if t_loss is not None:
+                    task_loss += t_loss
+                domain_loss += d_loss
+            #TODO possibly avg loss over num datasets?
+            loss = task_loss + alpha * domain_loss
+            self.manual_backward(loss)
+            step1_optim.step()
 
-        if loss is not None:
             self.log(
-                "train_loss",
+                "task_loss",
                 loss,
                 on_step=False,
                 on_epoch=True,
@@ -315,102 +345,174 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size=batch_size,
                 sync_dist=True,
             )
-            self.log_dict(
-                losses,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log_dict(
-                metrics,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
+            return {"task loss": task_loss}
 
-        return loss
+        ## begin unlearning
+        else:
+            # update encoder / task heads
+            optim.zero_grad()
+            task_loss = 0
+            batch_vals = []
+            batch_size = 0
+            for batch_i in batch:
+                batch_size += len(batch_i["data"])
+                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+                batch_vals.append({"features": features, "d_target": d_target})
+                if t_loss is not None:
+                    task_loss += t_loss
+            self.manual_backward(task_loss, retain_graph=True)
+            optim.step()
+
+            # update just domain classifier
+            dm_optim.zero_grad()
+            domain_loss = 0
+            for vals in batch_vals:
+                feats, targets = vals.values()
+                d_preds = self.domain_classifier(feats.detach())
+                d_loss = self.domain_criterion(d_preds, targets)
+                domain_loss += d_loss
+            domain_loss = alpha * domain_loss
+            self.manual_backward(domain_loss)
+            dm_optim.step()
+
+            # update just encoder using domain loss
+            conf_optim.zero_grad()
+            confusion_loss = 0
+            for vals in batch_vals:
+                feats, targets = vals.values()
+                conf_preds = self.domain_classifier(feats)
+                conf_loss = self.conf_criterion(conf_preds, targets)
+                confusion_loss += conf_loss
+            confusion_loss = beta * confusion_loss
+            self.manual_backward(confusion_loss, retain_graph=False)
+            conf_optim.step()
+
+            self.log(
+                "task_loss",
+                task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "domain_loss",
+                domain_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "confusion_loss",
+                confusion_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            return {"task loss": task_loss, "domain loss": domain_loss, "confusion loss": confusion_loss}
 
     #TODO implement domain unlearning iterative training scheme
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        loss, losses, metrics = self._shared_step(batch, batch_idx, "val")
+        #TODO implement normalizing total batch size across all 3 dataloaders to 32
+        # skipping for now to get the framework up and running
+        # also using MEGalodon loss instead of regressor loss criterion
+        task_loss = 0
+        batch_size = 0
+        domain_preds = []
+        domain_targets = []
+        for batch_i in batch:
+            batch_size += len(batch_i["data"])
+            t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+            d_pred = self.domain_classifier(features)
+            d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+            domain_preds.append(d_pred)
+            domain_targets.append(d_target)
+            if t_loss is not None:
+                task_loss += t_loss
+        domain_preds = torch.cat(domain_preds, 0)
+        domain_targets = torch.cat(domain_targets, 0)
 
-        batch_size = len(batch["data"])
-
-        if loss is not None:
-            self.log(
-                "val_loss",
-                loss,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log_dict(
-                losses,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log_dict(
-                metrics,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-
-        return loss
+        pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+        true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+        acc = accuracy_score(true_domains, pred_domains)
+    
+        self.log(
+            "task_loss",
+            task_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            batch_size=batch_size,
+            sync_dist=True,
+        )
+        self.log(
+            "classifier_acc",
+            acc,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            batch_size=batch_size,
+            sync_dist=True,
+        )
+        return {"task loss": task_loss, "classifier acc": acc}
 
     #TODO implement domain unlearning iterative training scheme
     def test_step(self, batch, batch_idx):
-        loss, losses, metrics = self._shared_step(batch, batch_idx, "test")
+        #TODO implement normalizing total batch size across all 3 dataloaders to 32
+        # skipping for now to get the framework up and running
+        # also using MEGalodon loss instead of regressor loss criterion
+        task_loss = 0
+        batch_size = 0
+        domain_preds = []
+        domain_targets = []
+        for batch_i in batch:
+            batch_size += len(batch_i["data"])
+            t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "test")
+            d_pred = self.domain_classifier(features)
+            d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+            domain_preds.append(d_pred)
+            domain_targets.append(d_target)
+            if t_loss is not None:
+                task_loss += t_loss
+        domain_preds = torch.cat(domain_preds, 0)
+        domain_targets = torch.cat(domain_targets, 0)
 
-        batch_size = len(batch["data"])
-
-        if loss is not None:
-            self.log(
-                "test_loss",
-                loss,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log_dict(
-                losses,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log_dict(
-                metrics,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-
-        return loss
+        pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+        true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+        acc = accuracy_score(true_domains, pred_domains)
+    
+        self.log(
+            "task_loss",
+            task_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            batch_size=batch_size,
+            sync_dist=True,
+        )
+        self.log(
+            "classifier_acc",
+            acc,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            batch_size=batch_size,
+            sync_dist=True,
+        )
+        return {"task loss": task_loss, "classifier acc": acc}
 
     def _shared_step(self, batch, batch_idx, stage: str):
         loss = 0.0
@@ -420,7 +522,8 @@ class RepLearnerUnlearner(L.LightningModule):
         data_key = get_key_from_batch_identifier(batch["info"])
         dataset = batch["info"]["dataset"][0]
 
-        return_values = self(batch)
+        return_values = self(batch) #TODO pop("features") 
+        features = return_values.pop("features")
 
         # Compute losses over this data batch
         for key, val in return_values.items():
@@ -442,7 +545,7 @@ class RepLearnerUnlearner(L.LightningModule):
         if loss == 0.0:
             loss = None
 
-        return loss, losses, metrics
+        return loss, losses, metrics, features
 
     def configure_optimizers(self):
         encoder_params = filter(lambda p: p.requires_grad, self.encoder_models.parameters())
@@ -457,34 +560,8 @@ class RepLearnerUnlearner(L.LightningModule):
         conf_optim = torch.optim.Adam(list(encoder_params), lr=1e-4)
         dm_optim = torch.optim.Adam(list(domain_classifier_params), lr=1e-4)
         
-        return [step1_optim, optim, conf_optim, dm_optim]
+        return step1_optim, optim, conf_optim, dm_optim
     
-    #TODO implement optimizer selection
-    # def optimizer_step(
-    #     self,
-    #     epoch,
-    #     batch_idx,
-    #     optimizer,
-    #     optimizer_idx,
-    #     optimizer_closure,
-    #     on_tpu,
-    #     using_native_amp,
-    #     using_lbfgs,
-    # ):
-    #     if self.current_phase == 0 and optimizer_idx == 0:
-    #         optimizer.step(closure=optimizer_closure)
-    #     elif self.current_phase == 1 and optimizer_idx == 1:
-    #         optimizer.step(closure=optimizer_closure)
-    #     elif self.current_phase == 2 and optimizer_idx == 2:
-    #         optimizer.step(closure=optimizer_closure)
-    #     elif self.current_phase == 3 and optimizer_idx == 3:
-    #         optimizer.step(closure=optimizer_closure)
-
-    #     # Update phase logic (example)
-    #     if batch_idx % 100 == 0:
-    #         self.current_phase = (self.current_phase + 1) % 4
-
-
     def finetuning_mode(self):
         self.freeze_except(
             ["dataset_block", "subject_"]
@@ -496,26 +573,46 @@ class RepLearnerUnlearner(L.LightningModule):
         if isinstance(module_names, str):
             module_names = [module_names]
 
-        for key in self.active_models.keys():
+        for key in self.encoder_models.keys():
             for module_name in module_names:
                 if module_name not in key:
-                    for param in self.active_models[key].parameters():
+                    for param in self.encoder_models[key].parameters():
                         param.requires_grad = False
 
+        for key in self.predictor_models.keys():
+            for module_name in module_names:
+                if module_name not in key:
+                    for param in self.predictor_models[key].parameters():
+                        param.requires_grad = False
+        
+        if "domain_classifier" not in module_names:
+            for param in self.domain_classifier.parameters():
+                param.requires_grad = False
+
     def disable_ssl(self):
-        keys = list(self.active_models.keys())
+        keys = list(self.encoder_models.keys())
         for key in keys:
             if "predictor" in key:
-                self.active_models.pop(key)
+                self.encoder_models.pop(key)
+
+        keys = list(self.predictor_models.keys())
+        for key in keys:
+            if "predictor" in key:
+                self.predictor_models.pop(key)
 
         # Also remove the SSL projector for fine-tuning
-        self.active_models["projector"] = nn.Identity()
+        self.encoder_models["projector"] = nn.Identity()
 
     def disable_classifiers(self):
-        keys = list(self.active_models.keys())
+        keys = list(self.encoder_models.keys())
         for key in keys:
             if "classifier" in key:
-                self.active_models.pop(key)
+                self.encoder_models.pop(key)
+
+        keys = list(self.predictor_models.keys())
+        for key in keys:
+            if "classifier" in key:
+                self.predictor_models.pop(key)
 
     def add_classifier(self, classifier_type: str, params: dict):
         # Labeled tasks for representation shaping or downstream classification
