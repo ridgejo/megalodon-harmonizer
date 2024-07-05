@@ -27,7 +27,7 @@ from models.subject_block import SubjectBlock
 from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
-from models.domain_classifier import DomainClassifier
+from models.domain_classifier import DomainClassifier, DomainPredictor
 from models.confusion_loss import ConfusionLoss
 
 
@@ -189,9 +189,10 @@ class RepLearnerUnlearner(L.LightningModule):
 
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
-        self.domain_classifier = DomainClassifier(nodes=2) # nodes = number of datasets (I think)
+        # self.domain_classifier = DomainClassifier(nodes=2) # nodes = number of datasets (I think)
+        self.domain_classifier = DomainPredictor(n_domains=2, init_features=512)
         self.rep_config = rep_config
-        self.domain_criterion = nn.CrossEntropyLoss()
+        self.domain_criterion = nn.BCELoss() # nn.CrossEntropyLoss()
         self.conf_criterion = ConfusionLoss()
 
         # Add classifiers if used in pre-training
@@ -223,15 +224,15 @@ class RepLearnerUnlearner(L.LightningModule):
 
         # Apply SSL projector to z_sequence
         T, E = z_sequence.shape[1:]
-        z_sequence = torch.unflatten(
-            self.encoder_models["projector"](
-                z_sequence.flatten(start_dim=1, end_dim=-1)
-            ),
-            dim=-1,
-            sizes=(T, E),
+        z_projected = self.encoder_models["projector"](
+            z_sequence.flatten(start_dim=1, end_dim=-1)
         )
+        z_sequence = torch.unflatten(z_projected, dim=-1, sizes=(T, E))
 
-        return z_sequence, z_independent, commit_loss
+        # The logits or final features output
+        features = z_projected.view(z.size(0), -1)  # [batch_size, _]
+
+        return features, z_sequence, z_independent, commit_loss
 
     def forward(self, inputs):
         x = inputs["data"]
@@ -242,16 +243,16 @@ class RepLearnerUnlearner(L.LightningModule):
         dataset = inputs["info"]["dataset"][0]
         subject = inputs["info"]["subject_id"]
 
-        z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
+        features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
         return_values = {"quantization": {"commit_loss": commit_loss},
-                         "classifier features": z_independent}
+                         "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
                 x, sample_rate=250
             )  # warning: hardcoded
-            z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
+            _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
             return_values["band_predictor"] = self.predictor_models["band_predictor"](
                 z_filtered_sequence, band_label
             )
@@ -260,7 +261,7 @@ class RepLearnerUnlearner(L.LightningModule):
             x_shifted, phase_label = self.predictor_models[
                 "phase_diff_predictor"
             ].apply_random_phase_shift(x)
-            z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
+            _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
             return_values["phase_diff_predictor"] = self.predictor_models[
                 "phase_diff_predictor"
             ](z_shifted_sequence, phase_label)
@@ -270,7 +271,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 "masked_channel_predictor"
             ].mask_input(x, sensor_pos)
             # todo: do something with commit loss
-            z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
+            _, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
             return_values["masked_channel_pred"] = self.predictor_models[
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
@@ -279,7 +280,7 @@ class RepLearnerUnlearner(L.LightningModule):
             x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
                 x
             )
-            z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
+            _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
             return_values["amp_scale_predictor"] = self.predictor_models[
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
@@ -321,13 +322,16 @@ class RepLearnerUnlearner(L.LightningModule):
             task_loss = 0
             domain_loss = 0
             batch_size = 0
-            for batch_i in batch:
+            print("Train step gets called")
+            for idx, batch_i in enumerate(batch):
                 batch_size += len(batch_i["data"])
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 d_pred = self.domain_classifier(features)
                 # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-                d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                d_target = d_target.int()
+                # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
+                d_target = torch.zeros((batch_size, len(batch)))
+                d_target[:, idx] = 1
+                # d_target = d_target.int()
                 d_target.to(self.device)
                 d_loss = self.domain_criterion(d_pred, d_target)
                 if t_loss is not None:
@@ -427,7 +431,7 @@ class RepLearnerUnlearner(L.LightningModule):
             return {"task loss": task_loss, "domain loss": domain_loss, "confusion loss": confusion_loss}
 
     #TODO implement domain unlearning iterative training scheme
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+    def validation_step(self, batch, batch_idx):
         #TODO implement normalizing total batch size across all 3 dataloaders to 32
         # skipping for now to get the framework up and running
         # also using MEGalodon loss instead of regressor loss criterion
@@ -435,19 +439,24 @@ class RepLearnerUnlearner(L.LightningModule):
         batch_size = 0
         domain_preds = []
         domain_targets = []
-        for batch_i in batch:
+        for idx, batch_i in enumerate(batch):
             print(f"data shape: {batch_i["data"].shape}")
 
             batch_size += len(batch_i["data"])
             t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+
+            print(f"features shape: {features}")
+
             d_pred = self.domain_classifier(features) 
 
             print(f"d_pred shape: {d_pred.shape}")
             print(f"d_pred: {d_pred}")
 
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-            d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-            d_target = d_target.int()
+            # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
+            d_target = torch.zeros((batch_size, len(batch)))
+            d_target[:, idx] = 1
+            # d_target = d_target.int()
             d_target.to(self.device)
             domain_preds.append(d_pred)
             domain_targets.append(d_target)
@@ -462,8 +471,8 @@ class RepLearnerUnlearner(L.LightningModule):
         print(f"domain_targets: {domain_targets}")
 
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-        # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-        true_domains = domain_targets.squeeze().detach().cpu().numpy() # no need to call argmax because no batch dim cause calculated here and not returned from Dataloader 
+        true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+        # true_domains = domain_targets.squeeze().detach().cpu().numpy() # no need to call argmax because no batch dim cause calculated here and not returned from Dataloader 
         
         print(f"pred_domains: {pred_domains}")
         print(f"true_domains: {true_domains}")
