@@ -246,7 +246,7 @@ class RepLearnerUnlearner(L.LightningModule):
         features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
         return_values = {"quantization": {"commit_loss": commit_loss},
-                         "classifier features": features}
+                         "classifier features": z_sequence}
 
         if "band_predictor" in self.predictor_models:
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
@@ -445,7 +445,7 @@ class RepLearnerUnlearner(L.LightningModule):
             batch_size += len(batch_i["data"])
             t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
 
-            print(f"features shape: {features}")
+            print(f"features shape: {features.shape}")
 
             d_pred = self.domain_classifier(features) 
 
