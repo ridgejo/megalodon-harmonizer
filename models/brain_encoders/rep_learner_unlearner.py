@@ -328,10 +328,10 @@ class RepLearnerUnlearner(L.LightningModule):
                 d_pred = self.domain_classifier(features)
                 # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
                 # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                d_target = torch.zeros((len(batch_i["data"]), len(batch)))
+                d_target = torch.zeros((len(batch_i["data"]), len(batch))).to(self.device)
                 d_target[:, idx] = 1
                 # d_target = d_target.int()
-                d_target.to(self.device)
+                # d_target.to(self.device)
                 d_loss = self.domain_criterion(d_pred, d_target)
                 if t_loss is not None:
                     task_loss += t_loss
@@ -365,10 +365,10 @@ class RepLearnerUnlearner(L.LightningModule):
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
                 # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                d_target = torch.zeros((len(batch_i["data"]), len(batch)))
+                d_target = torch.zeros((len(batch_i["data"]), len(batch))).to(self.device)
                 d_target[:, idx] = 1
                 # d_target = d_target.int()
-                d_target.to(self.device)
+                # d_target.to(self.device)
                 batch_vals.append({"features": features, "d_target": d_target})
                 if t_loss is not None:
                     task_loss += t_loss
@@ -455,10 +455,10 @@ class RepLearnerUnlearner(L.LightningModule):
 
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
             # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-            d_target = torch.zeros((len(batch_i["data"]), len(batch)))
+            d_target = torch.zeros((len(batch_i["data"]), len(batch))).to(self.device)
             d_target[:, idx] = 1
             # d_target = d_target.int()
-            d_target.to(self.device)
+            # d_target.to(self.device)
             domain_preds.append(d_pred)
             domain_targets.append(d_target)
             if t_loss is not None:
@@ -517,10 +517,10 @@ class RepLearnerUnlearner(L.LightningModule):
             d_pred = self.domain_classifier(features)
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
             # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-            d_target = torch.zeros((len(batch_i["data"]), len(batch)))
+            d_target = torch.zeros((len(batch_i["data"]), len(batch))).to(self.device)
             d_target[:, idx] = 1
             # d_target = d_target.int()
-            d_target.to(self.device)
+            # d_target.to(self.device)
             domain_preds.append(d_pred)
             domain_targets.append(d_target)
             if t_loss is not None:
