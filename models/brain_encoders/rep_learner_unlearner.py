@@ -192,7 +192,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.domain_classifier = DomainClassifier(nodes=2, init_features=2560, batch_size=512) # nodes = number of datasets (I think)
         # self.domain_classifier = DomainPredictor(n_domains=2, init_features=512)
         self.rep_config = rep_config
-        self.domain_criterion = nn.BCELoss() # nn.CrossEntropyLoss()
+        self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
         self.conf_criterion = ConfusionLoss()
 
         # Add classifiers if used in pre-training
@@ -322,7 +322,6 @@ class RepLearnerUnlearner(L.LightningModule):
             task_loss = 0
             domain_loss = 0
             batch_size = 0
-            print("Train step gets called")
             for idx, batch_i in enumerate(batch):
                 batch_size += len(batch_i["data"])
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
@@ -442,17 +441,17 @@ class RepLearnerUnlearner(L.LightningModule):
         domain_preds = []
         domain_targets = []
         for idx, batch_i in enumerate(batch):
-            print(f"data shape: {batch_i["data"].shape}")
+            # print(f"data shape: {batch_i["data"].shape}")
 
             batch_size += len(batch_i["data"])
             t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
 
-            print(f"features shape: {features.shape}")
+            # print(f"features shape: {features.shape}")
 
             d_pred = self.domain_classifier(features) 
 
-            print(f"d_pred shape: {d_pred.shape}")
-            print(f"d_pred: {d_pred}")
+            # print(f"d_pred shape: {d_pred.shape}")
+            # print(f"d_pred: {d_pred}")
 
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
             # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
@@ -467,17 +466,17 @@ class RepLearnerUnlearner(L.LightningModule):
         domain_preds = torch.cat(domain_preds, 0)
         domain_targets = torch.cat(domain_targets, 0)
 
-        print(f"domain_preds shape: {domain_preds.shape}")
-        print(f"domain_preds: {domain_preds}")
-        print(f"domain_targets shape: {domain_targets.shape}")
-        print(f"domain_targets: {domain_targets}")
+        # print(f"domain_preds shape: {domain_preds.shape}")
+        # print(f"domain_preds: {domain_preds}")
+        # print(f"domain_targets shape: {domain_targets.shape}")
+        # print(f"domain_targets: {domain_targets}")
 
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
         # true_domains = domain_targets.squeeze().detach().cpu().numpy() # no need to call argmax because no batch dim cause calculated here and not returned from Dataloader 
         
-        print(f"pred_domains: {pred_domains}")
-        print(f"true_domains: {true_domains}")
+        # print(f"pred_domains: {pred_domains}")
+        # print(f"true_domains: {true_domains}")
 
         acc = accuracy_score(true_domains, pred_domains)
     
