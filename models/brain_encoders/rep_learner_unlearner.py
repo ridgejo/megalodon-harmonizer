@@ -189,8 +189,8 @@ class RepLearnerUnlearner(L.LightningModule):
 
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
-        # self.domain_classifier = DomainClassifier(nodes=2) # nodes = number of datasets (I think)
-        self.domain_classifier = DomainPredictor(n_domains=2, init_features=512)
+        self.domain_classifier = DomainClassifier(nodes=2) # nodes = number of datasets (I think)
+        # self.domain_classifier = DomainPredictor(n_domains=2, init_features=512)
         self.rep_config = rep_config
         self.domain_criterion = nn.BCELoss() # nn.CrossEntropyLoss()
         self.conf_criterion = ConfusionLoss()
@@ -246,7 +246,7 @@ class RepLearnerUnlearner(L.LightningModule):
         features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
         return_values = {"quantization": {"commit_loss": commit_loss},
-                         "classifier features": z_sequence}
+                         "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
