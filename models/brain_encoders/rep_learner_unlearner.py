@@ -343,7 +343,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
             self.log(
                 "task_loss",
-                loss,
+                task_loss,
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
@@ -351,7 +351,11 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size=batch_size,
                 sync_dist=True,
             )
-            return {"task loss": task_loss}
+
+            del loss, task_loss, domain_loss
+            torch.cuda.empty_cache()
+
+            return 
 
         ## begin unlearning
         else:
@@ -429,7 +433,11 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size=batch_size,
                 sync_dist=True,
             )
-            return {"task loss": task_loss, "domain loss": domain_loss, "confusion loss": confusion_loss}
+
+            del task_loss, domain_loss, confusion_loss
+            torch.cuda.empty_cache()
+
+            return 
 
     #TODO implement domain unlearning iterative training scheme
     def validation_step(self, batch, batch_idx):
@@ -500,7 +508,11 @@ class RepLearnerUnlearner(L.LightningModule):
             batch_size=batch_size,
             sync_dist=True,
         )
-        return {"task loss": task_loss, "classifier acc": acc}
+
+        del domain_preds, domain_targets, pred_domains, true_domains, task_loss 
+        torch.cuda.empty_cache()
+
+        return 
 
     #TODO implement domain unlearning iterative training scheme
     def test_step(self, batch, batch_idx):
@@ -552,7 +564,11 @@ class RepLearnerUnlearner(L.LightningModule):
             batch_size=batch_size,
             sync_dist=True,
         )
-        return {"task loss": task_loss, "classifier acc": acc}
+
+        del domain_preds, domain_targets, pred_domains, true_domains, task_loss 
+        torch.cuda.empty_cache()
+
+        return 
 
     def _shared_step(self, batch, batch_idx, stage: str):
         loss = 0.0
