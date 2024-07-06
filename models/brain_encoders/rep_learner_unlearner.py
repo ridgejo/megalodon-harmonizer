@@ -349,8 +349,18 @@ class RepLearnerUnlearner(L.LightningModule):
             step1_optim.step()
 
             self.log(
-                "task_loss",
+                "train_loss",
                 task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "domain_loss",
+                domain_loss,
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,

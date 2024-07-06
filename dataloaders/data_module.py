@@ -207,13 +207,47 @@ class HarmonizationDataModule(L.LightningModule):
         return tuple(batches)
 
     def train_dataloader(self):
-        return self._combo_loader(self.train_loaders)
+        # return self._combo_loader(self.train_loaders)
+        return ComboLoader(self.train_loaders)
 
     def val_dataloader(self):
-        return self._combo_loader(self.val_loaders)
+        # return self._combo_loader(self.val_loaders)
+        return ComboLoader(self.val_loaders)
     
     def test_dataloader(self):
-        return self._combo_loader(self.test_loaders)
+        # return self._combo_loader(self.test_loaders)
+        return ComboLoader(self.test_loaders)
 
     def predict_dataloader(self):
-        return self._combo_loader(self.test_loaders)
+        # return self._combo_loader(self.test_loaders)
+        return ComboLoader(self.test_loaders)
+
+
+class ComboLoader:
+    def __init__(self, dataloaders):
+        self.dataloaders = dataloaders
+        self.iterators = [iter(dataloader) for dataloader in dataloaders]
+        self.num_batches = min(len(dataloader) for dataloader in dataloaders)
+
+    def __iter__(self):
+        self.iterators = [iter(dataloader) for dataloader in self.dataloaders]
+        self.batch_count = 0
+        return self
+
+    def __next__(self):
+        if self.batch_count >= self.num_batches:
+            raise StopIteration
+
+        batches = []
+        for iterator in self.iterators:
+            try:
+                batch = next(iterator)
+            except StopIteration:
+                batch = None
+            batches.append(batch)
+
+        self.batch_count += 1
+        return tuple(batches)
+
+    def __len__(self):
+        return self.num_batches
