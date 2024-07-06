@@ -322,13 +322,20 @@ class RepLearnerUnlearner(L.LightningModule):
             task_loss = 0
             domain_loss = 0
             batch_size = 0
+            subset = 0
             for idx, batch_i in enumerate(batch):
-                batch_size += len(batch_i["data"])
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    batch_i = {key: value[:subset] for key, value in batch.items()}
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = {key: value[:subset] for key, value in batch.items()}
+                batch_size += subset
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 d_pred = self.domain_classifier(features)
                 # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
                 # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                d_target = torch.zeros((len(batch_i["data"]), len(batch))).to(self.device)
+                d_target = torch.zeros((subset, len(batch))).to(self.device)
                 d_target[:, idx] = 1
                 # d_target = d_target.int()
                 # d_target.to(self.device)
@@ -448,22 +455,30 @@ class RepLearnerUnlearner(L.LightningModule):
         batch_size = 0
         domain_preds = []
         domain_targets = []
+        subset = 0
         for idx, batch_i in enumerate(batch):
-            # print(f"data shape: {batch_i["data"].shape}")
+            print(f"data shape: {batch_i["data"].shape}")
+            if idx == 0:
+                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                batch_i = {key: value[:subset] for key, value in batch.items()}
+            elif idx == 1:
+                subset = len(batch_i["data"]) - subset
+                batch_i = {key: value[:subset] for key, value in batch.items()}
+            batch_size += subset
 
-            batch_size += len(batch_i["data"])
+            # batch_size += len(batch_i["data"])
             t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
 
-            # print(f"features shape: {features.shape}")
+            print(f"features shape: {features.shape}")
 
             d_pred = self.domain_classifier(features) 
 
-            # print(f"d_pred shape: {d_pred.shape}")
-            # print(f"d_pred: {d_pred}")
+            print(f"d_pred shape: {d_pred.shape}")
+            print(f"d_pred: {d_pred}")
 
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
             # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-            d_target = torch.zeros((len(batch_i["data"]), len(batch))).to(self.device)
+            d_target = torch.zeros((subset, len(batch))).to(self.device)
             d_target[:, idx] = 1
             # d_target = d_target.int()
             # d_target.to(self.device)
@@ -474,17 +489,17 @@ class RepLearnerUnlearner(L.LightningModule):
         domain_preds = torch.cat(domain_preds, 0)
         domain_targets = torch.cat(domain_targets, 0)
 
-        # print(f"domain_preds shape: {domain_preds.shape}")
-        # print(f"domain_preds: {domain_preds}")
-        # print(f"domain_targets shape: {domain_targets.shape}")
-        # print(f"domain_targets: {domain_targets}")
+        print(f"domain_preds shape: {domain_preds.shape}")
+        print(f"domain_preds: {domain_preds}")
+        print(f"domain_targets shape: {domain_targets.shape}")
+        print(f"domain_targets: {domain_targets}")
 
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
         # true_domains = domain_targets.squeeze().detach().cpu().numpy() # no need to call argmax because no batch dim cause calculated here and not returned from Dataloader 
         
-        # print(f"pred_domains: {pred_domains}")
-        # print(f"true_domains: {true_domains}")
+        print(f"pred_domains: {pred_domains}")
+        print(f"true_domains: {true_domains}")
 
         acc = accuracy_score(true_domains, pred_domains)
     
@@ -578,7 +593,7 @@ class RepLearnerUnlearner(L.LightningModule):
         data_key = get_key_from_batch_identifier(batch["info"])
         dataset = batch["info"]["dataset"][0]
 
-        return_values = self(batch) #TODO pop("features") 
+        return_values = self(batch)
         features = return_values.pop("classifier features")
 
         # Compute losses over this data batch
