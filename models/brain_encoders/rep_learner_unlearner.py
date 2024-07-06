@@ -446,6 +446,14 @@ class RepLearnerUnlearner(L.LightningModule):
 
             return 
 
+    def _take_subset(self, batch, subset):
+        for key, value in batch.items():
+            if key == "info":
+                batch[key]= self._take_subset(value, subset)
+            else:
+                batch[key] = value[:subset]
+        return batch
+
     #TODO implement domain unlearning iterative training scheme
     def validation_step(self, batch, batch_idx):
         #TODO implement normalizing total batch size across all 3 dataloaders to 32
@@ -460,10 +468,11 @@ class RepLearnerUnlearner(L.LightningModule):
             print(f"data shape: {batch_i["data"].shape}")
             if idx == 0:
                 subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                batch_i = {key: value[:subset] for key, value in batch_i.items()}
+                # batch_i = {key: value[:subset] for key, value in batch_i.items()}
+                batch_i = self._take_subset(batch_i, subset)
             elif idx == 1:
                 subset = len(batch_i["data"]) - subset
-                batch_i = {key: value[:subset] for key, value in batch_i.items()}
+                batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
 
             # batch_size += len(batch_i["data"])
