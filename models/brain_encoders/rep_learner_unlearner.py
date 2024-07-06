@@ -326,10 +326,10 @@ class RepLearnerUnlearner(L.LightningModule):
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    batch_i = {key: value[:subset] for key, value in batch.items()}
+                    batch_i = {key: value[:subset] for key, value in batch_i.items()}
                 elif idx == 1:
                     subset = len(batch_i["data"]) - subset
-                    batch_i = {key: value[:subset] for key, value in batch.items()}
+                    batch_i = {key: value[:subset] for key, value in batch_i.items()}
                 batch_size += subset
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 d_pred = self.domain_classifier(features)
@@ -460,10 +460,10 @@ class RepLearnerUnlearner(L.LightningModule):
             print(f"data shape: {batch_i["data"].shape}")
             if idx == 0:
                 subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                batch_i = {key: value[:subset] for key, value in batch.items()}
+                batch_i = {key: value[:subset] for key, value in batch_i.items()}
             elif idx == 1:
                 subset = len(batch_i["data"]) - subset
-                batch_i = {key: value[:subset] for key, value in batch.items()}
+                batch_i = {key: value[:subset] for key, value in batch_i.items()}
             batch_size += subset
 
             # batch_size += len(batch_i["data"])
