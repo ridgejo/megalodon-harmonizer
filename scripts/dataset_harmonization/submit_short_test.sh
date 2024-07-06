@@ -1,0 +1,15 @@
+#! /bin/bash
+#SBATCH --nodes=1
+#SBATCH --mem=128G
+#SBATCH --qos=system
+#SBATCH --clusters=htc
+#SBATCH --job-name=megalodon
+#SBATCH --time=11:59:00
+#SBATCH --gres=gpu:1
+#SBATCH --partition=short
+#SBATCH --output=slurm_out/%j.out
+
+source /data/engs-pnpl/wolf6942/miniforge3/etc/profile.d/conda.sh
+mamba activate megalodon
+
+srun python $@
