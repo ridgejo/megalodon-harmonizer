@@ -1,9 +1,9 @@
 experiment:
   seed: 1
-  epochs: 200
+  epochs: 100 # 200
 
 rep_config:
-  epoch_stage_1: 75
+  epoch_stage_1: 30 # 75
   alpha: 1
   beta: 10
   lr: 0.000066
