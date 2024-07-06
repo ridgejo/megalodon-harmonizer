@@ -418,7 +418,7 @@ class RepLearnerUnlearner(L.LightningModule):
             conf_optim.step()
 
             self.log(
-                "task_loss",
+                "train_loss",
                 task_loss,
                 on_step=False,
                 on_epoch=True,
@@ -520,7 +520,7 @@ class RepLearnerUnlearner(L.LightningModule):
         acc = accuracy_score(true_domains, pred_domains)
     
         self.log(
-            "task_loss",
+            "val_loss",
             task_loss,
             on_step=False,
             on_epoch=True,
@@ -583,7 +583,7 @@ class RepLearnerUnlearner(L.LightningModule):
         acc = accuracy_score(true_domains, pred_domains)
     
         self.log(
-            "task_loss",
+            "test_loss",
             task_loss,
             on_step=False,
             on_epoch=True,
