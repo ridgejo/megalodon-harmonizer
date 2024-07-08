@@ -7,4 +7,4 @@ source /data/engs-pnpl/wolf6942/miniforge3/etc/profile.d/conda.sh
 SCRIPT_DIR="$( dirname "${BASH_SOURCE[0]}" )"
 
 # Activate the mamba environment
-mamba activate megalodon
+conda activate megalodon

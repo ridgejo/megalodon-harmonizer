@@ -5,7 +5,7 @@
 #SBATCH --mem=128G
 #SBATCH --qos=system
 #SBATCH --clusters=htc
-#SBATCH --job-name=devel_megalodon
+#SBATCH --job-name=slurm_subset_test
 #SBATCH --time=11:59:00
 #SBATCH --gres=gpu:1
 #SBATCH --partition=short
