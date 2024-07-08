@@ -9,7 +9,7 @@
 #SBATCH --time=11:59:00
 #SBATCH --gres=gpu:1
 #SBATCH --partition=short
-#SBATCH --output=slurm_out/slurm-%j.out
+#SBATCH --output=slurm_log/slurm-%j.out
 #SBATCH --error=slurm_log/slurm-%j.err
 
 # source env
