@@ -11,24 +11,9 @@
 #SBATCH --partition=short
 #SBATCH --output=slurm_out/%j.out
 
-echo "Starting job script"
+# source env
+source scripts/dataset_harmonization/source_megalodon_env.sh
 
-source /data/engs-pnpl/wolf6942/miniforge3/etc/profile.d/conda.sh
-if [ $? -ne 0 ]; then
-    echo "Failed to source conda.sh"
-    exit 1
-fi
-
-mamba activate megalodon
-if [ $? -ne 0 ]; then
-    echo "Failed to activate environment"
-    exit 1
-fi
-
+# run exp
 srun python $@
-if [ $? -ne 0 ]; then
-    echo "Python script failed"
-    exit 1
-fi
 
-echo "Job script completed successfully"
