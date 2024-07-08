@@ -382,7 +382,7 @@ class RepLearnerUnlearner(L.LightningModule):
             batch_vals = []
             batch_size = 0
             subset = 0
-            for batch_i in batch:
+            for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
                     batch_i = self._take_subset(batch_i, subset)
