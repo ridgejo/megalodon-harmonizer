@@ -141,7 +141,7 @@ class NormConv1d(nn.Module):
 
     def forward(self, x):
         # x = self.conv(x)
-
+        
         # Clone the weights and biases to avoid in-place modifications
         weight = self.conv.weight.clone()
         weight = weight.to(x.device)

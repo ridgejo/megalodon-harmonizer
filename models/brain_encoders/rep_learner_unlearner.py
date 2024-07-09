@@ -313,70 +313,72 @@ class RepLearnerUnlearner(L.LightningModule):
         alpha = self.rep_config["alpha"]
         beta = self.rep_config["beta"]
 
-        ## train main encoder
-        if self.current_epoch < self.epoch_stage_1:
-            #TODO implement normalizing total batch size across all 3 dataloaders to 32
-            # skipping for now to get the framework up and running
-            # also using MEGalodon loss instead of regressor loss criterion
-            step1_optim.zero_grad()
-            task_loss = 0
-            domain_loss = 0
-            batch_size = 0
-            subset = 0
-            for idx, batch_i in enumerate(batch):
-                if idx == 0:
-                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    batch_i = self._take_subset(batch_i, subset)
-                elif idx == 1:
-                    subset = len(batch_i["data"]) - subset
-                    batch_i = self._take_subset(batch_i, subset)
-                batch_size += subset
-                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
-                d_pred = self.domain_classifier(features)
-                # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-                # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                d_target = torch.zeros((subset, len(batch))).to(self.device)
-                d_target[:, idx] = 1
-                # d_target = d_target.int()
-                # d_target.to(self.device)
-                d_loss = self.domain_criterion(d_pred, d_target)
-                if t_loss is not None:
-                    task_loss += t_loss
-                domain_loss += d_loss
-            #TODO possibly avg loss over num datasets?
-            loss = task_loss + alpha * domain_loss
-            self.manual_backward(loss)
-            step1_optim.step()
+        #TODO remove after debugging
+        with torch.autograd.detect_anomaly():
 
-            self.log(
-                "train_loss",
-                task_loss,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log(
-                "domain_loss",
-                domain_loss,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
+            ## train main encoder
+            if self.current_epoch < self.epoch_stage_1:
+                #TODO implement normalizing total batch size across all 3 dataloaders to 32
+                # skipping for now to get the framework up and running
+                # also using MEGalodon loss instead of regressor loss criterion
+                step1_optim.zero_grad()
+                task_loss = 0
+                domain_loss = 0
+                batch_size = 0
+                subset = 0
+                for idx, batch_i in enumerate(batch):
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    batch_size += subset
+                    t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                    d_pred = self.domain_classifier(features)
+                    # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+                    # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
+                    d_target = torch.zeros((subset, len(batch))).to(self.device)
+                    d_target[:, idx] = 1
+                    # d_target = d_target.int()
+                    # d_target.to(self.device)
+                    d_loss = self.domain_criterion(d_pred, d_target)
+                    if t_loss is not None:
+                        task_loss += t_loss
+                    domain_loss += d_loss
+                #TODO possibly avg loss over num datasets?
+                loss = task_loss + alpha * domain_loss
+                self.manual_backward(loss)
+                step1_optim.step()
 
-            del loss, task_loss, domain_loss
-            torch.cuda.empty_cache()
+                self.log(
+                    "train_loss",
+                    task_loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log(
+                    "domain_loss",
+                    domain_loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
 
-            return 
+                del loss, task_loss, domain_loss
+                torch.cuda.empty_cache()
 
-        ## begin unlearning
-        else:
-            with torch.autograd.detect_anomaly():
+                return 
+
+            ## begin unlearning
+            else:
                 # update encoder / task heads
                 optim.zero_grad()
                 task_loss = 0
