@@ -12,12 +12,14 @@ class FiLM(nn.Module):
         # F => gamma * F + beta (feature-wise)
 
         # Function which predicts both gamma and beta (shared parameters)
-        self.film_projector = nn.Sequential(
-            nn.Linear(
-                in_features=self.embedding_dim,
-                out_features=self.feature_dim * 2,
-            )
-        )
+        self.film_projector = nn.Linear(in_features=self.embedding_dim, out_features=self.feature_dim * 2,)
+        # self.film_projector = nn.Sequential(
+        #     nn.Linear(
+        #         in_features=self.embedding_dim,
+        #         out_features=self.feature_dim * 2,
+        #     )
+        # )
+
 
     def forward(self, x, cond_embedding):
         """
@@ -27,7 +29,8 @@ class FiLM(nn.Module):
 
         # Get Film conditioning factors
         # warning: Does not need batching as conditioning should be the same for the entire batch
-        out = self.film_projector(cond_embedding)
+        out = nn.functional.linear(cond_embedding, self.film_projector.weight.clone(), self.film_projector.bias)
+        # out = self.film_projector(cond_embedding)
         gamma = out[:, : self.feature_dim]  # [B, C]
         beta = out[:, self.feature_dim :]  # [B, C]
 
