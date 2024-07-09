@@ -422,7 +422,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 feats, targets = vals.values()
                 conf_preds = self.domain_classifier(feats)
                 conf_loss = self.conf_criterion(conf_preds, targets)
-                confusion_loss += conf_loss
+                confusion_loss = confusion_loss + conf_loss
             confusion_loss = beta * confusion_loss
             self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
             conf_optim.step()
