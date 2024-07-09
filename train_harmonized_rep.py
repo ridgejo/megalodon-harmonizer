@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 from pathlib import Path
+import torch
 
 import yaml
 from lightning.pytorch import Trainer, seed_everything
@@ -16,6 +17,9 @@ from models.brain_encoders.rep_learner_unlearner import RepLearnerUnlearner
 
 # Increase wandb waiting time to avoid timeouts
 os.environ["WANDB__SERVICE_WAIT"] = "300"
+
+# Enable anomaly detection for better debugging
+torch.autograd.set_detect_anomaly(True)
 
 SAVE_PATH = Path("/data/engs-pnpl/wolf6942")
 
