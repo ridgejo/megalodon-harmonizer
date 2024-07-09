@@ -208,6 +208,20 @@ class SEANetBrainEncoder(nn.Module):
 
     def forward(self, x):
         return self.model(x)
+        # for layer in self.model:
+        #     if isinstance(layer, SConv1d) or isinstance(layer, SEANetResnetBlock):
+        #         # Clone weights and biases for custom layers to avoid in-place modifications
+        #         layer_weight = layer.conv.weight.clone()
+        #         layer_bias = layer.conv.bias.clone() if layer.conv.bias is not None else None
+        #         x = nn.functional.conv1d(x, layer_weight, layer_bias, stride=layer.conv.stride,
+        #                      padding=layer.conv.padding, dilation=layer.conv.dilation, groups=layer.conv.groups)
+        #     elif isinstance(layer, SLSTM):
+        #         # Handle LSTM layer appropriately if it exists
+        #         x, _ = layer(x)
+        #     else:
+        #         x = layer(x)
+        # return x
+
 
 
 class SEANetBrainDecoder(nn.Module):

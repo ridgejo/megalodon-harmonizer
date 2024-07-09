@@ -140,7 +140,16 @@ class NormConv1d(nn.Module):
         self.norm_type = norm
 
     def forward(self, x):
-        x = self.conv(x)
+        # x = self.conv(x)
+
+        # Clone the weights and biases to avoid in-place modifications
+        weight = self.conv.weight.clone()
+        bias = self.conv.bias.clone() if self.conv.bias is not None else None
+        
+        # Perform the convolution manually
+        x = F.conv1d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
+                      dilation=self.conv.dilation, groups=self.conv.groups)
+
         x = self.norm(x)
         return x
 
@@ -163,7 +172,16 @@ class NormConv2d(nn.Module):
         self.norm_type = norm
 
     def forward(self, x):
-        x = self.conv(x)
+        # x = self.conv(x)
+
+        # Clone the weights and biases to avoid in-place modifications
+        weight = self.conv.weight.clone()
+        bias = self.conv.bias.clone() if self.conv.bias is not None else None
+        
+        # Perform the convolution manually
+        x = F.conv2d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
+                      dilation=self.conv.dilation, groups=self.conv.groups)
+        
         x = self.norm(x)
         return x
 
