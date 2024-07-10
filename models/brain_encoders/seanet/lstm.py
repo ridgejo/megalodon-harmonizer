@@ -42,15 +42,15 @@ class SLSTM(nn.Module):
         bias_hh = [lstm_biases[i] for i in range(1, len(lstm_biases), 2)]
 
         # Initialize hidden and cell states
-        h_0 = torch.zeros(self.num_layers, x.size(1), self.lstm.input_size, device=x.device)
-        c_0 = torch.zeros(self.num_layers, x.size(1), self.lstm.input_size, device=x.device)
+        h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.input_size, device=x.device)
+        c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.input_size, device=x.device)
         
         # Manually call functional LSTM
         y, _ = torch._VF.lstm(x, (h_0, c_0), weight_ih, weight_hh, bias_ih, bias_hh)
 
         # # Initialize hidden and cell states
-        # h_0 = torch.zeros(self.num_layers, x.size(1), self.lstm.input_size, device=x.device)
-        # c_0 = torch.zeros(self.num_layers, x.size(1), self.lstm.input_size, device=x.device)
+        # h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.input_size, device=x.device)
+        # c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.input_size, device=x.device)
         
         # # Extract LSTM parameters and clone them
         # weight_ih_l = [param.clone() for name, param in self.lstm.named_parameters() if 'weight_ih' in name]
