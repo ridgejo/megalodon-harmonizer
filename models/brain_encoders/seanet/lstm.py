@@ -35,7 +35,7 @@ class SLSTM(nn.Module):
         c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
         
         # Manually call functional LSTM using torch._VF.lstm
-        y, _ = torch._VF.lstm(
+        y = torch._VF.lstm(
             x, 
             (h_0, c_0), 
             lstm_params, 
