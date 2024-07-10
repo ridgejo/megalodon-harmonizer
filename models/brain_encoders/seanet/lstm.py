@@ -35,7 +35,7 @@ class SLSTM(nn.Module):
         c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
         
         # Manually call functional LSTM using torch._VF.lstm
-        y = torch._VF.lstm(
+        y, _, _ = torch._VF.lstm(
             x, 
             (h_0, c_0), 
             lstm_params, 
@@ -46,11 +46,6 @@ class SLSTM(nn.Module):
             self.lstm.bidirectional, 
             False  # batch_first
         )
-
-        print(f"DEBUG: y type is f{type(y)}")
-        y, (h_n, c_n) = y  # Explicitly unpack the output
-        print(f"DEBUG: after unpacking y type is f{type(y)}")
-        print(f"DEBUG: x type is f{type(x)}")
         
         # # Initialize hidden and cell states
         # h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.input_size, device=x.device)
