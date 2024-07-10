@@ -6,6 +6,7 @@ from pnpl.dataloaders import MultiDataLoader
 from pnpl.datasets import Armeni2022, Gwilliams2022, Schoffelen2019, Shafto2014
 from torch.utils.data import DataLoader, random_split
 
+
 DATASET_CLASSES = {
     "armeni2022": Armeni2022,
     "gwilliams2022": Gwilliams2022,

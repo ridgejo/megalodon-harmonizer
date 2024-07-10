@@ -13,6 +13,8 @@ class DatasetBlock(nn.Module):
 
         super(DatasetBlock, self).__init__()
 
+        self.use_data_block = use_data_block
+
         self.dataset_encoders = nn.ModuleDict(
             {
                 dataset_id: nn.Conv1d(
@@ -36,7 +38,16 @@ class DatasetBlock(nn.Module):
         )
 
     def forward(self, data, dataset_id):
-        return self.dataset_encoders[dataset_id](data)
+        # return self.dataset_encoders[dataset_id](data)
+        if self.use_data_block:
+            weight = self.dataset_encoders[dataset_id].weight.clone()
+            bias = self.dataset_encoders[dataset_id].bias.clone()
+            return nn.functional.conv1d(data, weight, bias, stride=self.dataset_encoders[dataset_id].stride,
+                                        padding=self.dataset_encoders[dataset_id].padding, 
+                                        dilation=self.dataset_encoders[dataset_id].dilation,
+                                        groups=self.dataset_encoders[dataset_id].groups)
+        else:
+            return self.dataset_encoders[dataset_id](data)
 
     def decode(self, data, dataset_id):
         return self.dataset_decoders[dataset_id](data)
