@@ -155,7 +155,7 @@ class NormConv1d(nn.Module):
             self.conv.weight_v = self.conv.weight_v.to(x.device)
         if self.conv.bias is not None and self.conv.bias.device != x.device:
             self.conv.bias = self.conv.bias.to(x.device)
-            bias = self.conv.bias.clone()
+        bias = self.conv.bias.clone() if self.conv.bias is not None else None
 
         # Manually compute the weight from weight_g and weight_v
         weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
@@ -202,7 +202,7 @@ class NormConv2d(nn.Module):
             self.conv.weight_v = self.conv.weight_v.to(x.device)
         if self.conv.bias is not None and self.conv.bias.device != x.device:
             self.conv.bias = self.conv.bias.to(x.device)
-            bias = self.conv.bias.clone()
+        bias = self.conv.bias.clone() if self.conv.bias is not None else None
 
         # Manually compute the weight from weight_g and weight_v
         weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
