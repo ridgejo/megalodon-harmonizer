@@ -40,7 +40,7 @@ class SLSTM(nn.Module):
             (h_0, c_0), 
             lstm_params, 
             self.lstm.bias, 
-            self.num_layers, 
+            self.lstm.num_layers, 
             self.lstm.dropout, 
             self.lstm.training, 
             self.lstm.bidirectional, 
