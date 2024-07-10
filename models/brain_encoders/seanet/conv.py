@@ -157,9 +157,15 @@ class NormConv1d(nn.Module):
             self.conv.bias = self.conv.bias.to(x.device)
         bias = self.conv.bias.clone() if self.conv.bias is not None else None
 
+        # # Manually compute the weight from weight_g and weight_v
+        # weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
+        # weight = self.conv.weight_v * (self.conv.weight_g[:, None, None] / weight_norm)
+
         # Manually compute the weight from weight_g and weight_v
-        weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
-        weight = self.conv.weight_v * (self.conv.weight_g[:, None, None] / weight_norm)
+        weight_g = self.conv.weight_g.view(-1, 1, 1)
+        weight_v = self.conv.weight_v
+        weight_norm = torch.norm(weight_v, dim=(1, 2), keepdim=True)
+        weight = weight_v * (weight_g / weight_norm)
 
         # Perform the convolution manually
         x = F.conv1d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
@@ -204,9 +210,15 @@ class NormConv2d(nn.Module):
             self.conv.bias = self.conv.bias.to(x.device)
         bias = self.conv.bias.clone() if self.conv.bias is not None else None
 
+        # # Manually compute the weight from weight_g and weight_v
+        # weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
+        # weight = self.conv.weight_v * (self.conv.weight_g[:, None, None] / weight_norm)
+
         # Manually compute the weight from weight_g and weight_v
-        weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
-        weight = self.conv.weight_v * (self.conv.weight_g[:, None, None] / weight_norm)
+        weight_g = self.conv.weight_g.view(-1, 1, 1)
+        weight_v = self.conv.weight_v
+        weight_norm = torch.norm(weight_v, dim=(1, 2), keepdim=True)
+        weight = weight_v * (weight_g / weight_norm)
         
         # Perform the convolution manually
         x = F.conv2d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
