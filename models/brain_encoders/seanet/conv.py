@@ -13,7 +13,7 @@ import warnings
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.nn.utils.parametrizations import spectral_norm, weight_norm
+from torch.nn.utils import spectral_norm, weight_norm
 
 from .norm import ConvLayerNorm
 
@@ -140,36 +140,36 @@ class NormConv1d(nn.Module):
         self.norm_type = norm
 
     def forward(self, x):
-        x = self.conv(x)
+        # x = self.conv(x)
 
-        # # # Clone the weights and biases to avoid in-place modifications
-        # # weight = self.conv.weight.clone()
-        # # weight = weight.to(x.device)
-        # # bias = self.conv.bias.clone() if self.conv.bias is not None else None
-        # # bias = bias.to(x.device)
+        # # Clone the weights and biases to avoid in-place modifications
+        # weight = self.conv.weight.clone()
+        # weight = weight.to(x.device)
+        # bias = self.conv.bias.clone() if self.conv.bias is not None else None
+        # bias = bias.to(x.device)
         
-        # # Ensure that all parameters of the weight norm are on the same device as the input
+        # Ensure that all parameters of the weight norm are on the same device as the input
         # if self.conv.weight_g.device != x.device:
         #     self.conv.weight_g = self.conv.weight_g.to(x.device)
         # if self.conv.weight_v.device != x.device:
         #     self.conv.weight_v = self.conv.weight_v.to(x.device)
         # if self.conv.bias is not None and self.conv.bias.device != x.device:
         #     self.conv.bias = self.conv.bias.to(x.device)
-        # bias = self.conv.bias.clone() if self.conv.bias is not None else None
-
-        # # # Manually compute the weight from weight_g and weight_v
-        # # weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
-        # # weight = self.conv.weight_v * (self.conv.weight_g[:, None, None] / weight_norm)
+        bias = self.conv.bias.clone() if self.conv.bias is not None else None
 
         # # Manually compute the weight from weight_g and weight_v
-        # weight_g = self.conv.weight_g.view(-1, 1, 1)
-        # weight_v = self.conv.weight_v
-        # weight_norm = torch.norm(weight_v, dim=(1, 2), keepdim=True)
-        # weight = weight_v * (weight_g / weight_norm)
+        # weight_norm = torch.norm(self.conv.weight_v, dim=(1, 2), keepdim=True)
+        # weight = self.conv.weight_v * (self.conv.weight_g[:, None, None] / weight_norm)
 
-        # # Perform the convolution manually
-        # x = F.conv1d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
-        #               dilation=self.conv.dilation, groups=self.conv.groups)
+        # Manually compute the weight from weight_g and weight_v
+        weight_g = self.conv.weight_g.clone().view(-1, 1, 1).to(x.device)
+        weight_v = self.conv.weight_v.clone().to(x.device)
+        weight_norm = torch.norm(weight_v, dim=(1, 2), keepdim=True)
+        weight = weight_v * (weight_g / weight_norm)
+
+        # Perform the convolution manually
+        x = F.conv1d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
+                      dilation=self.conv.dilation, groups=self.conv.groups)
 
         x = self.norm(x)
         return x
