@@ -3,7 +3,7 @@ experiment:
   epochs: 100 # 300
 
 rep_config:
-  epoch_stage_1: 33 # 100
+  epoch_stage_1: 70 # 100
   alpha: 1
   beta: 10
   lr: 0.000066
