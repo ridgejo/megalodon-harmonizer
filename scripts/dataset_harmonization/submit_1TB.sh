@@ -8,7 +8,7 @@
 #SBATCH --job-name=ptMEGall
 #SBATCH --time=175:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --partition=test
+#SBATCH --partition=long
 #SBATCH --output=slurm_log/slurm-%j.out
 
 # source env
