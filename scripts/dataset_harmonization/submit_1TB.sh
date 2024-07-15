@@ -7,8 +7,8 @@
 #SBATCH --clusters=htc
 #SBATCH --job-name=ptMEGall
 #SBATCH --time=11:59:00
-#SBATCH --gres=gpu:1
-#SBATCH --partition=short
+#SBATCH --gres=gpu:1 --constraint='gpu_sku:A100'
+#SBATCH --partition=test
 #SBATCH --output=slurm_log/slurm-%j.out
 
 # source env
