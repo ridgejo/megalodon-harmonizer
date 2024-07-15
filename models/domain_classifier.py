@@ -20,7 +20,23 @@ class DomainClassifier(nn.Module):
         domain_pred = self.domain(x)
         return domain_pred
 
+class LeakyDomainClassifier(nn.Module):
+    def __init__(self, nodes=2, init_features=2560, batch_size=512):
+        super(DomainClassifier, self).__init__()
+        self.nodes = nodes
+        self.domain = nn.Sequential()
+        # 512 is the size output by the final layer of the encoder
+        self.domain.add_module('d_fc2', nn.Linear(init_features, batch_size)) #TODO investigate whether this is too big of a reduction
+        self.domain.add_module('d_relu2', nn.LeakyReLU(True))
+        self.domain.add_module('r_dropout', nn.Dropout(p=0.2)) # changed from Dropout3D but should investigate whether features has the right dimensionality
+        self.domain.add_module('d_fc3', nn.Linear(batch_size, nodes))
+        self.domain.add_module('d_pred', nn.Softmax(dim=1))
 
+    def forward(self, x):
+        domain_pred = self.domain(x)
+        return domain_pred
+
+# from Dinsdale segmentation use case
 class DomainPredictor(nn.Module):
     def __init__(self, n_domains=2, init_features=64):
         super(DomainPredictor, self).__init__()
