@@ -45,6 +45,7 @@ parser.add_argument(
 )
 parser.add_argument("--seed", help="Override experiment seed", type=int, default=None)
 parser.add_argument("--early_stop", help="Use early stopping checkpoint", action="store_true", default=False)
+parser.add_argument("--full_run", help="Training on subset", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -57,10 +58,15 @@ if args.seed is not None:
 
 seed_everything(config["experiment"]["seed"], workers=True)
 
+if args.full_run:
+    exp_path = SAVE_PATH / "experiments" / "MEGalodon" / "full_run"
+else:
+    exp_path = SAVE_PATH / "experiments" / "MEGalodon"
+
 wandb_logger = WandbLogger(
     name=args.name,
     project=parser.prog,
-    save_dir=SAVE_PATH / "experiments" / "MEGalodon",
+    save_dir=exp_path,
     log_model=True,  # Log checkpoint only at the end of training (to stop my wandb running out of storage!)
     dir=SAVE_PATH / "wandb" / "MEGalodon",
 )
@@ -194,7 +200,7 @@ trainer = Trainer(
     max_epochs=epochs,
     profiler="simple" if args.profile else None,
     devices=4 if args.ddp else 1,
-    default_root_dir= SAVE_PATH / "experiments" / "MEGalodon"
+    default_root_dir= exp_path
 )
 
 if args.lr_find:
