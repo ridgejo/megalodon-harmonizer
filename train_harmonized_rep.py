@@ -89,11 +89,12 @@ latest_checkpoint = ModelCheckpoint(
     save_top_k=1,
 )
 
-early_stopping = EarlyStopping(
-    monitor='val_loss',  # metric to monitor
-    patience=config['rep_config']['patience'],          # number of epochs with no improvement after which training will be stopped
-    mode='min'           # mode can be 'min' or 'max'
-)
+if args.early_stop:
+    early_stopping = EarlyStopping(
+        monitor='val_loss',  # metric to monitor
+        patience=config['rep_config']['patience'],          # number of epochs with no improvement after which training will be stopped
+        mode='min'           # mode can be 'min' or 'max'
+    )
 
 datamodule = HarmonizationDataModule(
     **config["datamodule_config"],
