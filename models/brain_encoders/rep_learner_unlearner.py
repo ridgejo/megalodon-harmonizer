@@ -314,157 +314,158 @@ class RepLearnerUnlearner(L.LightningModule):
         beta = self.rep_config["beta"]
 
         #TODO remove after debugging
-        with torch.autograd.detect_anomaly():
+        # with torch.autograd.detect_anomaly():
 
-            ## train main encoder
-            if self.current_epoch < self.epoch_stage_1:
-                #TODO implement normalizing total batch size across all 3 dataloaders to 32
-                # skipping for now to get the framework up and running
-                # also using MEGalodon loss instead of regressor loss criterion
-                step1_optim.zero_grad()
-                task_loss = 0
-                domain_loss = 0
-                batch_size = 0
-                subset = 0
-                for idx, batch_i in enumerate(batch):
-                    if idx == 0:
-                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 1:
-                        subset = len(batch_i["data"]) - subset
-                        batch_i = self._take_subset(batch_i, subset)
-                    batch_size += subset
-                    t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
-                    d_pred = self.domain_classifier(features)
-                    # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-                    # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                    d_target = torch.zeros((subset, len(batch))).to(self.device)
-                    d_target[:, idx] = 1
-                    # d_target = d_target.int()
-                    # d_target.to(self.device)
-                    d_loss = self.domain_criterion(d_pred, d_target)
-                    if t_loss is not None:
-                        task_loss += t_loss
-                    domain_loss += d_loss
-                #TODO possibly avg loss over num datasets?
-                loss = task_loss + alpha * domain_loss
-                self.manual_backward(loss)
-                step1_optim.step()
+        ## train main encoder
+        if self.current_epoch < self.epoch_stage_1:
+            #TODO implement normalizing total batch size across all 3 dataloaders to 32
+            # skipping for now to get the framework up and running
+            # also using MEGalodon loss instead of regressor loss criterion
+            step1_optim.zero_grad()
+            task_loss = 0
+            domain_loss = 0
+            batch_size = 0
+            subset = 0
+            for idx, batch_i in enumerate(batch):
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = self._take_subset(batch_i, subset)
+                batch_size += subset
+                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                d_pred = self.domain_classifier(features)
+                # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+                # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
+                d_target = torch.zeros((subset, len(batch))).to(self.device)
+                d_target[:, idx] = 1
+                # d_target = d_target.int()
+                # d_target.to(self.device)
+                d_loss = self.domain_criterion(d_pred, d_target)
+                if t_loss is not None:
+                    task_loss += t_loss
+                domain_loss += d_loss
+            #TODO possibly avg loss over num datasets?
+            loss = task_loss + alpha * domain_loss
+            self.manual_backward(loss)
+            step1_optim.step()
 
-                self.log(
-                    "train_loss",
-                    task_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
-                self.log(
-                    "domain_loss",
-                    domain_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
+            self.log(
+                "train_loss",
+                task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            #TODO maybye only start logging this during second stage
+            self.log(
+                "domain_train_loss",
+                domain_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
 
-                del loss, task_loss, domain_loss
-                torch.cuda.empty_cache()
+            del loss, task_loss, domain_loss
+            torch.cuda.empty_cache()
 
-                return 
+            return 
 
-            ## begin unlearning
-            else:
-                # update encoder / task heads
-                optim.zero_grad()
-                task_loss = 0
-                batch_vals = []
-                batch_size = 0
-                subset = 0
-                for idx, batch_i in enumerate(batch):
-                    if idx == 0:
-                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 1:
-                        subset = len(batch_i["data"]) - subset
-                        batch_i = self._take_subset(batch_i, subset)
-                    batch_size += len(batch_i["data"])
-                    t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
-                    # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-                    # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                    d_target = torch.zeros((subset, len(batch))).to(self.device)
-                    d_target[:, idx] = 1
-                    # d_target = d_target.int()
-                    # d_target.to(self.device)
-                    batch_vals.append({"features": features, "d_target": d_target})
-                    if t_loss is not None:
-                        task_loss += t_loss
-                self.manual_backward(task_loss, retain_graph=True)
-                optim.step()
+        ## begin unlearning
+        else:
+            # update encoder / task heads
+            optim.zero_grad()
+            task_loss = 0
+            batch_vals = []
+            batch_size = 0
+            subset = 0
+            for idx, batch_i in enumerate(batch):
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = self._take_subset(batch_i, subset)
+                batch_size += len(batch_i["data"])
+                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+                # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
+                d_target = torch.zeros((subset, len(batch))).to(self.device)
+                d_target[:, idx] = 1
+                # d_target = d_target.int()
+                # d_target.to(self.device)
+                batch_vals.append({"features": features, "d_target": d_target})
+                if t_loss is not None:
+                    task_loss += t_loss
+            self.manual_backward(task_loss, retain_graph=True)
+            optim.step()
 
-                # update just domain classifier
-                dm_optim.zero_grad()
-                domain_loss = 0
-                for vals in batch_vals:
-                    feats, targets = vals.values()
-                    d_preds = self.domain_classifier(feats.detach())
-                    d_loss = self.domain_criterion(d_preds, targets)
-                    domain_loss += d_loss
-                domain_loss = alpha * domain_loss
-                self.manual_backward(domain_loss)
-                dm_optim.step()
+            # update just domain classifier
+            dm_optim.zero_grad()
+            domain_loss = 0
+            for vals in batch_vals:
+                feats, targets = vals.values()
+                d_preds = self.domain_classifier(feats.detach())
+                d_loss = self.domain_criterion(d_preds, targets)
+                domain_loss += d_loss
+            domain_loss = alpha * domain_loss
+            self.manual_backward(domain_loss)
+            dm_optim.step()
 
-                # update just encoder using domain loss
-                conf_optim.zero_grad()
-                confusion_loss = 0
-                for vals in batch_vals:
-                    feats, targets = vals.values()
-                    conf_preds = self.domain_classifier(feats)
-                    conf_loss = self.conf_criterion(conf_preds, targets)
-                    confusion_loss += conf_loss
-                confusion_loss = beta * confusion_loss
-                self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
-                conf_optim.step()
+            # update just encoder using domain loss
+            conf_optim.zero_grad()
+            confusion_loss = 0
+            for vals in batch_vals:
+                feats, targets = vals.values()
+                conf_preds = self.domain_classifier(feats)
+                conf_loss = self.conf_criterion(conf_preds, targets)
+                confusion_loss += conf_loss
+            confusion_loss = beta * confusion_loss
+            self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
+            conf_optim.step()
 
-                self.log(
-                    "train_loss",
-                    task_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
-                self.log(
-                    "domain_loss",
-                    domain_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
-                self.log(
-                    "confusion_loss",
-                    confusion_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
+            self.log(
+                "train_loss",
+                task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "domain_train_loss",
+                domain_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "confusion_train_loss",
+                confusion_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
 
-                del task_loss, domain_loss, confusion_loss
-                torch.cuda.empty_cache()
+            del task_loss, domain_loss, confusion_loss
+            torch.cuda.empty_cache()
 
-                return 
+            return 
 
     def _take_subset(self, batch, subset):
         for key, value in batch.items():
@@ -474,89 +475,146 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch[key] = value[:subset]
         return batch
 
-    #TODO implement domain unlearning iterative training scheme
     def validation_step(self, batch, batch_idx):
         #TODO implement normalizing total batch size across all 3 dataloaders to 32
         # skipping for now to get the framework up and running
         # also using MEGalodon loss instead of regressor loss criterion
-        task_loss = 0
-        batch_size = 0
-        domain_preds = []
-        domain_targets = []
-        subset = 0
-        for idx, batch_i in enumerate(batch):
-            # print(f"data shape: {batch_i["data"].shape}")
-            if idx == 0:
-                subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                # batch_i = {key: value[:subset] for key, value in batch_i.items()}
-                batch_i = self._take_subset(batch_i, subset)
-            elif idx == 1:
-                subset = len(batch_i["data"]) - subset
-                batch_i = self._take_subset(batch_i, subset)
-            batch_size += subset
 
-            # batch_size += len(batch_i["data"])
-            t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+        if self.current_epoch < self.epoch_stage_1: #TODO make sure diff val functions serve a purpose, check if bypassing hooks avoid the tensor edited in place error
+            task_loss = 0
+            domain_loss = 0
+            batch_size = 0
+            domain_preds = []
+            domain_targets = []
+            subset = 0
+            for idx, batch_i in enumerate(batch):
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = self._take_subset(batch_i, subset)
+                batch_size += subset
 
-            # print(f"features shape: {features.shape}")
+                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
 
-            d_pred = self.domain_classifier(features) 
+                d_pred = self.domain_classifier(features) 
 
-            # print(f"d_pred shape: {d_pred.shape}")
-            # print(f"d_pred: {d_pred}")
+                d_target = torch.zeros((subset, len(batch))).to(self.device)
+                d_target[:, idx] = 1
 
-            # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-            # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-            d_target = torch.zeros((subset, len(batch))).to(self.device)
-            d_target[:, idx] = 1
-            # d_target = d_target.int()
-            # d_target.to(self.device)
-            domain_preds.append(d_pred)
-            domain_targets.append(d_target)
-            if t_loss is not None:
-                task_loss += t_loss
-        domain_preds = torch.cat(domain_preds, 0)
-        domain_targets = torch.cat(domain_targets, 0)
+                d_loss = self.domain_criterion(d_pred, d_target)
 
-        # print(f"domain_preds shape: {domain_preds.shape}")
-        # print(f"domain_preds: {domain_preds}")
-        # print(f"domain_targets shape: {domain_targets.shape}")
-        # print(f"domain_targets: {domain_targets}")
+                domain_preds.append(d_pred)
+                domain_targets.append(d_target)
+                if t_loss is not None:
+                    task_loss += t_loss
+                domain_loss += d_loss
+            domain_preds = torch.cat(domain_preds, 0)
+            domain_targets = torch.cat(domain_targets, 0)
 
-        pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-        true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-        # true_domains = domain_targets.squeeze().detach().cpu().numpy() # no need to call argmax because no batch dim cause calculated here and not returned from Dataloader 
+            pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+            true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+
+            acc = accuracy_score(true_domains, pred_domains)
         
-        # print(f"pred_domains: {pred_domains}")
-        # print(f"true_domains: {true_domains}")
+            self.log(
+                "val_loss",
+                task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "domain_val_loss",
+                domain_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "classifier_acc",
+                acc,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
 
-        acc = accuracy_score(true_domains, pred_domains)
-    
-        self.log(
-            "val_loss",
-            task_loss,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-            batch_size=batch_size,
-            sync_dist=True,
-        )
-        self.log(
-            "classifier_acc",
-            acc,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-            batch_size=batch_size,
-            sync_dist=True,
-        )
+            del domain_preds, domain_targets, pred_domains, true_domains, task_loss, domain_loss 
+            torch.cuda.empty_cache()
 
-        del domain_preds, domain_targets, pred_domains, true_domains, task_loss 
-        torch.cuda.empty_cache()
+            return 
+        
+        else:
+            task_loss = 0
+            batch_size = 0
+            domain_preds = []
+            domain_targets = []
+            subset = 0
+            for idx, batch_i in enumerate(batch):
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = self._take_subset(batch_i, subset)
+                batch_size += subset
 
-        return 
+                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+
+                # explicitly call forward to avoid hooks
+                d_pred = self.domain_classifier.forward(features) 
+
+                d_target = torch.zeros((subset, len(batch))).to(self.device)
+                d_target[:, idx] = 1
+
+                domain_preds.append(d_pred)
+                domain_targets.append(d_target)
+                if t_loss is not None:
+                    task_loss += t_loss
+            domain_preds = torch.cat(domain_preds, 0)
+            domain_targets = torch.cat(domain_targets, 0)
+
+            pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+            true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+
+            acc = accuracy_score(true_domains, pred_domains)
+        
+            self.log(
+                "val_loss",
+                task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "classifier_acc",
+                acc,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+
+            del domain_preds, domain_targets, pred_domains, true_domains, task_loss 
+            torch.cuda.empty_cache()
+
+            return
+
 
     #TODO implement domain unlearning iterative training scheme
     def test_step(self, batch, batch_idx):
