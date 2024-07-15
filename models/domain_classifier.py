@@ -39,7 +39,7 @@ class DomainPredictor(nn.Module):
         # Projector block to reduce features
         self.domain = nn.Sequential()
         self.domain.add_module('r_fc1', nn.Linear(121, 96))
-        self.domain.add_module('r_relu1', nn.ReLU(True))
+        self.domain.add_module('r_relu1', nn.ReLU(True)) #TODO use leaky ReLU if vanishing gradients persists
         self.domain.add_module('d_fc2', nn.Linear(96, 32))
         self.domain.add_module('d_relu2', nn.ReLU(True))
         self.domain.add_module('r_dropout', nn.Dropout2d(p=0.2))
