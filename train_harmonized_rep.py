@@ -7,6 +7,7 @@ import torch
 import yaml
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.tuner import Tuner
@@ -43,6 +44,7 @@ parser.add_argument(
     "--profile", help="Use profiling", action="store_true", default=False
 )
 parser.add_argument("--seed", help="Override experiment seed", type=int, default=None)
+parser.add_argument("--early_stop", help="Use early stopping checkpoint", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -79,6 +81,12 @@ latest_checkpoint = ModelCheckpoint(
     filename="latest-checkpoint",
     every_n_epochs=1,
     save_top_k=1,
+)
+
+early_stopping = EarlyStopping(
+    monitor='val_loss',  # metric to monitor
+    patience=config['rep_config']['patience'],          # number of epochs with no improvement after which training will be stopped
+    mode='min'           # mode can be 'min' or 'max'
 )
 
 datamodule = HarmonizationDataModule(
@@ -173,9 +181,14 @@ wandb_logger.watch(model)
 epochs = config["experiment"]["epochs"] if "epochs" in config["experiment"] else 1000
 epochs = 10 if args.profile else epochs
 
+if args.early_stop:
+    callbacks = [latest_checkpoint, val_checkpoint, early_stopping]
+else:
+    callbacks = [latest_checkpoint, val_checkpoint]
+
 trainer = Trainer(
     logger=wandb_logger,
-    callbacks=[latest_checkpoint, val_checkpoint],
+    callbacks=callbacks,
     detect_anomaly=args.anomaly_detect,
     strategy="auto" if not args.ddp else ddp_strategy,
     max_epochs=epochs,

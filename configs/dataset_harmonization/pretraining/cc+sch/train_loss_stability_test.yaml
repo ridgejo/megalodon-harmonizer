@@ -3,7 +3,8 @@ experiment:
   epochs: 200 # 300
 
 rep_config:
-  epoch_stage_1: 200 # 100
+  epoch_stage_1: 201 # 100
+  patience: 15
   alpha: 1
   beta: 10
   lr: 0.000066
