@@ -6,7 +6,7 @@
 #SBATCH --qos=system
 #SBATCH --clusters=htc
 #SBATCH --job-name=subset_test
-#SBATCH --time=23:59:00
+#SBATCH --time=11:59:00
 #SBATCH --gres=gpu:1
 #SBATCH --partition=short
 #SBATCH --output=slurm_log/slurm-%j.out
