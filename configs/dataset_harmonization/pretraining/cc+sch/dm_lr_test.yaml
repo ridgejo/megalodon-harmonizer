@@ -1,12 +1,13 @@
 experiment:
   seed: 1
-  epochs: 180 # 300
+  epochs: 100 # 300
 
 rep_config:
-  epoch_stage_1: 130 # 100
+  epoch_stage_1: 70 # 100
   alpha: 1
   beta: 10
   lr: 0.000066
+  dm_lr: 1e-4
   dataset_block:
     dataset_sizes:
       armeni2022: 269
