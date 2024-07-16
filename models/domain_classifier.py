@@ -22,7 +22,7 @@ class DomainClassifier(nn.Module):
 
 class LeakyDomainClassifier(nn.Module):
     def __init__(self, nodes=2, init_features=2560, batch_size=512):
-        super(DomainClassifier, self).__init__()
+        super(LeakyDomainClassifier, self).__init__()
         self.nodes = nodes
         self.domain = nn.Sequential()
         # 512 is the size output by the final layer of the encoder
