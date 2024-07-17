@@ -51,7 +51,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.epoch_stage_1 = rep_config["epoch_stage_1"]
 
         self.learning_rate = rep_config["lr"]
-        self.dm_learning_rate = rep_config.get("dm_lr", 1e-4)
+        self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
         self.weightings = {}
 
         encoder_models = {}
