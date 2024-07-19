@@ -207,7 +207,7 @@ trainer = Trainer(
 if args.lr_find:
     tuner = Tuner(trainer)
     # lr_finder = tuner.lr_find(model, datamodule=datamodule)
-    lr_finder = tuner.lr_find(model, datamodule=datamodule, attr_name="dm_lr")
+    lr_finder = tuner.lr_find(model, datamodule=datamodule, attr_name="dm_learning_rate")
     print("Learning rate search results:")
     print(lr_finder.results)
 
