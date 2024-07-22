@@ -2,6 +2,7 @@
 # Model for unlearning domain
 
 import torch.nn as nn
+import torch
 from collections import OrderedDict
 
 class DomainClassifier(nn.Module):
@@ -17,9 +18,23 @@ class DomainClassifier(nn.Module):
         self.domain.add_module('d_pred', nn.Softmax(dim=1))
 
     def forward(self, x):
-        domain_pred = self.domain(x)
-        return domain_pred
+        # domain_pred = self.domain(x)
+        # return domain_pred
+        print("Input to domain classifier:", x)
+        
+        # Manually pass the input through each layer to catch intermediate values
+        for name, module in self.domain.named_children():
+            x = module(x)
+            print(f"Output after {name}: {x}")
 
+            # Check for NaNs or Infs after each layer
+            if torch.isnan(x).any():
+                raise ValueError(f"NaN detected in output after {name}")
+            if torch.isinf(x).any():
+                raise ValueError(f"Inf detected in output after {name}")
+        return x
+
+#TODO remove
 class LeakyDomainClassifier(nn.Module):
     def __init__(self, nodes=2, init_features=2560, batch_size=512):
         super(LeakyDomainClassifier, self).__init__()
