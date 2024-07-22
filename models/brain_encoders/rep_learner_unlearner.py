@@ -410,29 +410,93 @@ class RepLearnerUnlearner(L.LightningModule):
                 self.manual_backward(task_loss, retain_graph=True)
                 optim.step()
 
-                # update just domain classifier
-                dm_optim.zero_grad()
-                domain_loss = 0
-                for vals in batch_vals:
-                    feats, targets = vals.values()
-                    d_preds = self.domain_classifier(feats.detach())
-                    d_loss = self.domain_criterion(d_preds, targets)
-                    domain_loss += d_loss
-                domain_loss = alpha * domain_loss
-                self.manual_backward(domain_loss)
-                dm_optim.step()
+                try:
+                    # update just domain classifier
+                    dm_optim.zero_grad()
+                    domain_loss = 0
+                    for vals in batch_vals:
+                        feats, targets = vals.values()
 
-                # update just encoder using domain loss
-                conf_optim.zero_grad()
-                confusion_loss = 0
-                for vals in batch_vals:
-                    feats, targets = vals.values()
-                    conf_preds = self.domain_classifier(feats)
-                    conf_loss = self.conf_criterion(conf_preds, targets)
-                    confusion_loss += conf_loss
-                confusion_loss = beta * confusion_loss
-                self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
-                conf_optim.step()
+                        # Check for NaNs or Infs in feats and targets
+                        if torch.isnan(feats).any():
+                            raise ValueError("NaN detected in features before domain classifier")
+                        if torch.isinf(feats).any():
+                            raise ValueError("Inf detected in features before domain classifier")
+                        if torch.isnan(targets).any():
+                            raise ValueError("NaN detected in targets before domain classifier")
+                        if torch.isinf(targets).any():
+                            raise ValueError("Inf detected in targets before domain classifier")
+
+                        d_preds = self.domain_classifier(feats.detach())
+                        d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
+                        domain_loss += d_loss
+                    domain_loss = alpha * domain_loss
+                    self.manual_backward(domain_loss)
+                    dm_optim.step()
+
+                    # update just encoder using domain loss
+                    conf_optim.zero_grad()
+                    confusion_loss = 0
+                    for vals in batch_vals:
+                        feats, targets = vals.values()
+                        conf_preds = self.domain_classifier(feats)
+
+                        # Check for NaNs in conf_preds
+                        if torch.isnan(conf_preds).any():
+                            raise ValueError("NaN detected in conf_preds from domain classifier")
+                        if torch.isinf(conf_preds).any():
+                            raise ValueError("Inf detected in conf_preds from domain classifier")
+
+                        conf_loss = self.conf_criterion(conf_preds, targets)
+                        confusion_loss += conf_loss
+                    confusion_loss = beta * confusion_loss
+
+                    self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
+                    conf_optim.step()
+                except:
+                    print("Using except loop")
+                    # update just domain classifier
+                    dm_optim.zero_grad()
+                    domain_loss = 0
+                    for vals in batch_vals:
+                        feats, targets = vals.values()
+
+                        # Check for NaNs or Infs in feats and targets
+                        if torch.isnan(feats).any():
+                            raise ValueError("NaN detected in features before domain classifier")
+                        if torch.isinf(feats).any():
+                            raise ValueError("Inf detected in features before domain classifier")
+                        if torch.isnan(targets).any():
+                            raise ValueError("NaN detected in targets before domain classifier")
+                        if torch.isinf(targets).any():
+                            raise ValueError("Inf detected in targets before domain classifier")
+
+                        d_preds = self.domain_classifier(feats.detach())
+                        d_loss = self.domain_criterion(d_preds, targets.detach()) #might need to detach targets
+                        domain_loss += d_loss
+                    domain_loss = alpha * domain_loss
+                    self.manual_backward(domain_loss)
+                    dm_optim.step()
+
+                    # update just encoder using domain loss
+                    conf_optim.zero_grad()
+                    confusion_loss = 0
+                    for vals in batch_vals:
+                        feats, targets = vals.values()
+                        conf_preds = self.domain_classifier(feats)
+
+                        # Check for NaNs in conf_preds
+                        if torch.isnan(conf_preds).any():
+                            raise ValueError("NaN detected in conf_preds from domain classifier")
+                        if torch.isinf(conf_preds).any():
+                            raise ValueError("Inf detected in conf_preds from domain classifier")
+
+                        conf_loss = self.conf_criterion(conf_preds, targets)
+                        confusion_loss += conf_loss
+                    confusion_loss = beta * confusion_loss
+
+                    self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
+                    conf_optim.step()
 
                 self.log(
                     "train_loss",
