@@ -472,10 +472,14 @@ class RepLearnerUnlearner(L.LightningModule):
                             raise ValueError("Inf detected in targets before domain classifier")
 
                         d_preds = self.domain_classifier(feats.detach())
-                        d_loss = self.domain_criterion(d_preds, targets.detach()) #might need to detach targets
+                        d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
                         domain_loss += d_loss
                     domain_loss = alpha * domain_loss
                     self.manual_backward(domain_loss)
+
+                    print("clipping domain grad")
+                    nn.utils.clip_grad_norm_(self.domain_classifier.parameters(), max_norm=1.0)
+
                     dm_optim.step()
 
                     # update just encoder using domain loss
