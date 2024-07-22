@@ -433,8 +433,8 @@ class RepLearnerUnlearner(L.LightningModule):
                 print(f"domain_loss before backward: {domain_loss}")
                 self.manual_backward(domain_loss)
 
-                print("clipping domain grad")
-                nn.utils.clip_grad_norm_(self.domain_classifier.parameters(), max_norm=1.0)
+                # print("clipping domain grad")
+                # nn.utils.clip_grad_norm_(self.domain_classifier.parameters(), max_norm=1.0)
 
                 dm_optim.step()
 

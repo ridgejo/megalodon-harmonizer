@@ -18,21 +18,21 @@ class DomainClassifier(nn.Module):
         self.domain.add_module('d_pred', nn.Softmax(dim=1))
 
     def forward(self, x):
-        # domain_pred = self.domain(x)
-        # return domain_pred
-        print("Input to domain classifier:", x)
+        domain_pred = self.domain(x)
+        return domain_pred
+        # print("Input to domain classifier:", x)
         
-        # Manually pass the input through each layer to catch intermediate values
-        for name, module in self.domain.named_children():
-            x = module(x)
-            print(f"Output after {name}: {x}")
+        # # Manually pass the input through each layer to catch intermediate values
+        # for name, module in self.domain.named_children():
+        #     x = module(x)
+        #     print(f"Output after {name}: {x}")
 
-            # Check for NaNs or Infs after each layer
-            if torch.isnan(x).any():
-                raise ValueError(f"NaN detected in output after {name}")
-            if torch.isinf(x).any():
-                raise ValueError(f"Inf detected in output after {name}")
-        return x
+        #     # Check for NaNs or Infs after each layer
+        #     if torch.isnan(x).any():
+        #         raise ValueError(f"NaN detected in output after {name}")
+        #     if torch.isinf(x).any():
+        #         raise ValueError(f"Inf detected in output after {name}")
+        # return x
 
 #TODO remove
 class LeakyDomainClassifier(nn.Module):
