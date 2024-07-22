@@ -52,6 +52,8 @@ class RepLearnerUnlearner(L.LightningModule):
 
         self.learning_rate = rep_config["lr"]
         self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
+        self.conf_learning_rate = rep_config.get("conf_lr", 0.0001)
+        self.task_learning_rate = rep_config.get("task_lr", 0.0001)
         self.weightings = {}
 
         encoder_models = {}
@@ -406,7 +408,7 @@ class RepLearnerUnlearner(L.LightningModule):
                     batch_vals.append({"features": features, "d_target": d_target})
                     if t_loss is not None:
                         task_loss += t_loss
-                print(f"task_loss before backward: {task_loss}")
+                # print(f"task_loss before backward: {task_loss}")
                 self.manual_backward(task_loss, retain_graph=True)
                 optim.step()
 
@@ -430,7 +432,7 @@ class RepLearnerUnlearner(L.LightningModule):
                     d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
                     domain_loss += d_loss
                 domain_loss = alpha * domain_loss
-                print(f"domain_loss before backward: {domain_loss}")
+                # print(f"domain_loss before backward: {domain_loss}")
                 self.manual_backward(domain_loss)
 
                 # print("clipping domain grad")
@@ -461,7 +463,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 if torch.isinf(confusion_loss).any():
                     raise ValueError("Inf detected in confusion_loss before backward call ")
                 
-                print(f"confusion_loss before backward: {confusion_loss}")
+                # print(f"confusion_loss before backward: {confusion_loss}")
                 self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
                 conf_optim.step()
                 
@@ -755,8 +757,8 @@ class RepLearnerUnlearner(L.LightningModule):
             encoder_params + predictor_params + domain_classifier_params, 
             lr=self.learning_rate
         )
-        optim = torch.optim.Adam(encoder_params + predictor_params, lr=1e-4)
-        conf_optim = torch.optim.Adam(encoder_params, lr=1e-4)
+        optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
+        conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)
         dm_optim = torch.optim.Adam(domain_classifier_params, lr=self.dm_learning_rate)
         
         return step1_optim, optim, conf_optim, dm_optim

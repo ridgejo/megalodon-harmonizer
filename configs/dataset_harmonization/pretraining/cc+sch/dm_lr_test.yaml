@@ -1,13 +1,15 @@
 experiment:
   seed: 1
-  epochs: 100 # 300
+  epochs: 200
 
 rep_config:
-  epoch_stage_1: 70 # 100
+  epoch_stage_1: 127 # checkpoint loads from 126
   alpha: 1
-  beta: 10
+  beta: 0.0001
   lr: 0.000066
-  dm_lr: 0.0001
+  dm_lr: 0.000066
+  conf_lr: 0.000066
+  task_lr: 0.000066
   dataset_block:
     dataset_sizes:
       armeni2022: 269
