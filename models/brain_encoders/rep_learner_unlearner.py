@@ -383,125 +383,125 @@ class RepLearnerUnlearner(L.LightningModule):
 
         ## begin unlearning
         else:
-            with torch.autograd.detect_anomaly():
-                # update encoder / task heads
-                optim.zero_grad()
-                task_loss = 0
-                batch_vals = []
-                batch_size = 0
-                subset = 0
-                for idx, batch_i in enumerate(batch):
-                    if idx == 0:
-                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 1:
-                        subset = len(batch_i["data"]) - subset
-                        batch_i = self._take_subset(batch_i, subset)
-                    batch_size += len(batch_i["data"])
-                    t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
-                    # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-                    # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                    d_target = torch.zeros((subset, len(batch))).to(self.device)
-                    d_target[:, idx] = 1
-                    # d_target = d_target.int()
-                    # d_target.to(self.device)
-                    batch_vals.append({"features": features, "d_target": d_target})
-                    if t_loss is not None:
-                        task_loss += t_loss
-                # print(f"task_loss before backward: {task_loss}")
-                self.manual_backward(task_loss, retain_graph=True)
-                optim.step()
+            #with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
+            # update encoder / task heads
+            optim.zero_grad()
+            task_loss = 0
+            batch_vals = []
+            batch_size = 0
+            subset = 0
+            for idx, batch_i in enumerate(batch):
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = self._take_subset(batch_i, subset)
+                batch_size += len(batch_i["data"])
+                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
+                # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
+                d_target = torch.zeros((subset, len(batch))).to(self.device)
+                d_target[:, idx] = 1
+                # d_target = d_target.int()
+                # d_target.to(self.device)
+                batch_vals.append({"features": features, "d_target": d_target})
+                if t_loss is not None:
+                    task_loss += t_loss
+            # print(f"task_loss before backward: {task_loss}")
+            self.manual_backward(task_loss, retain_graph=True)
+            optim.step()
 
-                # update just domain classifier
-                dm_optim.zero_grad()
-                domain_loss = 0
-                for vals in batch_vals:
-                    feats, targets = vals.values()
+            # update just domain classifier
+            dm_optim.zero_grad()
+            domain_loss = 0
+            for vals in batch_vals:
+                feats, targets = vals.values()
 
-                    # Check for NaNs or Infs in feats and targets
-                    if torch.isnan(feats).any():
-                        raise ValueError("NaN detected in features before domain classifier")
-                    if torch.isinf(feats).any():
-                        raise ValueError("Inf detected in features before domain classifier")
-                    if torch.isnan(targets).any():
-                        raise ValueError("NaN detected in targets before domain classifier")
-                    if torch.isinf(targets).any():
-                        raise ValueError("Inf detected in targets before domain classifier")
+                # Check for NaNs or Infs in feats and targets
+                if torch.isnan(feats).any():
+                    raise ValueError("NaN detected in features before domain classifier")
+                if torch.isinf(feats).any():
+                    raise ValueError("Inf detected in features before domain classifier")
+                if torch.isnan(targets).any():
+                    raise ValueError("NaN detected in targets before domain classifier")
+                if torch.isinf(targets).any():
+                    raise ValueError("Inf detected in targets before domain classifier")
 
-                    d_preds = self.domain_classifier(feats.detach())
-                    d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
-                    domain_loss += d_loss
-                domain_loss = alpha * domain_loss
-                # print(f"domain_loss before backward: {domain_loss}")
-                self.manual_backward(domain_loss)
+                d_preds = self.domain_classifier(feats.detach())
+                d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
+                domain_loss += d_loss
+            domain_loss = alpha * domain_loss
+            # print(f"domain_loss before backward: {domain_loss}")
+            self.manual_backward(domain_loss)
 
-                # print("clipping domain grad")
-                # nn.utils.clip_grad_norm_(self.domain_classifier.parameters(), max_norm=1.0)
+            # print("clipping domain grad")
+            # nn.utils.clip_grad_norm_(self.domain_classifier.parameters(), max_norm=1.0)
 
-                dm_optim.step()
+            dm_optim.step()
 
-                # update just encoder using domain loss
-                conf_optim.zero_grad()
-                confusion_loss = 0
-                for vals in batch_vals:
-                    feats, targets = vals.values()
-                    conf_preds = self.domain_classifier(feats)
+            # update just encoder using domain loss
+            conf_optim.zero_grad()
+            confusion_loss = 0
+            for vals in batch_vals:
+                feats, targets = vals.values()
+                conf_preds = self.domain_classifier(feats)
 
-                    # Check for NaNs in conf_preds
-                    if torch.isnan(conf_preds).any():
-                        raise ValueError("NaN detected in conf_preds from domain classifier")
-                    if torch.isinf(conf_preds).any():
-                        raise ValueError("Inf detected in conf_preds from domain classifier")
+                # Check for NaNs in conf_preds
+                if torch.isnan(conf_preds).any():
+                    raise ValueError("NaN detected in conf_preds from domain classifier")
+                if torch.isinf(conf_preds).any():
+                    raise ValueError("Inf detected in conf_preds from domain classifier")
 
-                    conf_loss = self.conf_criterion(conf_preds, targets)
-                    confusion_loss += conf_loss
-                confusion_loss = beta * confusion_loss
+                conf_loss = self.conf_criterion(conf_preds, targets)
+                confusion_loss += conf_loss
+            confusion_loss = beta * confusion_loss
 
-                # Check for NaNs in confusion_loss before backward call in except loop
-                if torch.isnan(confusion_loss).any():
-                    raise ValueError("NaN detected in confusion_loss before backward call ")
-                if torch.isinf(confusion_loss).any():
-                    raise ValueError("Inf detected in confusion_loss before backward call ")
-                
-                # print(f"confusion_loss before backward: {confusion_loss}")
-                self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
-                conf_optim.step()
-                
-                self.log(
-                    "train_loss",
-                    task_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
-                self.log(
-                    "domain_train_loss",
-                    domain_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
-                self.log(
-                    "confusion_train_loss",
-                    confusion_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
+            # Check for NaNs in confusion_loss before backward call in except loop
+            if torch.isnan(confusion_loss).any():
+                raise ValueError("NaN detected in confusion_loss before backward call ")
+            if torch.isinf(confusion_loss).any():
+                raise ValueError("Inf detected in confusion_loss before backward call ")
+            
+            # print(f"confusion_loss before backward: {confusion_loss}")
+            self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
+            conf_optim.step()
+            
+            self.log(
+                "train_loss",
+                task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "domain_train_loss",
+                domain_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "confusion_train_loss",
+                confusion_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
 
-                del task_loss, domain_loss, confusion_loss
-                torch.cuda.empty_cache()
+            del task_loss, domain_loss, confusion_loss
+            torch.cuda.empty_cache()
 
-                return 
+            return 
 
     def _take_subset(self, batch, subset):
         for key, value in batch.items():
