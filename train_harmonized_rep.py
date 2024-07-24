@@ -47,6 +47,7 @@ parser.add_argument("--seed", help="Override experiment seed", type=int, default
 parser.add_argument("--early_stop", help="Use early stopping checkpoint", action="store_true", default=False)
 parser.add_argument("--full_run", help="Training on full datasets", action="store_true", default=False)
 parser.add_argument("--get_tsne", help="Get TSNE plots for final encoder layer", action="store_true", default=False)
+parser.add_argument("--sdat", help="Use SDAT optimization framework for unlearning", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -59,6 +60,9 @@ if args.seed is not None:
 
 if args.get_tsne:
     config["rep_config"]["tsne"] = True
+
+if args.sdat:
+    config["rep_config"]["sdat"] = True
 
 seed_everything(config["experiment"]["seed"], workers=True)
 
@@ -216,21 +220,32 @@ if args.lr_find:
     print("Learning rate search results:")
     print(lr_finder.results)
 
-if resume_training:
-    trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint)
+if args.get_tsne:
+    # Get one batch from the validation dataloader
+    val_dataloader = datamodule.val_dataloader()
+    batch = next(iter(val_dataloader))
+
+    # Call the validation step
+    model.eval()  # Set model to evaluation mode
+    with torch.no_grad():  # Disable gradient calculation
+        # T-SNE plot made and saved in val step
+        model.validation_step(batch, batch_idx=0)
 else:
-    trainer.fit(model, datamodule=datamodule)
+    if resume_training:
+        trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint)
+    else:
+        trainer.fit(model, datamodule=datamodule)
 
-# Automatically tests model with best weights from training/fitting
-print("Testing model")
+    # Automatically tests model with best weights from training/fitting
+    print("Testing model")
 
-if "test_datamodule_config" in config:
-    del datamodule
-    test_datamodule = HarmonizationDataModule(
-        **config["test_datamodule_config"],
-        seed=config["experiment"]["seed"],
-    )
-else:
-    test_datamodule = datamodule
+    if "test_datamodule_config" in config:
+        del datamodule
+        test_datamodule = HarmonizationDataModule(
+            **config["test_datamodule_config"],
+            seed=config["experiment"]["seed"],
+        )
+    else:
+        test_datamodule = datamodule
 
-trainer.test(datamodule=test_datamodule)
+    trainer.test(datamodule=test_datamodule)
