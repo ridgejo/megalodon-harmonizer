@@ -45,7 +45,8 @@ parser.add_argument(
 )
 parser.add_argument("--seed", help="Override experiment seed", type=int, default=None)
 parser.add_argument("--early_stop", help="Use early stopping checkpoint", action="store_true", default=False)
-parser.add_argument("--full_run", help="Training on subset", action="store_true", default=False)
+parser.add_argument("--full_run", help="Training on full datasets", action="store_true", default=False)
+parser.add_argument("--get_tsne", help="Get TSNE plots for final encoder layer", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -55,6 +56,9 @@ if args.debug:
 
 if args.seed is not None:
     config["experiment"]["seed"] = args.seed
+
+if args.get_tsne:
+    config["rep_config"]["tsne"] = True
 
 seed_everything(config["experiment"]["seed"], workers=True)
 

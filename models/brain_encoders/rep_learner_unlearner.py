@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from sklearn.metrics import accuracy_score
+from pathlib import Path
 
 from dataloaders.data_utils import get_key_from_batch_identifier, get_dset_encoding
 from models.attach_subject import AttachSubject
@@ -29,6 +30,7 @@ from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
 from models.domain_classifier import DomainClassifier, DomainPredictor
 from models.confusion_loss import ConfusionLoss
+from models.analysis_utils import plot_tsne
 
 
 class LambdaModule(nn.Module):
@@ -54,6 +56,8 @@ class RepLearnerUnlearner(L.LightningModule):
         self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
         self.conf_learning_rate = rep_config.get("conf_lr", 0.0001)
         self.task_learning_rate = rep_config.get("task_lr", 0.0001)
+        self.tsne = rep_config.get("tsne", False)
+        self.activations = None
         self.weightings = {}
 
         encoder_models = {}
@@ -523,6 +527,8 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_preds = []
             domain_targets = []
             subset = 0
+            if self.tsne:
+                activations = []
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
@@ -533,6 +539,9 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+
+                if self.tsne:
+                    activations.append(features.detach())
 
                 d_pred = self.domain_classifier(features) 
 
@@ -551,6 +560,14 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+
+            if self.tsne:
+                activations = torch.cat(activations)
+                label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
+                # Convert numerical labels to class names
+                label_names = [label_mapping[label.item()] for label in true_domains]
+                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization")
+                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="task_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
@@ -596,6 +613,8 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_preds = []
             domain_targets = []
             subset = 0
+            if self.tsne:
+                activations = []
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
@@ -606,6 +625,9 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+
+                if self.tsne:
+                    activations.append(features.detach())
 
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
@@ -622,6 +644,14 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+
+            if self.tsne:
+                activations = torch.cat(activations)
+                label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
+                # Convert numerical labels to class names
+                label_names = [label_mapping[label.item()] for label in true_domains]
+                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization")
+                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearning_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
