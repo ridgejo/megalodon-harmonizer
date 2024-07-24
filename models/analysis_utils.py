@@ -1,5 +1,6 @@
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import torch
 import os
 
@@ -12,9 +13,13 @@ def plot_tsne(activations, labels, save_dir, file_name):
     colors = {label: idx for idx, label in enumerate(unique_labels)}
     scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=[colors[label] for label in labels], cmap='viridis')
     
-    # Create a colorbar with the unique class names
-    cbar = plt.colorbar(scatter, ticks=range(len(unique_labels)))
-    cbar.ax.set_yticklabels(unique_labels)
+    # # Create a colorbar with the unique class names
+    # cbar = plt.colorbar(scatter, ticks=range(len(unique_labels)))
+    # cbar.ax.set_yticklabels(unique_labels)
+
+    # Create custom legend
+    legend_handles = [mpatches.Patch(color=scatter.cmap(scatter.norm(colors[label])), label=label) for label in unique_labels]
+    plt.legend(handles=legend_handles, title="Datasets")
     
     plt.title('t-SNE of Model Activations')
     plt.xlabel('t-SNE Dimension 1')

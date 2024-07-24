@@ -792,7 +792,8 @@ class RepLearnerUnlearner(L.LightningModule):
         if self.sdat:
             optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
             conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)
-            dm_optim = torch.optim.SGD(domain_classifier_params, lr=self.dm_learning_rate)
+            dm_optim = torch.optim.SGD(domain_classifier_params, lr=self.dm_learning_rate, 
+                                       momentum=0.9, weight_decay=1e-3, nesterov=True)
         else:
             optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
             conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)
