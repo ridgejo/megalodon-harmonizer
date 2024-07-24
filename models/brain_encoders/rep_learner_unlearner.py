@@ -562,7 +562,7 @@ class RepLearnerUnlearner(L.LightningModule):
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
 
-            if self.tsne:
+            if self.tsne and batch_idx == 0:
                 activations = torch.cat(activations).to("cpu")
                 label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
                 # Convert numerical labels to class names
@@ -646,7 +646,7 @@ class RepLearnerUnlearner(L.LightningModule):
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
 
-            if self.tsne:
+            if self.tsne and batch_idx == 0:
                 activations = torch.cat(activations).to("cpu")
                 label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
                 # Convert numerical labels to class names
