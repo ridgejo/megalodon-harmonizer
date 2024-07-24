@@ -222,7 +222,7 @@ if args.lr_find:
 
 if args.get_tsne:
     # Get one batch from the validation dataloader
-    datamodule.setup()
+    datamodule.setup('validate')
     val_dataloader = datamodule.val_dataloader()
     batch = next(iter(val_dataloader))
 
