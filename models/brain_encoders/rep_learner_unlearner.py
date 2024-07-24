@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import numpy as np
 from sklearn.metrics import accuracy_score
 from pathlib import Path
+from torch.optim import SGD
+from torch.optim.lr_scheduler import LambdaLR
 
 from dataloaders.data_utils import get_key_from_batch_identifier, get_dset_encoding
 from models.attach_subject import AttachSubject
@@ -31,7 +33,7 @@ from models.vector_quantize import VectorQuantize
 from models.domain_classifier import DomainClassifier, DomainPredictor
 from models.confusion_loss import ConfusionLoss
 from models.analysis_utils import plot_tsne
-
+from models.sam_optimizer import SAM
 
 class LambdaModule(nn.Module):
     def __init__(self, func):
@@ -783,26 +785,50 @@ class RepLearnerUnlearner(L.LightningModule):
         encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
         predictor_params = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))
         domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
-        
-        step1_optim = torch.optim.AdamW(
-            encoder_params + predictor_params + domain_classifier_params, 
-            lr=self.learning_rate
-        )
 
         if self.sdat:
-            optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
-            conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)
-            dm_optim = torch.optim.SGD(domain_classifier_params, lr=self.dm_learning_rate, 
+            base_optim = torch.optim.SGD
+
+            step1_optim = SAM(encoder_params + predictor_params + domain_classifier_params, base_optim,
+                              rho=0.05, adaptive=False, lr=self.learning_rate, momentum=0.9,
+                              weight_decay=1e-3, nesterov=True)
+
+            optim = SAM(encoder_params + predictor_params, base_optim,
+                              rho=0.05, adaptive=False, lr=self.task_learning_rate, momentum=0.9,
+                              weight_decay=1e-3, nesterov=True)
+            conf_optim = SAM(encoder_params, base_optim,
+                              rho=0.05, adaptive=False, lr=self.conf_learning_rate, momentum=0.9,
+                              weight_decay=1e-3, nesterov=True)
+            dm_optim = SGD(domain_classifier_params, lr=self.dm_learning_rate, 
                                        momentum=0.9, weight_decay=1e-3, nesterov=True)
-            # Clear the state for the domain classifier optimizer
-            step1_optim.state = {}
-            dm_optim.state = {}
+            
+            step1_scheduler = LambdaLR(step1_optim, lambda x: self.learning_rate *
+                            (1. + 0.001 * float(x)) ** (-0.75))
+            optim_scheduler = LambdaLR(optim, lambda x: self.task_learning_rate *
+                            (1. + 0.001 * float(x)) ** (-0.75))
+            conf_scheduler = LambdaLR(conf_optim, lambda x: self.conf_learning_rate *
+                            (1. + 0.001 * float(x)) ** (-0.75))
+            dm_scheduler = LambdaLR(
+                 dm_optim, lambda x: self.dm_learning_rate * (1. + 0.001 * float(x)) ** (-0.75))
+            
+            return [
+                {'optimizer': step1_optim, 'lr_scheduler': {'scheduler': step1_scheduler, 'interval': 'epoch', 'frequency': 1}},
+                {'optimizer': optim, 'lr_scheduler': {'scheduler': optim_scheduler, 'interval': 'step', 'frequency': 1}},
+                {'optimizer': conf_optim, 'lr_scheduler': {'scheduler': conf_scheduler, 'interval': 'step', 'frequency': 1}},
+                {'optimizer': dm_optim, 'lr_scheduler': {'scheduler': dm_scheduler, 'interval': 'step', 'frequency': 1}}
+            ]
+
         else:
+            step1_optim = torch.optim.AdamW(
+                encoder_params + predictor_params + domain_classifier_params, 
+                lr=self.learning_rate
+            )
+
             optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
             conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)
             dm_optim = torch.optim.Adam(domain_classifier_params, lr=self.dm_learning_rate)
         
-        return step1_optim, optim, conf_optim, dm_optim
+            return step1_optim, optim, conf_optim, dm_optim
     
     def finetuning_mode(self):
         self.freeze_except(
