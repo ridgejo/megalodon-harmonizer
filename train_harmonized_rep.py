@@ -205,7 +205,8 @@ trainer = Trainer(
     max_epochs=epochs,
     profiler="simple" if args.profile else None,
     devices=4 if args.ddp else 1,
-    default_root_dir= exp_path
+    default_root_dir= exp_path,
+    num_sanity_val_steps=0
 )
 
 if args.lr_find:
