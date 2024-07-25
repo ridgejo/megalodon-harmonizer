@@ -226,11 +226,10 @@ trainer = Trainer(
 
 if args.sgd:
     # Extract the epoch and global step from the checkpoint
-    epoch = checkpoint['epoch']
-    global_step = checkpoint['global_step']
+    trainer_state = torch.load(checkpoint)
     # Manually set the trainer's state
-    trainer.current_epoch = epoch
-    trainer.global_step = global_step
+    trainer.current_epoch = trainer_state['epoch']
+    trainer.global_step = trainer_state['global_step']
 
 if args.lr_find:
     tuner = Tuner(trainer)
@@ -245,13 +244,11 @@ if args.get_tsne:
     val_dataloader = datamodule.val_dataloader()
     batch = next(iter(val_dataloader))
 
-    # # Check for GPU availability
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = "cpu"
-    # Move model to GPU
+    # Move model to CPU
     model.to(device)
 
-    # Move batch to GPU by iterating over the tensors
+    # Ensure batch on CPU by iterating over the tensors
     for b in batch:
         b['data'] = b['data'].float().to(device)
 
