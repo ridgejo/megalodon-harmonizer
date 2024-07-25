@@ -48,6 +48,7 @@ parser.add_argument("--early_stop", help="Use early stopping checkpoint", action
 parser.add_argument("--full_run", help="Training on full datasets", action="store_true", default=False)
 parser.add_argument("--get_tsne", help="Get TSNE plots for final encoder layer", action="store_true", default=False)
 parser.add_argument("--sdat", help="Use SDAT optimization framework for unlearning", action="store_true", default=False)
+parser.add_argument("--sgd", help="Use SGD for domain classifier during unlearning", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -63,6 +64,9 @@ if args.get_tsne:
 
 if args.sdat:
     config["rep_config"]["sdat"] = True
+
+if args.sgd:
+    config["rep_config"]["sgd"] = True
 
 seed_everything(config["experiment"]["seed"], workers=True)
 
@@ -180,10 +184,17 @@ if args.checkpoint:
                 0
             ]  # Find latest checkpoint file within the directory
 
-        # Load model from the pre-trained checkpoint and resume training
-        model = RepLearnerUnlearner.load_from_checkpoint(
-            checkpoint, rep_config=config["rep_config"]
-        )
+        if args.sgd:
+            # Load only model weights 
+            model = RepLearnerUnlearner(rep_config=config["rep_config"])
+            state_dict = torch.load(checkpoint)
+            model.load_state_dict(state_dict['state_dict'])
+            resume_training = False
+        else:
+            # Load model from the pre-trained checkpoint and resume training
+            model = RepLearnerUnlearner.load_from_checkpoint(
+                checkpoint, rep_config=config["rep_config"]
+            )
 
 else:
     model = RepLearnerUnlearner(

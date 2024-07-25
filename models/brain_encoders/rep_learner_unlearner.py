@@ -60,6 +60,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.task_learning_rate = rep_config.get("task_lr", 0.0001)
         self.tsne = rep_config.get("tsne", False)
         self.sdat = rep_config.get("sdat", False)
+        self.sgd = rep_config.get("sgd", False)
         self.activations = None
         self.weightings = {}
 
@@ -572,6 +573,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
                 np.save(save_path / "task_activations.npy", activations.numpy())
                 np.save(save_path / "task_labels.npy", np.array(label_names))
+                print("Saving activations...")
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="task_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
@@ -658,6 +660,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
                 np.save(save_path / "unlearned_activations.npy", activations.numpy())
                 np.save(save_path / "unlearned_labels.npy", np.array(label_names))
+                print("Saving activations...")
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
@@ -830,7 +833,11 @@ class RepLearnerUnlearner(L.LightningModule):
 
             optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
             conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)
-            dm_optim = torch.optim.Adam(domain_classifier_params, lr=self.dm_learning_rate)
+            if self.sgd:
+                dm_optim = SGD(domain_classifier_params, lr=self.dm_learning_rate, 
+                                       momentum=0.9, weight_decay=1e-3, nesterov=True)
+            else:
+                dm_optim = torch.optim.Adam(domain_classifier_params, lr=self.dm_learning_rate)
         
             return step1_optim, optim, conf_optim, dm_optim
     
