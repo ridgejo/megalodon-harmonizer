@@ -708,7 +708,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
 
-            t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx=0, stage="val")
+            t_loss, losses, metrics, features = self._shared_step(batch=batch_i, batch_idx=0, stage="val")
 
             if self.tsne:
                 activations.append(features.detach())
