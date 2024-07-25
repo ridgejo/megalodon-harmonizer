@@ -2,7 +2,7 @@
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=jeremiah.ridge@wolfson.ox.ac.uk
 #SBATCH --nodes=1
-#SBATCH --mem=300G
+#SBATCH --mem=150G
 #SBATCH --qos=system
 #SBATCH --clusters=htc
 #SBATCH --job-name=dev_subset_test

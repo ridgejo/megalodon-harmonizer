@@ -224,6 +224,14 @@ trainer = Trainer(
     num_sanity_val_steps=0
 )
 
+if args.sgd:
+    # Extract the epoch and global step from the checkpoint
+    epoch = checkpoint['epoch']
+    global_step = checkpoint['global_step']
+    # Manually set the trainer's state
+    trainer.current_epoch = epoch
+    trainer.global_step = global_step
+
 if args.lr_find:
     tuner = Tuner(trainer)
     # lr_finder = tuner.lr_find(model, datamodule=datamodule)
@@ -231,45 +239,45 @@ if args.lr_find:
     print("Learning rate search results:")
     print(lr_finder.results)
 
-# if args.get_tsne:
-#     # Get one batch from the validation dataloader
-#     datamodule.setup('validate')
-#     val_dataloader = datamodule.val_dataloader()
-#     batch = next(iter(val_dataloader))
+if args.get_tsne:
+    # Get one batch from the validation dataloader
+    datamodule.setup('validate')
+    val_dataloader = datamodule.val_dataloader()
+    batch = next(iter(val_dataloader))
 
-#     # Check for GPU availability
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Check for GPU availability
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-#     # Move model to GPU
-#     model.to(device)
+    # Move model to GPU
+    model.to(device)
 
-#     # Move batch to GPU by iterating over the tensors
-#     temp = []
-#     for b in batch:
-#         temp.append(tuple(tensor.to(device) for tensor in b))
-#     batch = tuple(temp)
+    # Move batch to GPU by iterating over the tensors
+    temp = []
+    for b in batch:
+        temp.append(tuple(tensor.to(device) for tensor in b))
+    batch = tuple(temp)
 
-#     # Call the validation step
-#     model.eval()  # Set model to evaluation mode
-#     with torch.no_grad():  # Disable gradient calculation
-#         # T-SNE plot made and saved in val step
-#         model.validation_step(batch, batch_idx=0)
-# else:
-if resume_training:
-    trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint)
+    # Call the validation step
+    model.eval()  # Set model to evaluation mode
+    with torch.no_grad():  # Disable gradient calculation
+        # T-SNE plot made and saved in val step
+        model.get_tsne(batch)
 else:
-    trainer.fit(model, datamodule=datamodule)
+    if resume_training:
+        trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint)
+    else:
+        trainer.fit(model, datamodule=datamodule)
 
-# Automatically tests model with best weights from training/fitting
-print("Testing model")
+    # Automatically tests model with best weights from training/fitting
+    print("Testing model")
 
-if "test_datamodule_config" in config:
-    del datamodule
-    test_datamodule = HarmonizationDataModule(
-        **config["test_datamodule_config"],
-        seed=config["experiment"]["seed"],
-    )
-else:
-    test_datamodule = datamodule
+    if "test_datamodule_config" in config:
+        del datamodule
+        test_datamodule = HarmonizationDataModule(
+            **config["test_datamodule_config"],
+            seed=config["experiment"]["seed"],
+        )
+    else:
+        test_datamodule = datamodule
 
-trainer.test(datamodule=test_datamodule)
+    trainer.test(datamodule=test_datamodule)

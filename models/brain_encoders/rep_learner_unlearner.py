@@ -691,6 +691,53 @@ class RepLearnerUnlearner(L.LightningModule):
 
             return
 
+    def get_tsne(self, batch):
+        task_loss = 0
+        batch_size = 0
+        domain_preds = []
+        domain_targets = []
+        subset = 0
+        if self.tsne:
+            activations = []
+        for idx, batch_i in enumerate(batch):
+            if idx == 0:
+                subset = (len(batch_i["data"]) - 1) // 2
+                batch_i = self._take_subset(batch_i, subset)
+            elif idx == 1:
+                subset = len(batch_i["data"]) - subset
+                batch_i = self._take_subset(batch_i, subset)
+            batch_size += subset
+
+            t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx=0, stage="val")
+
+            if self.tsne:
+                activations.append(features.detach())
+
+            # explicitly call forward to avoid hooks
+            d_pred = self.domain_classifier.forward(features) 
+
+            d_target = torch.zeros((subset, len(batch))).to(self.device)
+            d_target[:, idx] = 1
+
+            domain_preds.append(d_pred)
+            domain_targets.append(d_target)
+            if t_loss is not None:
+                task_loss += t_loss
+        domain_preds = torch.cat(domain_preds, 0)
+        domain_targets = torch.cat(domain_targets, 0)
+
+        pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+        true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+
+        activations = torch.cat(activations).to("cpu")
+        label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
+        # Convert numerical labels to class names
+        label_names = [label_mapping[label.item()] for label in true_domains]
+        save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
+        np.save(save_path / "unlearned_activations.npy", activations.numpy())
+        np.save(save_path / "unlearned_labels.npy", np.array(label_names))
+        print("Saving activations...")
+        plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
 
     #TODO implement domain unlearning iterative training scheme
     def test_step(self, batch, batch_idx):
