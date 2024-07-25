@@ -247,13 +247,13 @@ if args.get_tsne:
 
     # # Check for GPU availability
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # # Move model to GPU
-    # model.to(device)
+    device = "cpu"
+    # Move model to GPU
+    model.to(device)
 
     # Move batch to GPU by iterating over the tensors
     for b in batch:
-        b['data'] = b['data'].float()
+        b['data'] = b['data'].float().to(device)
 
     # Call the validation step
     model.eval()  # Set model to evaluation mode
