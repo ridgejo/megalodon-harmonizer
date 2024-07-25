@@ -252,8 +252,8 @@ if args.get_tsne:
     # model.to(device)
 
     # Move batch to GPU by iterating over the tensors
-    # for b in batch:
-    #     b['data'] = b['data'].float().to(device)
+    for b in batch:
+        b['data'] = b['data'].float()
 
     # Call the validation step
     model.eval()  # Set model to evaluation mode
