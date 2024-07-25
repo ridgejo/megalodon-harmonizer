@@ -569,7 +569,9 @@ class RepLearnerUnlearner(L.LightningModule):
                 label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
                 # Convert numerical labels to class names
                 label_names = [label_mapping[label.item()] for label in true_domains]
-                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization")
+                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
+                np.save(save_path / "task_activations.npy", activations.numpy())
+                np.save(save_path / "task_labels.npy", np.array(label_names))
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="task_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
@@ -653,8 +655,10 @@ class RepLearnerUnlearner(L.LightningModule):
                 label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
                 # Convert numerical labels to class names
                 label_names = [label_mapping[label.item()] for label in true_domains]
-                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization")
-                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearning_tsne.png")
+                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
+                np.save(save_path / "unlearned_activations.npy", activations.numpy())
+                np.save(save_path / "unlearned_labels.npy", np.array(label_names))
+                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
