@@ -697,6 +697,8 @@ class RepLearnerUnlearner(L.LightningModule):
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
 
+        acc = accuracy_score(true_domains, pred_domains)
+
         activations = torch.cat(activations).to("cpu")
         label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
         # Convert numerical labels to class names
@@ -704,6 +706,7 @@ class RepLearnerUnlearner(L.LightningModule):
         save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
         np.save(save_path / "unlearned_activations.npy", activations.numpy())
         np.save(save_path / "unlearned_labels.npy", np.array(label_names))
+        print(f"Single batch accuracy: {acc}")
         print("Saving activations...")
         plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
 
@@ -804,7 +807,8 @@ class RepLearnerUnlearner(L.LightningModule):
         return loss, losses, metrics, features
     
     def on_load_checkpoint(self, checkpoint):
-        checkpoint["optimizer_states"] = []
+        if self.sgd or self.sdat: # assumes checkpoint was pretrained with adam
+            checkpoint["optimizer_states"] = []
 
     def configure_optimizers(self):
         encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
