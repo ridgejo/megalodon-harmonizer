@@ -184,17 +184,18 @@ if args.checkpoint:
                 0
             ]  # Find latest checkpoint file within the directory
 
-        if args.sgd:
-            # Load only model weights 
-            model = RepLearnerUnlearner(rep_config=config["rep_config"])
-            state_dict = torch.load(checkpoint)
-            model.load_state_dict(state_dict['state_dict'])
-            resume_training = False
-        else:
-            # Load model from the pre-trained checkpoint and resume training
-            model = RepLearnerUnlearner.load_from_checkpoint(
-                checkpoint, rep_config=config["rep_config"]
-            )
+        # if args.sgd:
+        #     # Load only model weights 
+        #     model = RepLearnerUnlearner(rep_config=config["rep_config"])
+        #     state_dict = torch.load(checkpoint)
+        #     model.load_state_dict(state_dict['state_dict'])
+        #     resume_training = False
+        # else:
+        
+        # Load model from the pre-trained checkpoint and resume training
+        model = RepLearnerUnlearner.load_from_checkpoint(
+            checkpoint, rep_config=config["rep_config"]
+        )
 
 else:
     model = RepLearnerUnlearner(
@@ -224,12 +225,12 @@ trainer = Trainer(
     num_sanity_val_steps=0
 )
 
-if args.sgd:
-    # Extract the epoch and global step from the checkpoint
-    trainer_state = torch.load(checkpoint)
-    # Manually set the trainer's state
-    trainer.current_epoch = trainer_state['epoch']
-    trainer.global_step = trainer_state['global_step']
+# if args.sgd:
+#     # Extract the epoch and global step from the checkpoint
+#     trainer_state = torch.load(checkpoint)
+#     # Manually set the trainer's state
+#     trainer.current_epoch = trainer_state['epoch']
+#     trainer.global_step = trainer_state['global_step']
 
 if args.lr_find:
     tuner = Tuner(trainer)

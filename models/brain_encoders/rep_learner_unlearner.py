@@ -531,8 +531,6 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_preds = []
             domain_targets = []
             subset = 0
-            if self.tsne:
-                activations = []
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
@@ -543,9 +541,6 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
-
-                if self.tsne:
-                    activations.append(features.detach())
 
                 d_pred = self.domain_classifier(features) 
 
@@ -564,17 +559,6 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-
-            if self.tsne and batch_idx == 0:
-                activations = torch.cat(activations).to("cpu")
-                label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
-                # Convert numerical labels to class names
-                label_names = [label_mapping[label.item()] for label in true_domains]
-                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
-                np.save(save_path / "task_activations.npy", activations.numpy())
-                np.save(save_path / "task_labels.npy", np.array(label_names))
-                print("Saving activations...")
-                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="task_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
@@ -620,8 +604,6 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_preds = []
             domain_targets = []
             subset = 0
-            if self.tsne:
-                activations = []
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
@@ -632,9 +614,6 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
-
-                if self.tsne:
-                    activations.append(features.detach())
 
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
@@ -651,17 +630,6 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-
-            if self.tsne and batch_idx == 0:
-                activations = torch.cat(activations).to("cpu")
-                label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
-                # Convert numerical labels to class names
-                label_names = [label_mapping[label.item()] for label in true_domains]
-                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
-                np.save(save_path / "unlearned_activations.npy", activations.numpy())
-                np.save(save_path / "unlearned_labels.npy", np.array(label_names))
-                print("Saving activations...")
-                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
@@ -834,6 +802,9 @@ class RepLearnerUnlearner(L.LightningModule):
             loss = None
 
         return loss, losses, metrics, features
+    
+    def on_load_checkpoint(self, checkpoint):
+        checkpoint["optimizer_states"] = []
 
     def configure_optimizers(self):
         encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
