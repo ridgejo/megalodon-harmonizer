@@ -53,6 +53,9 @@ args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
 
+# share experiment config val with lightning module
+config["rep_config"]["max_epochs"] = config["experiment"]["epochs"]
+
 if args.debug:
     config["datamodule_config"]["debug"] = True
 
@@ -73,7 +76,6 @@ seed_everything(config["experiment"]["seed"], workers=True)
 if args.full_run:
     exp_path = SAVE_PATH / "experiments" / "MEGalodon" / "full_run"
     config["rep_config"]["full_run"] = True
-    config["rep_config"]["max_epochs"] = config["experiment"]["epochs"]
 else:
     exp_path = SAVE_PATH / "experiments" / "MEGalodon"
 

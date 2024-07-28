@@ -852,6 +852,13 @@ class RepLearnerUnlearner(L.LightningModule):
         if self.sgd or self.sdat: # assumes checkpoint was pretrained with adam
             checkpoint["optimizer_states"] = []
 
+    ## to be used in the potential case that checkpoint is trained with adam but you don't want to begin unlearning immediately
+    def reset_optimizer_states(self):
+        # Function to reset optimizer states
+        for optimizer in self.trainer.optimizers:
+            optimizer.state = {}
+        self.configure_optimizers()
+
     def configure_optimizers(self):
         encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
         predictor_params = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))
