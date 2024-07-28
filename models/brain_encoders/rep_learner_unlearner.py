@@ -53,6 +53,7 @@ class RepLearnerUnlearner(L.LightningModule):
         super().__init__()
         self.automatic_optimization = False
         self.epoch_stage_1 = rep_config["epoch_stage_1"]
+        self.max_epochs = rep_config["max_epochs"]
 
         self.learning_rate = rep_config["lr"]
         self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
@@ -61,6 +62,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.tsne = rep_config.get("tsne", False)
         self.sdat = rep_config.get("sdat", False)
         self.sgd = rep_config.get("sgd", False)
+        self.full_run = rep_config.get("full_run", False)
         self.activations = None
         self.weightings = {}
 
@@ -525,12 +527,18 @@ class RepLearnerUnlearner(L.LightningModule):
         # also using MEGalodon loss instead of regressor loss criterion
 
         if self.current_epoch < self.epoch_stage_1: #TODO make sure diff val functions serve a purpose, check if bypassing hooks avoid the tensor edited in place error
+            if self.full_run and self.current_epoch == self.epoch_stage_1 - 1 and batch_idx == 0:
+                save_activations = True
+            else:
+                save_activations = False
             task_loss = 0
             domain_loss = 0
             batch_size = 0
             domain_preds = []
             domain_targets = []
             subset = 0
+            if save_activations:
+                activations = []
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
@@ -541,6 +549,9 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+
+                if save_activations:
+                    activations.append(features.detach())
 
                 d_pred = self.domain_classifier(features) 
 
@@ -559,6 +570,17 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+
+            if save_activations:
+                activations = torch.cat(activations).to("cpu")
+                label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
+                # Convert numerical labels to class names
+                label_names = [label_mapping[label.item()] for label in true_domains]
+                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/full_run/fullrun_tsne_plots")
+                np.save(save_path / "task_activations.npy", activations.numpy())
+                np.save(save_path / "task_labels.npy", np.array(label_names))
+                print("Saving activations...")
+                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="task_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
@@ -599,11 +621,17 @@ class RepLearnerUnlearner(L.LightningModule):
             return 
         
         else:
+            if self.full_run and self.current_epoch == self.max_epochs - 1 and batch_idx == 0:
+                save_activations = True
+            else:
+                save_activations = False
             task_loss = 0
             batch_size = 0
             domain_preds = []
             domain_targets = []
             subset = 0
+            if save_activations:
+                activations = []
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
@@ -614,6 +642,9 @@ class RepLearnerUnlearner(L.LightningModule):
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+
+                if save_activations:
+                    activations.append(features.detach())
 
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
@@ -630,6 +661,17 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+
+            if save_activations:
+                activations = torch.cat(activations).to("cpu")
+                label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
+                # Convert numerical labels to class names
+                label_names = [label_mapping[label.item()] for label in true_domains]
+                save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/full_run/fullrun_tsne_plots")
+                np.save(save_path / "unlearned_activations.npy", activations.numpy())
+                np.save(save_path / "unlearned_labels.npy", np.array(label_names))
+                print("Saving activations...")
+                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         

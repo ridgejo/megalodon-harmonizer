@@ -72,6 +72,8 @@ seed_everything(config["experiment"]["seed"], workers=True)
 
 if args.full_run:
     exp_path = SAVE_PATH / "experiments" / "MEGalodon" / "full_run"
+    config["rep_config"]["full_run"] = True
+    config["rep_config"]["max_epochs"] = config["experiment"]["epochs"]
 else:
     exp_path = SAVE_PATH / "experiments" / "MEGalodon"
 
