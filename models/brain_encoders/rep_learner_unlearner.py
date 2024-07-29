@@ -63,6 +63,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.sdat = rep_config.get("sdat", False)
         self.sgd = rep_config.get("sgd", False)
         self.full_run = rep_config.get("full_run", False)
+        self.clear_optim = rep_config.get("clear_optim", False)
         self.activations = None
         self.weightings = {}
 
@@ -849,10 +850,11 @@ class RepLearnerUnlearner(L.LightningModule):
         return loss, losses, metrics, features
     
     def on_load_checkpoint(self, checkpoint):
-        if self.sgd or self.sdat: # assumes checkpoint was pretrained with adam
+        if (self.sgd or self.sdat) and self.clear_optim: # assumes checkpoint was pretrained with adam
             checkpoint["optimizer_states"] = []
 
     ## to be used in the potential case that checkpoint is trained with adam but you don't want to begin unlearning immediately
+    ## currently not called anywhere
     def reset_optimizer_states(self):
         # Function to reset optimizer states
         for optimizer in self.trainer.optimizers:

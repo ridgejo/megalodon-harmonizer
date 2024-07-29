@@ -8,7 +8,10 @@
 
 from torch import nn
 import torch
+import warnings
 
+# Suppress the specific RNN warning
+warnings.filterwarnings("ignore", message=".*RNN module weights are not part of single contiguous chunk of memory.*")
 
 class SLSTM(nn.Module):
     """
