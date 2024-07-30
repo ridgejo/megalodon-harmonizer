@@ -12,7 +12,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.tuner import Tuner
 
-from dataloaders.data_module import HarmonizationDataModule
+from dataloaders.data_module import HarmonizationDataModule, MEGDataModule
 from dataloaders.data_utils import DATA_PATH
 from models.brain_encoders.rep_learner_unlearner import RepLearnerUnlearner
 
@@ -121,10 +121,13 @@ if args.early_stop:
         mode='min'           # mode can be 'min' or 'max'
     )
 
-datamodule = HarmonizationDataModule(
-    **config["datamodule_config"],
-    seed=config["experiment"]["seed"],
-)
+if "finetune" in config:
+    datamodule = MEGDataModule
+else:
+    datamodule = HarmonizationDataModule(
+        **config["datamodule_config"],
+        seed=config["experiment"]["seed"],
+    )
 
 ddp_strategy = DDPStrategy(
     find_unused_parameters=True, static_graph=False
@@ -267,10 +270,17 @@ else:
 
     if "test_datamodule_config" in config:
         del datamodule
-        test_datamodule = HarmonizationDataModule(
-            **config["test_datamodule_config"],
-            seed=config["experiment"]["seed"],
-        )
+        if "finetune" in config:
+            test_datamodule = MEGDataModule(
+                **config["test_datamodule_config"],
+                seed=config["experiment"]["seed"],
+            )
+        else:
+            test_datamodule = HarmonizationDataModule(
+                **config["test_datamodule_config"],
+                seed=config["experiment"]["seed"],
+            )
+        
     else:
         test_datamodule = datamodule
 
