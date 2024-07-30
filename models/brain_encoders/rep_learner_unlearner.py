@@ -323,7 +323,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
-        if self.finetuning:
+        if self.finetune:
             loss, losses, metrics = self._shared_step(batch, batch_idx, "train")
 
             batch_size = len(batch["data"])
@@ -564,6 +564,44 @@ class RepLearnerUnlearner(L.LightningModule):
         # skipping for now to get the framework up and running
         # also using MEGalodon loss instead of regressor loss criterion
 
+        if self.finetune:
+            loss, losses, metrics = self._shared_step(batch, batch_idx, "val")
+
+            batch_size = len(batch["data"])
+
+            if loss is not None:
+                self.log(
+                    "val_loss",
+                    loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log_dict(
+                    losses,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log_dict(
+                    metrics,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+
+            return loss
+
+        ## Pre-training
         if self.current_epoch < self.epoch_stage_1: #TODO make sure diff val functions serve a purpose, check if bypassing hooks avoid the tensor edited in place error
             if self.full_run and self.current_epoch == self.epoch_stage_1 - 1 and batch_idx == 0:
                 save_activations = True
@@ -795,6 +833,45 @@ class RepLearnerUnlearner(L.LightningModule):
         #TODO implement normalizing total batch size across all 3 dataloaders to 32
         # skipping for now to get the framework up and running
         # also using MEGalodon loss instead of regressor loss criterion
+
+        if self.finetune:
+            loss, losses, metrics = self._shared_step(batch, batch_idx, "test")
+
+            batch_size = len(batch["data"])
+
+            if loss is not None:
+                self.log(
+                    "test_loss",
+                    loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log_dict(
+                    losses,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log_dict(
+                    metrics,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+
+            return loss
+
+        ## Pre-training
         task_loss = 0
         batch_size = 0
         domain_preds = []
