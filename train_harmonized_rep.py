@@ -58,8 +58,9 @@ config = yaml.safe_load(Path(args.config).read_text())
 config["rep_config"]["max_epochs"] = config["experiment"]["epochs"]
 
 # check fine tuning
-if config.get("finetune") is not None:
+if "finetune" in config:
     config["rep_config"]["epoch_stage_1"] = config["experiment"]["epochs"] + 1
+    config["rep_config"]["finetune"] = True
 
 if args.debug:
     config["datamodule_config"]["debug"] = True

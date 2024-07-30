@@ -64,6 +64,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.sgd = rep_config.get("sgd", False)
         self.full_run = rep_config.get("full_run", False)
         self.clear_optim = rep_config.get("clear_optim", False)
+        self.finetune = self.rep_config.get("finetune", False)
         self.activations = None
         self.weightings = {}
 
@@ -204,7 +205,6 @@ class RepLearnerUnlearner(L.LightningModule):
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
         self.domain_classifier = DomainClassifier(nodes=2, init_features=2560, batch_size=512) # nodes = number of datasets (I think)
-        # self.domain_classifier = DomainPredictor(n_domains=2, init_features=512)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
         self.conf_criterion = ConfusionLoss()
@@ -323,6 +323,43 @@ class RepLearnerUnlearner(L.LightningModule):
 
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
+        if self.finetuning:
+            loss, losses, metrics = self._shared_step(batch, batch_idx, "train")
+
+            batch_size = len(batch["data"])
+            if loss is not None:
+                self.log(
+                    "train_loss",
+                    loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log_dict(
+                    losses,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log_dict(
+                    metrics,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+
+            return loss
+
+        ## Pre-training Mode
         step1_optim, optim, conf_optim, dm_optim = self.optimizers()
         alpha = self.rep_config["alpha"]
         beta = self.rep_config["beta"]
@@ -866,7 +903,12 @@ class RepLearnerUnlearner(L.LightningModule):
         predictor_params = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))
         domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
 
-        if self.sdat:
+        if self.finetune:
+            return torch.optim.AdamW(
+                encoder_params + predictor_params, 
+                lr=self.learning_rate
+            )
+        elif self.sdat:
             base_optim = torch.optim.SGD
 
             step1_optim = SAM(encoder_params + predictor_params + domain_classifier_params, base_optim,
@@ -931,22 +973,7 @@ class RepLearnerUnlearner(L.LightningModule):
                     for param in self.encoder_models[key].parameters():
                         param.requires_grad = False
 
-        for key in self.predictor_models.keys():
-            for module_name in module_names:
-                if module_name not in key:
-                    for param in self.predictor_models[key].parameters():
-                        param.requires_grad = False
-        
-        if "domain_classifier" not in module_names:
-            for param in self.domain_classifier.parameters():
-                param.requires_grad = False
-
     def disable_ssl(self):
-        keys = list(self.encoder_models.keys())
-        for key in keys:
-            if "predictor" in key:
-                self.encoder_models.pop(key)
-
         keys = list(self.predictor_models.keys())
         for key in keys:
             if "predictor" in key:
@@ -956,11 +983,6 @@ class RepLearnerUnlearner(L.LightningModule):
         self.encoder_models["projector"] = nn.Identity()
 
     def disable_classifiers(self):
-        keys = list(self.encoder_models.keys())
-        for key in keys:
-            if "classifier" in key:
-                self.encoder_models.pop(key)
-
         keys = list(self.predictor_models.keys())
         for key in keys:
             if "classifier" in key:
