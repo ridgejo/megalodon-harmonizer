@@ -122,7 +122,10 @@ if args.early_stop:
     )
 
 if "finetune" in config:
-    datamodule = MEGDataModule
+    datamodule = MEGDataModule(        
+        **config["datamodule_config"],
+        seed=config["experiment"]["seed"],
+    )
 else:
     datamodule = HarmonizationDataModule(
         **config["datamodule_config"],
