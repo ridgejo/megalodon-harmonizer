@@ -324,7 +324,7 @@ class RepLearnerUnlearner(L.LightningModule):
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
         if self.finetune:
-            loss, losses, metrics = self._shared_step(batch, batch_idx, "train")
+            loss, losses, metrics, features = self._shared_step(batch, batch_idx, "train")
 
             batch_size = len(batch["data"])
             if loss is not None:
@@ -565,7 +565,7 @@ class RepLearnerUnlearner(L.LightningModule):
         # also using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
-            loss, losses, metrics = self._shared_step(batch, batch_idx, "val")
+            loss, losses, metrics, features = self._shared_step(batch, batch_idx, "val")
 
             batch_size = len(batch["data"])
 
@@ -835,7 +835,7 @@ class RepLearnerUnlearner(L.LightningModule):
         # also using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
-            loss, losses, metrics = self._shared_step(batch, batch_idx, "test")
+            loss, losses, metrics, features = self._shared_step(batch, batch_idx, "test")
 
             batch_size = len(batch["data"])
 
