@@ -55,6 +55,11 @@ datamodule_config:
       window_len: 0.5
       label: "speech"
       info: ["subject", "subject_id", "dataset"]
+      include_subjects: ["001", "002", "003"]
+      include_sessions:
+        "001": ["001"]
+        "002": ["001"]
+        "003": ["001"]
       preload: true
       label_delay: 0.02
   dataloader_configs:
@@ -68,4 +73,4 @@ datamodule_config:
       per_channel: true
       scaler_conf:
         standard_scaler:
-        
+
