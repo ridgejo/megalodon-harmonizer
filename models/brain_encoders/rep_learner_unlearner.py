@@ -64,7 +64,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.sgd = rep_config.get("sgd", False)
         self.full_run = rep_config.get("full_run", False)
         self.clear_optim = rep_config.get("clear_optim", False)
-        self.finetune = self.rep_config.get("finetune", False)
+        self.finetune = rep_config.get("finetune", False)
         self.activations = None
         self.weightings = {}
 
