@@ -964,7 +964,7 @@ class RepLearnerUnlearner(L.LightningModule):
         return loss, losses, metrics, features
     
     def on_load_checkpoint(self, checkpoint):
-        if (self.sgd or self.sdat) and self.clear_optim: # assumes checkpoint was pretrained with adam
+        if self.clear_optim: # assumes checkpoint was pretrained with adam
             checkpoint["optimizer_states"] = []
 
     ## to be used in the potential case that checkpoint is trained with adam but you don't want to begin unlearning immediately
