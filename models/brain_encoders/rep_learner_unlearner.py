@@ -431,6 +431,8 @@ class RepLearnerUnlearner(L.LightningModule):
 
         ## begin unlearning
         else:
+            if self.current_epoch == self.epoch_stage_1:
+                self.reset_optimizer_states()
             #with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
             # update encoder / task heads
             optim.zero_grad()
