@@ -984,8 +984,12 @@ class RepLearnerUnlearner(L.LightningModule):
                     param_group["lr"] = self.conf_learning_rate
                 elif idx == 3:
                     param_group["lr"] = self.dm_learning_rate
+                # Ensure momentum key is present
                 if isinstance(optimizer, torch.optim.SGD):
-                    param_group['momentum'] = 0.9 # Ensure momentum key is present
+                    param_group['momentum'] = 0.9 
+                    param_group['dampening'] = 0
+                    param_group['nesterov'] = True
+                    param_group['weight_decay'] = 1e-3
 
         # for param_group in self.trainer.optimizers["step1_optim"]:
         #     param_group["lr"] = self.learning_rate
