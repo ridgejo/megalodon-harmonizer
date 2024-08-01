@@ -431,6 +431,9 @@ class RepLearnerUnlearner(L.LightningModule):
 
         ## begin unlearning
         else:
+            if self.current_epoch == self.epoch_stage_1:
+                self.reset_optims() 
+
             #with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
             # update encoder / task heads
             optim.zero_grad()
@@ -967,7 +970,7 @@ class RepLearnerUnlearner(L.LightningModule):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
             checkpoint["optimizer_states"] = []
 
-    def on_val_epoch_end(self):
+    def reset_optims(self):
         print("WORKING")
         if self.current_epoch == self.epoch_stage_1 - 1:
             for optimizer in self.trainer.optimizers:
