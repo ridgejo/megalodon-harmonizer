@@ -977,7 +977,7 @@ class RepLearnerUnlearner(L.LightningModule):
             # print(f"{optimizer} state keys: {optimizer.state.keys()}")
             # optimizer.state = {}
             # optimizer.state = {param: {} for param in optimizer.state.keys()}
-            for param_group in optimizer:
+            for param_group in optimizer.param_groups:
                 if idx == 1:
                     param_group["lr"] = self.task_learning_rate
                 elif idx == 2:
