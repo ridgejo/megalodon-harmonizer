@@ -973,31 +973,38 @@ class RepLearnerUnlearner(L.LightningModule):
     def reset_optims(self):
         print("WORKING")
         # if self.current_epoch == self.epoch_stage_1 - 1:
-        for optimizer in self.trainer.optimizers:
-            print(f"{optimizer} state keys: {optimizer.state.keys()}")
+        for idx, optimizer in enumerate(self.trainer.optimizers):
+            # print(f"{optimizer} state keys: {optimizer.state.keys()}")
             # optimizer.state = {}
-            optimizer.state = {param: {} for param in optimizer.state.keys()}
+            # optimizer.state = {param: {} for param in optimizer.state.keys()}
+            for param_group in optimizer:
+                if idx == 1:
+                    param_group["lr"] = self.task_learning_rate
+                elif idx == 2:
+                    param_group["lr"] = self.conf_learning_rate
+                elif idx == 3:
+                    param_group["lr"] = self.dm_learning_rate
 
-        for param_group in self.trainer.optimizers["step1_optim"]:
-            param_group["lr"] = self.learning_rate
-            param_group["betas"] = (0.9, 0.999)
-            param_group["eps"] = 1e-08
-            param_group["weight_decay"] = 0
-        for param_group in self.trainer.optimizers["optim"]:
-            param_group["lr"] = self.task_learning_rate
-            param_group["betas"] = (0.9, 0.999)
-            param_group["eps"] = 1e-08
-            param_group["weight_decay"] = 0
-        for param_group in self.trainer.optimizers["conf_optim"]:
-            param_group["lr"] = self.conf_learning_rate
-            param_group["betas"] = (0.9, 0.999)
-            param_group["eps"] = 1e-08
-            param_group["weight_decay"] = 0
-        for param_group in self.trainer.optimizers["dm_optim"]:
-            param_group["lr"] = self.dm_learning_rate
-            param_group["betas"] = (0.9, 0.999)
-            param_group["eps"] = 1e-08
-            param_group["weight_decay"] = 0
+        # for param_group in self.trainer.optimizers["step1_optim"]:
+        #     param_group["lr"] = self.learning_rate
+        #     param_group["betas"] = (0.9, 0.999)
+        #     param_group["eps"] = 1e-08
+        #     param_group["weight_decay"] = 0
+        # for param_group in self.trainer.optimizers["optim"]:
+        #     param_group["lr"] = self.task_learning_rate
+        #     param_group["betas"] = (0.9, 0.999)
+        #     param_group["eps"] = 1e-08
+        #     param_group["weight_decay"] = 0
+        # for param_group in self.trainer.optimizers["conf_optim"]:
+        #     param_group["lr"] = self.conf_learning_rate
+        #     param_group["betas"] = (0.9, 0.999)
+        #     param_group["eps"] = 1e-08
+        #     param_group["weight_decay"] = 0
+        # for param_group in self.trainer.optimizers["dm_optim"]:
+        #     param_group["lr"] = self.dm_learning_rate
+        #     param_group["betas"] = (0.9, 0.999)
+        #     param_group["eps"] = 1e-08
+        #     param_group["weight_decay"] = 0
 
         # for optimizer in self.trainer.optimizers:
         #     for param_group in optimizer:
