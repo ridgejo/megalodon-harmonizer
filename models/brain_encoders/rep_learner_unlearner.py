@@ -969,14 +969,20 @@ class RepLearnerUnlearner(L.LightningModule):
 
     def on_val_epoch_end(self):
         if self.current_epoch == self.epoch_stage_1 - 1:
-            for param_group in self.trainer.optimizers["step1_optim"]:
-                param_group["lr"] = self.learning_rate
-            for param_group in self.trainer.optimizers["optim"]:
-                param_group["lr"] = self.task_learning_rate
-            for param_group in self.trainer.optimizers["conf_optim"]:
-                param_group["lr"] = self.conf_learning_rate
-            for param_group in self.trainer.optimizers["dm_optim"]:
-                param_group["lr"] = self.dm_learning_rate
+            # for param_group in self.trainer.optimizers["step1_optim"]:
+            #     param_group["lr"] = self.learning_rate
+            # for param_group in self.trainer.optimizers["optim"]:
+            #     param_group["lr"] = self.task_learning_rate
+            # for param_group in self.trainer.optimizers["conf_optim"]:
+            #     param_group["lr"] = self.conf_learning_rate
+            # for param_group in self.trainer.optimizers["dm_optim"]:
+            #     param_group["lr"] = self.dm_learning_rate
+            for optimizer in self.trainer.optimizers:
+                for param_group in optimizer:
+                    for param in param_group["params"]:
+                        state = optimizer.state[param]
+                        state["exp_avg"] = torch.zeros_like["param"]
+                        state["exp_avg_sq"] = torch.zeros_like["param"]
 
     ## to be used in the potential case that checkpoint is trained with adam but you don't want to begin unlearning immediately
     ## currently not called anywhere
