@@ -431,9 +431,6 @@ class RepLearnerUnlearner(L.LightningModule):
 
         ## begin unlearning
         else:
-            # if self.current_epoch == self.epoch_stage_1:
-            #     self.reset_optimizer_states()
-            
             #with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
             # update encoder / task heads
             optim.zero_grad()
@@ -969,6 +966,17 @@ class RepLearnerUnlearner(L.LightningModule):
     def on_load_checkpoint(self, checkpoint):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
             checkpoint["optimizer_states"] = []
+
+    def on_val_epoch_end(self):
+        if self.current_epoch == self.epoch_stage_1 - 1:
+            for param_group in self.trainer.optimizers["step1_optim"]:
+                param_group["lr"] = self.learning_rate
+            for param_group in self.trainer.optimizers["optim"]:
+                param_group["lr"] = self.task_learning_rate
+            for param_group in self.trainer.optimizers["conf_optim"]:
+                param_group["lr"] = self.conf_learning_rate
+            for param_group in self.trainer.optimizers["dm_optim"]:
+                param_group["lr"] = self.dm_learning_rate
 
     ## to be used in the potential case that checkpoint is trained with adam but you don't want to begin unlearning immediately
     ## currently not called anywhere
