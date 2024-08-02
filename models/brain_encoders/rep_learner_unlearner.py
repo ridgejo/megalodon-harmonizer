@@ -323,8 +323,15 @@ class RepLearnerUnlearner(L.LightningModule):
 
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
+        step1_optim, optim, conf_optim, dm_optim = self.optimizers()
+        alpha = self.rep_config["alpha"]
+        beta = self.rep_config["beta"]
+
         if self.finetune:
+            step1_optim.zero_grad()
             loss, losses, metrics, features = self._shared_step(batch, batch_idx, "train")
+            self.manual_backward(loss)
+            step1_optim.step()
 
             batch_size = len(batch["data"])
             if loss is not None:
@@ -359,13 +366,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
             return loss
 
-        ## Pre-training Mode
-        step1_optim, optim, conf_optim, dm_optim = self.optimizers()
-        alpha = self.rep_config["alpha"]
-        beta = self.rep_config["beta"]
-
-        #TODO remove after debugging
-        # with torch.autograd.detect_anomaly():
+        ## Pre-training Mode ##
 
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
