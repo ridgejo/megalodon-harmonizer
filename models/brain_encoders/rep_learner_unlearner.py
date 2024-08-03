@@ -381,6 +381,8 @@ class RepLearnerUnlearner(L.LightningModule):
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
                     batch_i = self._take_subset(batch_i, subset)
                 elif idx == 1:
                     subset = len(batch_i["data"]) - subset
@@ -446,6 +448,8 @@ class RepLearnerUnlearner(L.LightningModule):
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
                     batch_i = self._take_subset(batch_i, subset)
                 elif idx == 1:
                     subset = len(batch_i["data"]) - subset
@@ -623,6 +627,8 @@ class RepLearnerUnlearner(L.LightningModule):
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
                     batch_i = self._take_subset(batch_i, subset)
                 elif idx == 1:
                     subset = len(batch_i["data"]) - subset
@@ -716,6 +722,8 @@ class RepLearnerUnlearner(L.LightningModule):
             for idx, batch_i in enumerate(batch):
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
                     batch_i = self._take_subset(batch_i, subset)
                 elif idx == 1:
                     subset = len(batch_i["data"]) - subset

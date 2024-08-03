@@ -8,6 +8,7 @@ import yaml
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.callbacks import Callback
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.tuner import Tuner
@@ -121,6 +122,17 @@ if args.early_stop:
         mode='min'           # mode can be 'min' or 'max'
     )
 
+# Custom callback to save checkpoint halfway through training
+class HalfwayCheckpoint(Callback):
+    def on_epoch_end(self, trainer, pl_module):
+        if trainer.current_epoch == (pl_module.max_epochs / 2) - 1:
+            # Save checkpoint
+            checkpoint_path = os.path.join(trainer.checkpoint_callback.dirpath, f"epoch_{trainer.current_epoch}.ckpt")
+            trainer.save_checkpoint(checkpoint_path)
+            print(f"Checkpoint saved at {checkpoint_path}")
+
+halfway_checkpoint = HalfwayCheckpoint()
+
 if "finetune" in config:
     datamodule = MEGDataModule(        
         **config["datamodule_config"],
@@ -220,9 +232,9 @@ epochs = config["experiment"]["epochs"] if "epochs" in config["experiment"] else
 epochs = 10 if args.profile else epochs
 
 if args.early_stop:
-    callbacks = [latest_checkpoint, val_checkpoint, early_stopping]
+    callbacks = [latest_checkpoint, val_checkpoint, halfway_checkpoint, early_stopping]
 else:
-    callbacks = [latest_checkpoint, val_checkpoint]
+    callbacks = [latest_checkpoint, halfway_checkpoint, val_checkpoint]
 
 trainer = Trainer(
     logger=wandb_logger,
