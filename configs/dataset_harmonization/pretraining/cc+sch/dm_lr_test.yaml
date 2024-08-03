@@ -8,7 +8,7 @@ rep_config:
   beta: 0.0001 #1 #0.0001
   lr: 0.000066
   dm_lr: 0.000066
-  conf_lr: 0.00066 #0.0000066 #0.000066
+  conf_lr: 0.000066 #0.0000066 #0.000066
   task_lr: 0.000066
   dataset_block:
     dataset_sizes:
