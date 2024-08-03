@@ -970,6 +970,7 @@ class RepLearnerUnlearner(L.LightningModule):
     
     def on_load_checkpoint(self, checkpoint):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
+            print("CLEARED CHECKPOINT OPTIMS")
             checkpoint["optimizer_states"] = []
 
     def reset_optims(self):
