@@ -115,11 +115,11 @@ latest_checkpoint = ModelCheckpoint(
     save_top_k=1,
 )
 
-unlearning_checkpoint = ModelCheckpoint(
-    filename="UL-checkpoint",
-    every_n_epochs=config['rep_config']['epoch_stage_1'] - 1,
-    save_top_k=1,
-)
+# unlearning_checkpoint = ModelCheckpoint(
+#     filename="UL-checkpoint",
+#     every_n_epochs=config['rep_config']['epoch_stage_1'] - 1,
+#     save_top_k=1,
+# )
 
 if args.early_stop:
     early_stopping = EarlyStopping(
@@ -128,16 +128,17 @@ if args.early_stop:
         mode='min'           # mode can be 'min' or 'max'
     )
 
-# # Custom callback to save checkpoint halfway through training
-# class HalfwayCheckpoint(Callback):
-#     def on_epoch_end(self, trainer, pl_module):
-#         if trainer.current_epoch == (pl_module.max_epochs / 2) - 1:
-#             # Save checkpoint
-#             checkpoint_path = os.path.join(trainer.checkpoint_callback.dirpath, f"epoch_{trainer.current_epoch}.ckpt")
-#             trainer.save_checkpoint(checkpoint_path)
-#             print(f"Checkpoint saved at {checkpoint_path}")
+# Custom callback to save checkpoint halfway through training
+class HalfwayCheckpoint(Callback):
+    def on_epoch_end(self, trainer, pl_module):
+        if trainer.current_epoch == (trainer.max_epochs / 2) - 1:
+            # Save checkpoint
+            print("Saving Halfway Checkpoint...")
+            checkpoint_path = os.path.join(trainer.checkpoint_callback.dirpath, f"epoch_{trainer.current_epoch}.ckpt")
+            trainer.save_checkpoint(checkpoint_path)
+            print(f"Checkpoint saved at {checkpoint_path}")
 
-# halfway_checkpoint = HalfwayCheckpoint()
+halfway_checkpoint = HalfwayCheckpoint()
 
 if "finetune" in config:
     datamodule = MEGDataModule(        
@@ -238,9 +239,9 @@ epochs = config["experiment"]["epochs"] if "epochs" in config["experiment"] else
 epochs = 10 if args.profile else epochs
 
 if args.early_stop:
-    callbacks = [latest_checkpoint, val_checkpoint, unlearning_checkpoint, early_stopping]
+    callbacks = [latest_checkpoint, val_checkpoint, halfway_checkpoint, early_stopping]
 else:
-    callbacks = [latest_checkpoint, unlearning_checkpoint, val_checkpoint]
+    callbacks = [latest_checkpoint, halfway_checkpoint, val_checkpoint]
 
 trainer = Trainer(
     logger=wandb_logger,
