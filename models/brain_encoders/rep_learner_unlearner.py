@@ -204,7 +204,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
-        self.domain_classifier = DomainClassifier(nodes=2, init_features=2560, batch_size=512) # nodes = number of datasets (I think)
+        self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=512) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
         self.conf_criterion = ConfusionLoss()
@@ -378,15 +378,28 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_loss = 0
             batch_size = 0
             subset = 0
+            split_1 = 0
             for idx, batch_i in enumerate(batch):
-                if idx == 0:
-                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                if len(batch) == 2:
+                    if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    batch_i = self._take_subset(batch_i, subset)
-                elif idx == 1:
-                    subset = len(batch_i["data"]) - subset
-                    batch_i = self._take_subset(batch_i, subset)
+                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                elif len(batch) == 3:
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        split_1 = subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset - 1
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 2:
+                        subset = len(batch_i["data"]) - split_1 - subset
+                        batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 d_pred = self.domain_classifier(features)
@@ -445,15 +458,28 @@ class RepLearnerUnlearner(L.LightningModule):
             batch_vals = []
             batch_size = 0
             subset = 0
+            split_1 = 0
             for idx, batch_i in enumerate(batch):
-                if idx == 0:
-                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                if len(batch) == 2:
+                    if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    batch_i = self._take_subset(batch_i, subset)
-                elif idx == 1:
-                    subset = len(batch_i["data"]) - subset
-                    batch_i = self._take_subset(batch_i, subset)
+                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                elif len(batch) == 3:
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        split_1 = subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset - 1
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 2:
+                        subset = len(batch_i["data"]) - split_1 - subset
+                        batch_i = self._take_subset(batch_i, subset)
                 batch_size += len(batch_i["data"])
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
@@ -622,17 +648,30 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_preds = []
             domain_targets = []
             subset = 0
+            split_1 = 0
             if save_activations:
                 activations = []
             for idx, batch_i in enumerate(batch):
-                if idx == 0:
-                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                if len(batch) == 2:
+                    if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    batch_i = self._take_subset(batch_i, subset)
-                elif idx == 1:
-                    subset = len(batch_i["data"]) - subset
-                    batch_i = self._take_subset(batch_i, subset)
+                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                elif len(batch) == 3:
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        split_1 = subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset - 1
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 2:
+                        subset = len(batch_i["data"]) - split_1 - subset
+                        batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
@@ -717,17 +756,30 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_preds = []
             domain_targets = []
             subset = 0
+            split_1 = 0
             if save_activations:
                 activations = []
             for idx, batch_i in enumerate(batch):
-                if idx == 0:
-                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                if len(batch) == 2:
+                    if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                    batch_i = self._take_subset(batch_i, subset)
-                elif idx == 1:
-                    subset = len(batch_i["data"]) - subset
-                    batch_i = self._take_subset(batch_i, subset)
+                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                elif len(batch) == 3:
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        split_1 = subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset - 1
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 2:
+                        subset = len(batch_i["data"]) - split_1 - subset
+                        batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
@@ -890,13 +942,28 @@ class RepLearnerUnlearner(L.LightningModule):
         domain_preds = []
         domain_targets = []
         subset = 0
+        split_1 = 0
         for idx, batch_i in enumerate(batch):
-            if idx == 0:
-                subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                batch_i = self._take_subset(batch_i, subset)
-            elif idx == 1:
-                subset = len(batch_i["data"]) - subset
-                batch_i = self._take_subset(batch_i, subset)
+            if len(batch) == 2:
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = self._take_subset(batch_i, subset)
+            elif len(batch) == 3:
+                if idx == 0:
+                    subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                    split_1 = subset
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset - 1
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 2:
+                    subset = len(batch_i["data"]) - split_1 - subset
+                    batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
             t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "test")
             d_pred = self.domain_classifier(features)

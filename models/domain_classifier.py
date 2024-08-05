@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch
 from collections import OrderedDict
 
-class DomainClassifier(nn.Module):
+class DomainClassifier(nn.Module): #maybe try linear SVM 
     def __init__(self, nodes=2, init_features=2560, batch_size=512):
         super(DomainClassifier, self).__init__()
         self.nodes = nodes
