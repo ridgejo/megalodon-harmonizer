@@ -117,7 +117,7 @@ latest_checkpoint = ModelCheckpoint(
 
 unlearning_checkpoint = ModelCheckpoint(
     filename="UL-checkpoint",
-    every_n_epochs=config['rep_config']['epoch_stage_1'] - 1,
+    every_n_epochs=config['rep_config']['epoch_stage_1'] - 1, #TODO val doesn't exists for FT conf
     save_top_k=1,
     enable_version_counter=True
 )
@@ -242,6 +242,8 @@ epochs = 10 if args.profile else epochs
 
 if args.early_stop:
     callbacks = [latest_checkpoint, val_checkpoint, unlearning_checkpoint, early_stopping]
+elif "finetune" in config:
+    callbacks = [latest_checkpoint, val_checkpoint]
 else:
     callbacks = [latest_checkpoint, unlearning_checkpoint, val_checkpoint]
 
