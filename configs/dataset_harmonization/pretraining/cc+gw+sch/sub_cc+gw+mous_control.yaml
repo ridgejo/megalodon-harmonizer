@@ -1,9 +1,9 @@
 experiment:
   seed: 1
-  epochs: 100
+  epochs: 200
 
 rep_config:
-  epoch_stage_1: 101
+  epoch_stage_1: 201
   alpha: 1
   beta: 0.0001 
   lr: 0.000066
@@ -140,6 +140,20 @@ datamodule_config:
         "CC720103"
         ]
       preload: true
+    gwilliams2022:
+      data_path: "/data/engs-pnpl/lina4368/gwilliams2022"
+      preproc_path: "/data/engs-pnpl/lina4368/gwilliams2022"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      label: "speech"
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: ["01","02","03","04"]
+      preload: true
+      label_delay: 0.02
     schoffelen2019:
       data_path: "/data/engs-pnpl/lina4368/schoffelen2019"
       preproc_path: "/data/engs-pnpl/lina4368/schoffelen2019"
