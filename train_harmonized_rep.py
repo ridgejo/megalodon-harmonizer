@@ -117,7 +117,8 @@ latest_checkpoint = ModelCheckpoint(
 
 unlearning_checkpoint = ModelCheckpoint(
     filename="UL-checkpoint",
-    every_n_epochs=config['rep_config']['epoch_stage_1'] - 1, #TODO val doesn't exists for FT conf
+    # every_n_epochs=config['rep_config']['epoch_stage_1'] - 1, #TODO val doesn't exists for FT conf
+    every_n_epochs=100,
     save_top_k=1,
     enable_version_counter=True
 )
