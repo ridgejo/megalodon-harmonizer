@@ -392,7 +392,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 elif len(batch) == 3:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
@@ -476,7 +476,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 elif len(batch) == 3:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
@@ -672,7 +672,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 elif len(batch) == 3:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
@@ -784,7 +784,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 elif len(batch) == 3:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
@@ -972,7 +972,7 @@ class RepLearnerUnlearner(L.LightningModule):
             elif len(batch) == 3:
                 if idx == 0:
                     subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                    while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                    while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
                     split_1 = subset
                     batch_i = self._take_subset(batch_i, subset)
