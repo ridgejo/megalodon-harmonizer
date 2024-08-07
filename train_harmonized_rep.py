@@ -104,18 +104,21 @@ except Exception as _:
 
 # Checkpoint model only when validation loss improves
 val_checkpoint = ModelCheckpoint(
+    dirpath = exp_path / "MEGalodon-rep-harmonization" / args.name, 
     monitor="val_loss",
     mode="min",
     auto_insert_metric_name=True,
 )
 
 latest_checkpoint = ModelCheckpoint(
+    dirpath = exp_path / "MEGalodon-rep-harmonization" / args.name,
     filename="latest-checkpoint",
     every_n_epochs=1,
     save_top_k=1,
 )
 
 unlearning_checkpoint = ModelCheckpoint(
+    dirpath = exp_path / "MEGalodon-rep-harmonization" / args.name,
     filename="UL-checkpoint",
     # every_n_epochs=config['rep_config']['epoch_stage_1'] - 1, #TODO val doesn't exists for FT conf
     every_n_epochs=100,
