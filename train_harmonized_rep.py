@@ -51,6 +51,7 @@ parser.add_argument("--get_tsne", help="Get TSNE plots for final encoder layer",
 parser.add_argument("--sdat", help="Use SDAT optimization framework for unlearning", action="store_true", default=False)
 parser.add_argument("--sgd", help="Use SGD for domain classifier during unlearning", action="store_true", default=False)
 parser.add_argument("--clear_optim", help="Clear optimizer state upon loading checkpoint", action="store_true", default=False)
+parser.add_argument("--ckpt_dset_num", help="Override num classes for loading domain classifier ckpt", type=int, default=None)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -80,6 +81,9 @@ if args.sgd:
 
 if args.clear_optim:
     config["rep_config"]["clear_optim"] = True
+
+if args.ckpt_dset_num is not None:
+    config["rep_config"]["num_datasets"] = args.ckpt_dset_num
 
 seed_everything(config["experiment"]["seed"], workers=True)
 
