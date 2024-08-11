@@ -858,7 +858,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
             return
 
-    def get_tsne(self, batch):
+    def get_tsne(self, batch, name=None):
         task_loss = 0
         batch_size = 0
         domain_preds = []
@@ -903,8 +903,14 @@ class RepLearnerUnlearner(L.LightningModule):
         # Convert numerical labels to class names
         label_names = [label_mapping[label.item()] for label in true_domains]
         save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
-        np.save(save_path / "unlearned_activations.npy", activations.numpy())
-        np.save(save_path / "unlearned_labels.npy", np.array(label_names))
+        if name is not None:
+            activs = f"{name}_activations.npy"
+            labels = f"{name}_labels.npy"
+        else:
+            activs = "activations.npy"
+            labels = "labels.npy"
+        np.save(save_path / activs, activations.numpy())
+        np.save(save_path / labels, np.array(label_names))
         print(f"Single batch accuracy: {acc}")
         print("Saving activations...")
         plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")

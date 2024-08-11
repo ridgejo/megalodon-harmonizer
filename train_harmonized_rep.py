@@ -126,7 +126,7 @@ unlearning_checkpoint = ModelCheckpoint(
     filename="{epoch}-UL-checkpoint",
     # every_n_epochs=config['rep_config']['epoch_stage_1'] - 1, #TODO val doesn't exists for FT conf
     every_n_epochs=100,
-    save_top_k=2,
+    save_top_k=1,
     # enable_version_counter=True
 )
 
@@ -292,7 +292,7 @@ if args.get_tsne:
     model.eval()  # Set model to evaluation mode
     with torch.no_grad():  # Disable gradient calculation
         # T-SNE plot made and saved in val step
-        model.get_tsne(batch)
+        model.get_tsne(batch=batch, name=args.name)
 else:
     if resume_training:
         trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint)
