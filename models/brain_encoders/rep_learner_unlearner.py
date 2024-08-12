@@ -30,7 +30,7 @@ from models.subject_block import SubjectBlock
 from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
-from models.domain_classifier import DomainClassifier, DomainPredictor
+from models.domain_classifier import DomainClassifier
 from models.confusion_loss import ConfusionLoss
 from models.analysis_utils import plot_tsne
 from models.sam_optimizer import SAM
