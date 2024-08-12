@@ -3,13 +3,13 @@ experiment:
   epochs: 200 
 
 rep_config:
-  epoch_stage_1: 95
+  epoch_stage_1: 100
   alpha: 1
   beta: 0.0001
   lr: 0.000066
-  dm_lr: 0.000066
-  conf_lr: 0.000066 ## changed lr - check git status
-  task_lr: 0.000066
+  dm_lr: 0.00001
+  conf_lr: 0.00001
+  task_lr: 0.00001
   dataset_block:
     dataset_sizes:
       armeni2022: 269

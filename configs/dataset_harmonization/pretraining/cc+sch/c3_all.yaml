@@ -1,5 +1,5 @@
 experiment:
-  seed: 2
+  seed: 3
   epochs: 200 
 
 rep_config:
