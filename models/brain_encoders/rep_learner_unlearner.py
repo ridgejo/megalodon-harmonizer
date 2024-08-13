@@ -367,7 +367,10 @@ class RepLearnerUnlearner(L.LightningModule):
             return loss
 
         ## Pre-training Mode ##
-        step1_optim, optim, conf_optim, dm_optim = self.optimizers()
+        if self.sdat:
+            step1_optim, optim, dm_optim = self.optimizers()
+        else:
+            step1_optim, optim, conf_optim, dm_optim = self.optimizers()
         alpha = self.rep_config["alpha"]
         beta = self.rep_config["beta"]
 
@@ -504,7 +507,10 @@ class RepLearnerUnlearner(L.LightningModule):
                     task_loss += t_loss
             # print(f"task_loss before backward: {task_loss}")
             self.manual_backward(task_loss, retain_graph=True)
-            optim.step()
+            if self.sdat:
+                optim.first_step(zero_grad=True)
+            else:
+                optim.step()
 
             # update just domain classifier
             dm_optim.zero_grad()
@@ -535,7 +541,8 @@ class RepLearnerUnlearner(L.LightningModule):
             dm_optim.step()
 
             # update just encoder using domain loss
-            conf_optim.zero_grad()
+            if not self.sdat:
+                conf_optim.zero_grad()
             confusion_loss = 0
             for vals in batch_vals:
                 feats, targets = vals.values()
@@ -559,7 +566,10 @@ class RepLearnerUnlearner(L.LightningModule):
             
             # print(f"confusion_loss before backward: {confusion_loss}")
             self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
-            conf_optim.step()
+            if self.sdat:
+                optim.second_step(zero_grad=True)
+            else:
+                conf_optim.step()
             
             self.log(
                 "train_loss",
@@ -1156,32 +1166,36 @@ class RepLearnerUnlearner(L.LightningModule):
         elif self.sdat:
             base_optim = torch.optim.SGD
 
-            step1_optim = SAM(encoder_params + predictor_params + domain_classifier_params, base_optim,
-                              rho=0.05, adaptive=False, lr=self.learning_rate, momentum=0.9,
-                              weight_decay=1e-3, nesterov=True)
+            step1_optim = torch.optim.AdamW(
+                encoder_params + predictor_params + domain_classifier_params, 
+                lr=self.learning_rate
+            )
+
+            # step1_optim = SAM(encoder_params + predictor_params + domain_classifier_params, base_optim,
+            #                   rho=0.05, adaptive=False, lr=self.learning_rate, momentum=0.9,
+            #                   weight_decay=1e-3, nesterov=True)
 
             optim = SAM(encoder_params + predictor_params, base_optim,
                               rho=0.05, adaptive=False, lr=self.task_learning_rate, momentum=0.9,
                               weight_decay=1e-3, nesterov=True)
-            conf_optim = SAM(encoder_params, base_optim,
-                              rho=0.05, adaptive=False, lr=self.conf_learning_rate, momentum=0.9,
-                              weight_decay=1e-3, nesterov=True)
+            # conf_optim = SAM(encoder_params, base_optim,
+            #                   rho=0.05, adaptive=False, lr=self.conf_learning_rate, momentum=0.9,
+            #                   weight_decay=1e-3, nesterov=True)
             dm_optim = SGD(domain_classifier_params, lr=self.dm_learning_rate, 
                                        momentum=0.9, weight_decay=1e-3, nesterov=True)
             
-            step1_scheduler = LambdaLR(step1_optim, lambda x: self.learning_rate *
-                            (1. + 0.001 * float(x)) ** (-0.75))
+            # step1_scheduler = LambdaLR(step1_optim, lambda x: self.learning_rate *
+            #                 (1. + 0.001 * float(x)) ** (-0.75))
             optim_scheduler = LambdaLR(optim, lambda x: self.task_learning_rate *
                             (1. + 0.001 * float(x)) ** (-0.75))
-            conf_scheduler = LambdaLR(conf_optim, lambda x: self.conf_learning_rate *
-                            (1. + 0.001 * float(x)) ** (-0.75))
+            # conf_scheduler = LambdaLR(conf_optim, lambda x: self.conf_learning_rate *
+            #                 (1. + 0.001 * float(x)) ** (-0.75))
             dm_scheduler = LambdaLR(
                  dm_optim, lambda x: self.dm_learning_rate * (1. + 0.001 * float(x)) ** (-0.75))
             
             return [
-                {'optimizer': step1_optim, 'lr_scheduler': {'scheduler': step1_scheduler, 'interval': 'epoch', 'frequency': 1}},
+                {'optimizer': step1_optim},
                 {'optimizer': optim, 'lr_scheduler': {'scheduler': optim_scheduler, 'interval': 'step', 'frequency': 1}},
-                {'optimizer': conf_optim, 'lr_scheduler': {'scheduler': conf_scheduler, 'interval': 'step', 'frequency': 1}},
                 {'optimizer': dm_optim, 'lr_scheduler': {'scheduler': dm_scheduler, 'interval': 'step', 'frequency': 1}}
             ]
 
