@@ -276,9 +276,9 @@ if args.lr_find:
 
 if args.get_tsne:
     # Get one batch from the validation dataloader
-    datamodule.setup('validate')
-    val_dataloader = datamodule.val_dataloader()
-    batch = next(iter(val_dataloader))
+    datamodule.setup('test')
+    test_dataloader = datamodule.test_dataloader()
+    batch = next(iter(test_dataloader))
 
     device = "cpu"
     # Move model to CPU
