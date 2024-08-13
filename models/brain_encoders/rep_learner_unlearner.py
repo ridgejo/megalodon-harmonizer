@@ -385,6 +385,8 @@ class RepLearnerUnlearner(L.LightningModule):
             batch_size = 0
             subset = 0
             split_1 = 0
+            domain_preds = []
+            domain_targets = []
             for idx, batch_i in enumerate(batch):
                 if len(batch) == 2:
                     if idx == 0:
@@ -419,11 +421,21 @@ class RepLearnerUnlearner(L.LightningModule):
                 d_target[:, idx] = 1
                 # d_target = d_target.int()
                 # d_target.to(self.device)
-                d_loss = self.domain_criterion(d_pred, d_target)
+
+                domain_preds.append(d_pred)
+                domain_targets.append(d_target)
+                # d_loss = self.domain_criterion(d_pred, d_target)
+
                 if t_loss is not None:
                     task_loss += t_loss
-                domain_loss += d_loss
+
+                # domain_loss += d_loss
             #TODO possibly avg loss over num datasets?
+
+            domain_preds = torch.cat(domain_preds, 0)
+            domain_targets = torch.cat(domain_targets, 0)
+            domain_loss = self.domain_criterion(domain_preds, domain_targets)
+
             loss = task_loss + alpha * domain_loss
             self.manual_backward(loss)
             step1_optim.step()
@@ -515,22 +527,32 @@ class RepLearnerUnlearner(L.LightningModule):
             # update just domain classifier
             dm_optim.zero_grad()
             domain_loss = 0
+            domain_preds = []
+            domain_targets = []
             for vals in batch_vals:
                 feats, targets = vals.values()
 
-                # Check for NaNs or Infs in feats and targets
-                if torch.isnan(feats).any():
-                    raise ValueError("NaN detected in features before domain classifier")
-                if torch.isinf(feats).any():
-                    raise ValueError("Inf detected in features before domain classifier")
-                if torch.isnan(targets).any():
-                    raise ValueError("NaN detected in targets before domain classifier")
-                if torch.isinf(targets).any():
-                    raise ValueError("Inf detected in targets before domain classifier")
+                domain_preds.append(self.domain_classifier(feats.detach()))
+                domain_targets.append(targets)
 
-                d_preds = self.domain_classifier(feats.detach())
-                d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
-                domain_loss += d_loss
+                # # Check for NaNs or Infs in feats and targets
+                # if torch.isnan(feats).any():
+                #     raise ValueError("NaN detected in features before domain classifier")
+                # if torch.isinf(feats).any():
+                #     raise ValueError("Inf detected in features before domain classifier")
+                # if torch.isnan(targets).any():
+                #     raise ValueError("NaN detected in targets before domain classifier")
+                # if torch.isinf(targets).any():
+                #     raise ValueError("Inf detected in targets before domain classifier")
+
+                # d_preds = self.domain_classifier(feats.detach())
+                # d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
+                # domain_loss += d_loss
+
+            domain_preds = torch.cat(domain_preds, 0)
+            domain_targets = torch.cat(domain_targets, 0)
+            domain_loss = self.domain_criterion(domain_preds, domain_targets)
+
             domain_loss = alpha * domain_loss
             # print(f"domain_loss before backward: {domain_loss}")
             self.manual_backward(domain_loss)
@@ -544,6 +566,10 @@ class RepLearnerUnlearner(L.LightningModule):
             if not self.sdat:
                 conf_optim.zero_grad()
             confusion_loss = 0
+
+            domain_preds = []
+            domain_targets = []
+
             for vals in batch_vals:
                 feats, targets = vals.values()
                 conf_preds = self.domain_classifier(feats)
@@ -554,8 +580,15 @@ class RepLearnerUnlearner(L.LightningModule):
                 if torch.isinf(conf_preds).any():
                     raise ValueError("Inf detected in conf_preds from domain classifier")
 
-                conf_loss = self.conf_criterion(conf_preds, targets)
-                confusion_loss += conf_loss
+                domain_preds.append(conf_preds)
+                domain_targets.append(domain_targets)
+                # conf_loss = self.conf_criterion(conf_preds, targets)
+                # confusion_loss += conf_loss
+            
+            domain_preds = torch.cat(domain_preds, 0)
+            domain_targets = torch.cat(domain_targets, 0)
+            confusion_loss = self.conf_criterion(domain_preds, domain_targets)
+
             confusion_loss = beta * confusion_loss
 
             # Check for NaNs in confusion_loss before backward call in except loop
@@ -664,7 +697,7 @@ class RepLearnerUnlearner(L.LightningModule):
             else:
                 save_activations = False
             task_loss = 0
-            domain_loss = 0
+            # domain_loss = 0
             batch_size = 0
             domain_preds = []
             domain_targets = []
@@ -709,15 +742,17 @@ class RepLearnerUnlearner(L.LightningModule):
                 d_target = torch.zeros((subset, len(batch))).to(self.device)
                 d_target[:, idx] = 1
 
-                d_loss = self.domain_criterion(d_pred, d_target)
+                # d_loss = self.domain_criterion(d_pred, d_target)
 
                 domain_preds.append(d_pred)
                 domain_targets.append(d_target)
                 if t_loss is not None:
                     task_loss += t_loss
-                domain_loss += d_loss
+                # domain_loss += d_loss
             domain_preds = torch.cat(domain_preds, 0)
             domain_targets = torch.cat(domain_targets, 0)
+
+            domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
