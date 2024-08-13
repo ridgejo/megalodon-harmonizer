@@ -867,12 +867,21 @@ class RepLearnerUnlearner(L.LightningModule):
         if self.tsne:
             activations = []
         for idx, batch_i in enumerate(batch):
-            if idx == 0:
-                subset = (len(batch_i["data"]) - 1) // 2
-                batch_i = self._take_subset(batch_i, subset)
-            elif idx == 1:
-                subset = len(batch_i["data"]) - subset
-                batch_i = self._take_subset(batch_i, subset)
+            if len(batch) == 2:
+                if idx == 0:
+                    subset = (len(batch_i["data"]) - 1) // 2
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 1:
+                    subset = len(batch_i["data"]) - subset
+                    batch_i = self._take_subset(batch_i, subset)
+            elif len(batch) == 3:
+                if idx == 0 or idx == 1:
+                    subset = len(batch_i["data"]) // 3
+                    batch_i = self._take_subset(batch_i, subset)
+                elif idx == 2:
+                    start = 2 * len(batch_i["data"]) // 3
+                    subset = len(batch_i["data"]) - start
+                    batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
 
             t_loss, losses, metrics, features = self._shared_step(batch=batch_i, batch_idx=0, stage="val")
