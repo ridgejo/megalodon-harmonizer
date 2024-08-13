@@ -908,7 +908,7 @@ class RepLearnerUnlearner(L.LightningModule):
         acc = accuracy_score(true_domains, pred_domains)
 
         activations = torch.cat(activations).to("cpu")
-        label_mapping = {0: 'dataset_1', 1: 'dataset_2'}
+        label_mapping = {0: 'dataset_1', 1: 'dataset_2', 2: 'dataset_3'}
         # Convert numerical labels to class names
         label_names = [label_mapping[label.item()] for label in true_domains]
         save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/MEGalodon-rep-harmonization/subset_tsne_plots")
