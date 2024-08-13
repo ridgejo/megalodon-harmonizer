@@ -53,6 +53,7 @@ parser.add_argument("--sgd", help="Use SGD for domain classifier during unlearni
 parser.add_argument("--clear_optim", help="Clear optimizer state upon loading checkpoint", action="store_true", default=False)
 parser.add_argument("--ckpt_dset_num", help="Override num classes for loading domain classifier ckpt", type=int, default=None)
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
+parser.add_argument("--cat_dloss", help="change how domain loss is calcuated", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -76,6 +77,9 @@ if args.get_tsne:
 
 if args.sdat:
     config["rep_config"]["sdat"] = True
+
+if args.cat_dloss:
+    config["rep_config"]["cat_dloss"] = True
 
 if args.sgd:
     config["rep_config"]["sgd"] = True
