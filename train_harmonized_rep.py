@@ -52,6 +52,7 @@ parser.add_argument("--sdat", help="Use SDAT optimization framework for unlearni
 parser.add_argument("--sgd", help="Use SGD for domain classifier during unlearning", action="store_true", default=False)
 parser.add_argument("--clear_optim", help="Clear optimizer state upon loading checkpoint", action="store_true", default=False)
 parser.add_argument("--ckpt_dset_num", help="Override num classes for loading domain classifier ckpt", type=int, default=None)
+parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -78,6 +79,9 @@ if args.sdat:
 
 if args.sgd:
     config["rep_config"]["sgd"] = True
+
+if args.lsvm:
+    config["rep_config"]["lsvm"] = True
 
 if args.clear_optim:
     config["rep_config"]["clear_optim"] = True

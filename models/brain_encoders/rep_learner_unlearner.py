@@ -30,7 +30,7 @@ from models.subject_block import SubjectBlock
 from models.subject_embedding import SubjectEmbedding
 from models.transformer_encoder import TransformerEncoder
 from models.vector_quantize import VectorQuantize
-from models.domain_classifier import DomainClassifier
+from models.domain_classifier import DomainClassifier, LSVM_DomainClassifier
 from models.confusion_loss import ConfusionLoss
 from models.analysis_utils import plot_tsne
 from models.sam_optimizer import SAM
@@ -204,7 +204,10 @@ class RepLearnerUnlearner(L.LightningModule):
 
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
-        self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=512) # nodes = number of datasets (I think)
+        if rep_config.get("lsvm") is not None:
+            self.domain_classifier = LSVM_DomainClassifier(2560, rep_config.get("num_datasets", 2))
+        else:
+            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=512) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
         self.conf_criterion = ConfusionLoss()

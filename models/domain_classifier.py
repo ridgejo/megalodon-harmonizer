@@ -20,19 +20,14 @@ class DomainClassifier(nn.Module): #maybe try linear SVM
     def forward(self, x):
         domain_pred = self.domain(x)
         return domain_pred
-        # print("Input to domain classifier:", x)
-        
-        # # Manually pass the input through each layer to catch intermediate values
-        # for name, module in self.domain.named_children():
-        #     x = module(x)
-        #     print(f"Output after {name}: {x}")
+    
+class LSVM_DomainClassifier(nn.Module):
+    def __init__(self, input_dim, num_classes):
+        super(LSVM_DomainClassifier, self).__init__()
+        self.fc = nn.Linear(input_dim, num_classes)
 
-        #     # Check for NaNs or Infs after each layer
-        #     if torch.isnan(x).any():
-        #         raise ValueError(f"NaN detected in output after {name}")
-        #     if torch.isinf(x).any():
-        #         raise ValueError(f"Inf detected in output after {name}")
-        # return x
+    def forward(self, x):
+        return self.fc(x)  # No activation function like ReLU or Softmax
 
 #TODO remove
 class LeakyDomainClassifier(nn.Module):
