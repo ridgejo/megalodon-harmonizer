@@ -561,7 +561,7 @@ class RepLearnerUnlearner(L.LightningModule):
                     raise ValueError("Inf detected in conf_preds from domain classifier")
                 
                 domain_preds.append(conf_preds)
-                domain_targets.append(domain_targets)
+                domain_targets.append(targets)
             
             domain_preds = torch.cat(domain_preds)
             domain_targets = torch.cat(domain_targets)
