@@ -745,7 +745,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 print("Saving activations...")
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="task_tsne.png")
 
-            acc = accuracy_score(true_domains, pred_domains)
+            acc = accuracy_score(true_domains, pred_domains.cpu().numpy())
         
             self.log(
                 "val_loss",
@@ -855,7 +855,7 @@ class RepLearnerUnlearner(L.LightningModule):
                 print("Saving activations...")
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
 
-            acc = accuracy_score(true_domains, pred_domains)
+            acc = accuracy_score(true_domains, pred_domains.cpu().numpy())
         
             self.log(
                 "val_loss",
@@ -930,7 +930,7 @@ class RepLearnerUnlearner(L.LightningModule):
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
 
-        acc = accuracy_score(true_domains, pred_domains)
+        acc = accuracy_score(true_domains, pred_domains.cpu().numpy())
 
         activations = torch.cat(activations).to("cpu")
         label_mapping = {0: 'dataset_1', 1: 'dataset_2', 2: 'dataset_3'}
@@ -1042,7 +1042,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-        acc = accuracy_score(true_domains, pred_domains)
+        acc = accuracy_score(true_domains, pred_domains.cpu().numpy())
     
         self.log(
             "test_loss",
