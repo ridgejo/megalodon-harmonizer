@@ -732,7 +732,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-            true_domains = domain_targets.cpu().numpy()
+            true_domains = domain_targets.detach().cpu().numpy()
 
             if save_activations:
                 activations = torch.cat(activations).to("cpu")
@@ -842,7 +842,7 @@ class RepLearnerUnlearner(L.LightningModule):
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-            true_domains = domain_targets.cpu().numpy()
+            true_domains = domain_targets.detach().cpu().numpy()
 
             if save_activations:
                 activations = torch.cat(activations).to("cpu")
