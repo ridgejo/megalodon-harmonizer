@@ -54,6 +54,7 @@ parser.add_argument("--clear_optim", help="Clear optimizer state upon loading ch
 parser.add_argument("--ckpt_dset_num", help="Override num classes for loading domain classifier ckpt", type=int, default=None)
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 parser.add_argument("--cat_dloss", help="change how domain loss is calcuated", action="store_true", default=False)
+parser.add_argument("--harmonization_lr", help="Override lr for harmonization stage", type=int, default=None)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -92,6 +93,11 @@ if args.clear_optim:
 
 if args.ckpt_dset_num is not None:
     config["rep_config"]["num_datasets"] = args.ckpt_dset_num
+
+if args.harmonization_lr is not None:
+    config["rep_config"]["dm_lr"] = args.harmonization_lr
+    config["rep_config"]["conf_lr"] = args.harmonization_lr
+    config["rep_config"]["task_lr"] = args.harmonization_lr
 
 seed_everything(config["experiment"]["seed"], workers=True)
 
