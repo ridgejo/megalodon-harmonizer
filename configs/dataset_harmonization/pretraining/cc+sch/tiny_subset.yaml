@@ -59,6 +59,17 @@ datamodule_config:
         "CC721888",
         "CC410226",
         "CC410243",
+        "CC220567",
+        "CC122620",
+        "CC223085",
+        "CC420412",
+        "CC520065",
+        "CC510639",
+        "CC121428",
+        "CC410101",
+        "CC620659",
+        "CC721107",
+        "CC620935"
           ]
       preload: true
     schoffelen2019:
@@ -72,7 +83,9 @@ datamodule_config:
       window_len: 0.5
       info: ["subject", "subject_id", "dataset"]
       # exclude_subjects: ['V1002', 'V1006', 'A2011', 'V1005', 'A2119', 'A2084', 'A2063', 'A2076', 'V1090', 'A2036', 'V1001', 'V1003', 'A2062']
-      include_subjects: ["A2002"]
+      include_subjects: ["A2002",
+        "A2003",
+        "A2004"]
       preload: true
   dataloader_configs:
     train_ratio: 0.8
