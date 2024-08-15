@@ -65,6 +65,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.cat_dloss = rep_config.get("cat_dloss", False)
         self.full_run = rep_config.get("full_run", False)
         self.clear_optim = rep_config.get("clear_optim", False)
+        self.clear_betas = rep_config.get("clear_betas", False)
         self.finetune = rep_config.get("finetune", False)
         self.activations = None
         self.weightings = {}
@@ -1109,6 +1110,12 @@ class RepLearnerUnlearner(L.LightningModule):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
             print("CLEARED CHECKPOINT OPTIMS")
             checkpoint["optimizer_states"] = []
+        if self.clear_betas:
+            for param_group in checkpoint["optimizer_states"]:
+                if 'betas' in param_group:
+                    del param_group['betas']
+                if 'weight_decay' in param_group:
+                    del param_group['weight_decay']
 
     def reset_optims(self):
         print("WORKING")

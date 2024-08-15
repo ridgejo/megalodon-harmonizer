@@ -51,6 +51,7 @@ parser.add_argument("--get_tsne", help="Get TSNE plots for final encoder layer",
 parser.add_argument("--sdat", help="Use SDAT optimization framework for unlearning", action="store_true", default=False)
 parser.add_argument("--sgd", help="Use SGD for domain classifier during unlearning", action="store_true", default=False)
 parser.add_argument("--clear_optim", help="Clear optimizer state upon loading checkpoint", action="store_true", default=False)
+parser.add_argument("--clear_betas", help="Clear optimizer state betas, weight decay upon loading checkpoint", action="store_true", default=False)
 parser.add_argument("--ckpt_dset_num", help="Override num classes for loading domain classifier ckpt", type=int, default=None)
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 parser.add_argument("--cat_dloss", help="change how domain loss is calcuated", action="store_true", default=False)
@@ -90,6 +91,9 @@ if args.lsvm:
 
 if args.clear_optim:
     config["rep_config"]["clear_optim"] = True
+
+if args.clear_betas:
+    config["rep_config"]["clear_betas"] = True
 
 if args.ckpt_dset_num is not None:
     config["rep_config"]["num_datasets"] = args.ckpt_dset_num
