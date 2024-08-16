@@ -211,7 +211,10 @@ class RepLearnerUnlearner(L.LightningModule):
         else:
             self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=512) # nodes = number of datasets (I think)
         self.rep_config = rep_config
-        self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
+        if rep_config.get("num_datasets", 2) == 2:
+            self.domain_criterion = nn.BCEWithLogitsLoss()
+        else:
+            self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
         self.conf_criterion = ConfusionLoss()
 
         # Add classifiers if used in pre-training
@@ -554,6 +557,7 @@ class RepLearnerUnlearner(L.LightningModule):
             for vals in batch_vals:
                 feats, targets = vals.values()
                 conf_preds = self.domain_classifier(feats)
+                conf_preds = torch.softmax(conf_preds, dim=1)
 
                 # Check for NaNs in conf_preds
                 if torch.isnan(conf_preds).any():
@@ -730,6 +734,7 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_targets = torch.cat(domain_targets)
 
             domain_loss = self.domain_criterion(domain_preds, domain_targets)
+            domain_preds = torch.softmax(domain_preds, dim=1)
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
@@ -841,6 +846,7 @@ class RepLearnerUnlearner(L.LightningModule):
             domain_preds = torch.cat(domain_preds)
             domain_targets = torch.cat(domain_targets)
 
+            domain_preds = torch.softmax(domain_preds, dim=1)
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
             true_domains = domain_targets.detach().cpu().numpy()

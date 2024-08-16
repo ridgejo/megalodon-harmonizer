@@ -15,7 +15,7 @@ class DomainClassifier(nn.Module): #maybe try linear SVM
         self.domain.add_module('d_relu2', nn.ReLU(True))
         self.domain.add_module('r_dropout', nn.Dropout(p=0.2)) # changed from Dropout3D but should investigate whether features has the right dimensionality
         self.domain.add_module('d_fc3', nn.Linear(batch_size, nodes))
-        self.domain.add_module('d_pred', nn.Softmax(dim=1))
+        # self.domain.add_module('d_pred', nn.Softmax(dim=1)) #removed bc using cross entropy loss
 
     def forward(self, x):
         domain_pred = self.domain(x)
@@ -27,7 +27,7 @@ class LSVM_DomainClassifier(nn.Module):
         self.fc = nn.Linear(input_dim, num_classes)
 
     def forward(self, x):
-        return self.fc(x)  # No activation function like ReLU or Softmax
+        return self.fc(x)  
 
 #TODO remove
 class LeakyDomainClassifier(nn.Module):
