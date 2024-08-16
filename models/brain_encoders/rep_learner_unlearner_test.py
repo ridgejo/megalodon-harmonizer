@@ -211,10 +211,10 @@ class RepLearnerUnlearner(L.LightningModule):
         else:
             self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=512) # nodes = number of datasets (I think)
         self.rep_config = rep_config
-        if rep_config.get("num_datasets", 2) == 2:
-            self.domain_criterion = nn.BCEWithLogitsLoss()
-        else:
-            self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
+        # if rep_config.get("num_datasets", 2) <= 2:
+        #     self.domain_criterion = nn.BCEWithLogitsLoss()
+        # else:
+        self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
         self.conf_criterion = ConfusionLoss()
 
         # Add classifiers if used in pre-training
