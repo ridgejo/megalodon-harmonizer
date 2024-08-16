@@ -933,6 +933,7 @@ class RepHarmonizer(L.LightningModule):
         domain_preds = torch.cat(domain_preds, 0)
         domain_targets = torch.cat(domain_targets, 0)
 
+        domain_preds = torch.softmax(domain_preds, dim=1)
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
         true_domains = domain_targets.cpu().numpy()
