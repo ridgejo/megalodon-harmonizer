@@ -67,6 +67,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.clear_optim = rep_config.get("clear_optim", False)
         self.clear_betas = rep_config.get("clear_betas", False)
         self.finetune = rep_config.get("finetune", False)
+        self.no_dm_control = rep_config.get("no_dm_control", False)
         self.activations = None
         self.weightings = {}
 
@@ -1227,10 +1228,16 @@ class RepLearnerUnlearner(L.LightningModule):
             ]
 
         else:
-            step1_optim = torch.optim.AdamW(
-                encoder_params + predictor_params + domain_classifier_params, 
-                lr=self.learning_rate
-            )
+            if self.no_dm_control:
+                step1_optim = torch.optim.AdamW(
+                    encoder_params + predictor_params, 
+                    lr=self.learning_rate
+                )
+            else:
+                step1_optim = torch.optim.AdamW(
+                    encoder_params + predictor_params + domain_classifier_params, 
+                    lr=self.learning_rate
+                )
 
             optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
             conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)

@@ -56,6 +56,8 @@ parser.add_argument("--ckpt_dset_num", help="Override num classes for loading do
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 parser.add_argument("--cat_dloss", help="change how domain loss is calcuated", action="store_true", default=False)
 parser.add_argument("--harmonization_lr", help="Override lr for harmonization stage", type=float, default=None)
+parser.add_argument("--epoch_stage_1", help="Epoch to begin harmonization at", type=int, default=None)
+parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -77,6 +79,9 @@ if args.seed is not None:
 if args.get_tsne:
     config["rep_config"]["tsne"] = True
 
+if args.no_dm_control:
+    config["rep_config"]["no_dm_control"] = True
+
 if args.sdat:
     config["rep_config"]["sdat"] = True
 
@@ -97,6 +102,9 @@ if args.clear_betas:
 
 if args.ckpt_dset_num is not None:
     config["rep_config"]["num_datasets"] = args.ckpt_dset_num
+
+if args.epoch_stage_1 is not None:
+    config["rep_config"]["epoch_stage_1"] = args.epoch_stage_1
 
 if args.harmonization_lr is not None:
     config["rep_config"]["dm_lr"] = args.harmonization_lr
