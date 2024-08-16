@@ -1,0 +1,122 @@
+experiment:
+  seed: 1
+  epochs: 150
+
+rep_config:
+  epoch_stage_1: 25
+  alpha: 1
+  beta: 0.0001 
+  lr: 0.000066
+  dm_lr: 0.00001
+  conf_lr: 0.00001
+  task_lr: 0.00001
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 270
+      gwilliams2022: 208
+      shafto2014: 306
+    shared_dim: 512
+    use_data_block: true
+  encoder:
+    channels: 512
+    conv_channels: [512, 512, 512, 512]
+    ratios: [5, 5, 1]
+    dimension: 512
+  subject_film:
+    subject_embedding:
+      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019", "shafto2014"]
+      embedding_dim: 16
+    film_module:
+      feature_dim: 512
+      embedding_dim: 16
+  projector:
+    input_dim: 2560
+    hidden_dim: 2048
+  band_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+  amp_scale_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.2
+  phase_diff_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.5
+
+datamodule_config:
+  dataset_preproc_configs:
+    shafto2014:
+      data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: [
+        "CC310135",
+        "CC721888",
+        "CC410226",
+        "CC410243",
+        "CC220567",
+        "CC122620",
+        "CC223085",
+        "CC420412",
+        "CC520065",
+        "CC510639",
+        "CC121428",
+        "CC410101",
+        "CC620659",
+        "CC721107",
+        "CC620935",
+        "CC320359",
+        "CC722542",
+        "CC210526",
+        "CC420236",
+        "CC720407",
+        "CC210172",
+        "CC720941",
+        "CC420623",
+        "CC520584",
+        "CC410432",
+        "CC620114",
+        "CC120640",
+        "CC510050",
+        "CC221040",
+        "CC710446",
+          ]
+      preload: true
+    schoffelen2019:
+      data_path: "/data/engs-pnpl/lina4368/schoffelen2019"
+      preproc_path: "/data/engs-pnpl/lina4368/schoffelen2019"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      # exclude_subjects: ['V1002', 'V1006', 'A2011', 'V1005', 'A2119', 'A2084', 'A2063', 'A2076', 'V1090', 'A2036', 'V1001', 'V1003', 'A2062']
+      include_subjects: [
+        "A2003",
+        "A2004",
+        "A2005",
+        "A2006",
+        "A2007",
+        "A2008",
+        "A2009",
+        "A2010",
+        "A2013"]
+      preload: true
+  dataloader_configs:
+    train_ratio: 0.8
+    val_ratio: 0.1
+    test_ratio: 0.1
+    pred_ratio: 0.0
+    batch_size: 512
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:

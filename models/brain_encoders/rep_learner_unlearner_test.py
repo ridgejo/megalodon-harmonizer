@@ -1110,7 +1110,7 @@ class RepLearnerUnlearner(L.LightningModule):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
             print("CLEARED CHECKPOINT OPTIMS")
             checkpoint["optimizer_states"] = []
-        if self.clear_betas:
+        if self.clear_betas: # should be add betas
             for param_group in checkpoint["optimizer_states"]:
                 if 'betas' in param_group:
                     del param_group['betas']
