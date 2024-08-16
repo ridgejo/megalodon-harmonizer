@@ -44,7 +44,7 @@ class LambdaModule(nn.Module):
         return self.func(*args)
 
 
-class RepLearnerUnlearner(L.LightningModule):
+class RepHarmonizer(L.LightningModule):
     """
     Representation learner with dataset unlearning.
     """
@@ -54,6 +54,7 @@ class RepLearnerUnlearner(L.LightningModule):
         self.automatic_optimization = False
         self.epoch_stage_1 = rep_config["epoch_stage_1"]
         self.max_epochs = rep_config["max_epochs"]
+        self.run_name = rep_config.get("run_name", "")
 
         self.learning_rate = rep_config["lr"]
         self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
@@ -62,10 +63,11 @@ class RepLearnerUnlearner(L.LightningModule):
         self.tsne = rep_config.get("tsne", False)
         self.sdat = rep_config.get("sdat", False)
         self.sgd = rep_config.get("sgd", False)
-        self.cat_dloss = rep_config.get("cat_dloss", False)
         self.full_run = rep_config.get("full_run", False)
         self.clear_optim = rep_config.get("clear_optim", False)
+        self.clear_betas = rep_config.get("clear_betas", False)
         self.finetune = rep_config.get("finetune", False)
+        self.no_dm_control = rep_config.get("no_dm_control", False)
         self.activations = None
         self.weightings = {}
 
@@ -210,7 +212,7 @@ class RepLearnerUnlearner(L.LightningModule):
         else:
             self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=512) # nodes = number of datasets (I think)
         self.rep_config = rep_config
-        self.domain_criterion = nn.CrossEntropyLoss() # nn.BCELoss() to be used with DomainPredictor
+        self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
 
         # Add classifiers if used in pre-training
@@ -377,9 +379,9 @@ class RepLearnerUnlearner(L.LightningModule):
 
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
-            #TODO implement normalizing total batch size across all 3 dataloaders to 32
+            #TODO investigate implementing normalized total batch size across all 3 dataloaders to 32
             # skipping for now to get the framework up and running
-            # also using MEGalodon loss instead of regressor loss criterion
+            # Using MEGalodon loss instead of regressor loss criterion
             step1_optim.zero_grad()
             task_loss = 0
             domain_loss = 0
@@ -413,32 +415,21 @@ class RepLearnerUnlearner(L.LightningModule):
                     elif idx == 2:
                         subset = len(batch_i["data"]) - split_1 - subset
                         batch_i = self._take_subset(batch_i, subset)
+                
                 batch_size += subset
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 d_pred = self.domain_classifier(features)
-                # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-                # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                d_target = torch.zeros((subset, len(batch))).to(self.device)
-                d_target[:, idx] = 1
-                # d_target = d_target.int()
-                # d_target.to(self.device)
+                d_target = torch.full((subset,), idx).to(self.device)
 
-                if self.cat_dloss:
-                    domain_preds.append(d_pred)
-                    domain_targets.append(d_target)
-                else:
-                    d_loss = self.domain_criterion(d_pred, d_target)
-                    domain_loss += d_loss
+                domain_targets.append(d_target)
+                domain_preds.append(d_pred)
 
                 if t_loss is not None:
                     task_loss += t_loss
                 
-            #TODO possibly avg loss over num datasets?
-
-            if self.cat_dloss:
-                domain_preds = torch.cat(domain_preds, 0)
-                domain_targets = torch.cat(domain_targets, 0)
-                domain_loss = self.domain_criterion(domain_preds, domain_targets)
+            domain_preds = torch.cat(domain_preds)
+            domain_targets = torch.cat(domain_targets)
+            domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
             loss = task_loss + alpha * domain_loss
             self.manual_backward(loss)
@@ -512,12 +503,7 @@ class RepLearnerUnlearner(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 batch_size += len(batch_i["data"])
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
-                # d_target = torch.full_like(batch_i['data'], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-                # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-                d_target = torch.zeros((subset, len(batch))).to(self.device)
-                d_target[:, idx] = 1
-                # d_target = d_target.int()
-                # d_target.to(self.device)
+                d_target = torch.full((subset,), idx).to(self.device)
                 batch_vals.append({"features": features, "d_target": d_target})
                 if t_loss is not None:
                     task_loss += t_loss
@@ -546,25 +532,15 @@ class RepLearnerUnlearner(L.LightningModule):
                 if torch.isinf(targets).any():
                     raise ValueError("Inf detected in targets before domain classifier")
 
-                if self.cat_dloss:
-                    domain_preds.append(self.domain_classifier(feats.detach()))
-                    domain_targets.append(targets)
-                else:
-                    d_preds = self.domain_classifier(feats.detach())
-                    d_loss = self.domain_criterion(d_preds, targets) #might need to detach targets
-                    domain_loss += d_loss
+                domain_preds.append(self.domain_classifier(feats.detach()))
+                domain_targets.append(targets)
 
-            if self.cat_dloss:
-                domain_preds = torch.cat(domain_preds, 0)
-                domain_targets = torch.cat(domain_targets, 0)
-                domain_loss = self.domain_criterion(domain_preds, domain_targets)
+            domain_preds = torch.cat(domain_preds)
+            domain_targets = torch.cat(domain_targets)
+            domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
             domain_loss = alpha * domain_loss
-            # print(f"domain_loss before backward: {domain_loss}")
             self.manual_backward(domain_loss)
-
-            # print("clipping domain grad")
-            # nn.utils.clip_grad_norm_(self.domain_classifier.parameters(), max_norm=1.0)
 
             dm_optim.step()
 
@@ -579,24 +555,20 @@ class RepLearnerUnlearner(L.LightningModule):
             for vals in batch_vals:
                 feats, targets = vals.values()
                 conf_preds = self.domain_classifier(feats)
+                conf_preds = torch.softmax(conf_preds, dim=1)
 
                 # Check for NaNs in conf_preds
                 if torch.isnan(conf_preds).any():
                     raise ValueError("NaN detected in conf_preds from domain classifier")
                 if torch.isinf(conf_preds).any():
                     raise ValueError("Inf detected in conf_preds from domain classifier")
-
-                if self.cat_dloss:
-                    domain_preds.append(conf_preds)
-                    domain_targets.append(domain_targets)
-                else:
-                    conf_loss = self.conf_criterion(conf_preds, targets)
-                    confusion_loss += conf_loss
+                
+                domain_preds.append(conf_preds)
+                domain_targets.append(targets)
             
-            if self.cat_dloss:
-                domain_preds = torch.cat(domain_preds, 0)
-                domain_targets = torch.cat(domain_targets, 0)
-                confusion_loss = self.conf_criterion(domain_preds, domain_targets)
+            domain_preds = torch.cat(domain_preds)
+            domain_targets = torch.cat(domain_targets)
+            confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
             confusion_loss = beta * confusion_loss
 
@@ -606,8 +578,7 @@ class RepLearnerUnlearner(L.LightningModule):
             if torch.isinf(confusion_loss).any():
                 raise ValueError("Inf detected in confusion_loss before backward call ")
             
-            # print(f"confusion_loss before backward: {confusion_loss}")
-            self.manual_backward(confusion_loss, retain_graph=False) #causing the error - test out in interactive session with unlearning step immediately 
+            self.manual_backward(confusion_loss, retain_graph=False) 
             if self.sdat:
                 optim.second_step(zero_grad=True)
             else:
@@ -658,9 +629,9 @@ class RepLearnerUnlearner(L.LightningModule):
         return batch
 
     def validation_step(self, batch, batch_idx):
-        #TODO implement normalizing total batch size across all 3 dataloaders to 32
+        #TODO investigate implement normalized total batch size across all 3 dataloaders to 32
         # skipping for now to get the framework up and running
-        # also using MEGalodon loss instead of regressor loss criterion
+        # Using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
             loss, losses, metrics, features = self._shared_step(batch, batch_idx, "val")
@@ -700,7 +671,7 @@ class RepLearnerUnlearner(L.LightningModule):
             return loss
 
         ## Pre-training
-        if self.current_epoch < self.epoch_stage_1: #TODO make sure diff val functions serve a purpose, check if bypassing hooks avoid the tensor edited in place error
+        if self.current_epoch < self.epoch_stage_1: 
             if self.full_run and self.current_epoch == self.epoch_stage_1 - 1 and batch_idx == 0:
                 save_activations = True
             else:
@@ -748,27 +719,23 @@ class RepLearnerUnlearner(L.LightningModule):
 
                 d_pred = self.domain_classifier(features) 
 
-                d_target = torch.zeros((subset, len(batch))).to(self.device)
-                d_target[:, idx] = 1
+                d_target = torch.full((subset,), idx).to(self.device)
 
                 domain_preds.append(d_pred)
                 domain_targets.append(d_target)
 
-                if not self.cat_dloss:
-                    d_loss = self.domain_criterion(d_pred, d_target)
-                    domain_loss += d_loss
-
                 if t_loss is not None:
                     task_loss += t_loss
                 
-            domain_preds = torch.cat(domain_preds, 0)
-            domain_targets = torch.cat(domain_targets, 0)
+            domain_preds = torch.cat(domain_preds)
+            domain_targets = torch.cat(domain_targets)
 
-            if self.cat_dloss:
-                domain_loss = self.domain_criterion(domain_preds, domain_targets)
+            domain_loss = self.domain_criterion(domain_preds, domain_targets)
+            domain_preds = torch.softmax(domain_preds, dim=1)
 
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-            true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+            true_domains = domain_targets.detach().cpu().numpy()
 
             if save_activations:
                 activations = torch.cat(activations).to("cpu")
@@ -776,10 +743,11 @@ class RepLearnerUnlearner(L.LightningModule):
                 # Convert numerical labels to class names
                 label_names = [label_mapping[label.item()] for label in true_domains]
                 save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/full_run/fullrun_tsne_plots")
-                np.save(save_path / "task_activations.npy", activations.numpy())
-                np.save(save_path / "task_labels.npy", np.array(label_names))
+                np.save(save_path / f"{self.run_name}_task_activations.npy", activations.numpy())
+                np.save(save_path / f"{self.run_name}_task_labels.npy", np.array(label_names))
                 print("Saving activations...")
-                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="task_tsne.png")
+                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, 
+                          file_name=f"{self.run_name}_task_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
@@ -867,18 +835,19 @@ class RepLearnerUnlearner(L.LightningModule):
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
 
-                d_target = torch.zeros((subset, len(batch))).to(self.device)
-                d_target[:, idx] = 1
+                d_target = torch.full((subset,), idx).to(self.device)
 
                 domain_preds.append(d_pred)
                 domain_targets.append(d_target)
                 if t_loss is not None:
                     task_loss += t_loss
-            domain_preds = torch.cat(domain_preds, 0)
-            domain_targets = torch.cat(domain_targets, 0)
+            domain_preds = torch.cat(domain_preds)
+            domain_targets = torch.cat(domain_targets)
 
+            domain_preds = torch.softmax(domain_preds, dim=1)
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-            true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+            true_domains = domain_targets.detach().cpu().numpy()
 
             if save_activations:
                 activations = torch.cat(activations).to("cpu")
@@ -886,10 +855,11 @@ class RepLearnerUnlearner(L.LightningModule):
                 # Convert numerical labels to class names
                 label_names = [label_mapping[label.item()] for label in true_domains]
                 save_path = Path("/data/engs-pnpl/wolf6942/experiments/MEGalodon/full_run/fullrun_tsne_plots")
-                np.save(save_path / "unlearned_activations.npy", activations.numpy())
-                np.save(save_path / "unlearned_labels.npy", np.array(label_names))
+                np.save(save_path / f"{self.run_name}_unlearned_activations.npy", activations.numpy())
+                np.save(save_path / f"{self.run_name}_unlearned_labels.npy", np.array(label_names))
                 print("Saving activations...")
-                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
+                plot_tsne(activations=activations, labels=label_names, save_dir=save_path, 
+                          file_name=f"{self.run_name}_unlearned_tsne.png")
 
             acc = accuracy_score(true_domains, pred_domains)
         
@@ -964,7 +934,8 @@ class RepLearnerUnlearner(L.LightningModule):
         domain_targets = torch.cat(domain_targets, 0)
 
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-        true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+        # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+        true_domains = domain_targets.cpu().numpy()
 
         acc = accuracy_score(true_domains, pred_domains)
 
@@ -983,7 +954,7 @@ class RepLearnerUnlearner(L.LightningModule):
         np.save(save_path / labels, np.array(label_names))
         print(f"Single batch accuracy: {acc}")
         print("Saving activations...")
-        plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name="unlearned_tsne.png")
+        plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name=f"{name}_unlearned_tsne.png")
 
     #TODO implement domain unlearning iterative training scheme
     def test_step(self, batch, batch_idx):
@@ -1077,7 +1048,8 @@ class RepLearnerUnlearner(L.LightningModule):
         domain_targets = torch.cat(domain_targets, 0)
 
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-        true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+        # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+        true_domains = domain_targets.cpu().numpy()
         acc = accuracy_score(true_domains, pred_domains)
     
         self.log(
@@ -1143,6 +1115,12 @@ class RepLearnerUnlearner(L.LightningModule):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
             print("CLEARED CHECKPOINT OPTIMS")
             checkpoint["optimizer_states"] = []
+        if self.clear_betas: # should be add betas
+            for param_group in checkpoint["optimizer_states"]:
+                if 'betas' in param_group:
+                    del param_group['betas']
+                if 'weight_decay' in param_group:
+                    del param_group['weight_decay']
 
     def reset_optims(self):
         print("WORKING")
@@ -1164,34 +1142,6 @@ class RepLearnerUnlearner(L.LightningModule):
                     param_group['dampening'] = 0
                     param_group['nesterov'] = True
                     param_group['weight_decay'] = 1e-3
-
-        # for param_group in self.trainer.optimizers["step1_optim"]:
-        #     param_group["lr"] = self.learning_rate
-        #     param_group["betas"] = (0.9, 0.999)
-        #     param_group["eps"] = 1e-08
-        #     param_group["weight_decay"] = 0
-        # for param_group in self.trainer.optimizers["optim"]:
-        #     param_group["lr"] = self.task_learning_rate
-        #     param_group["betas"] = (0.9, 0.999)
-        #     param_group["eps"] = 1e-08
-        #     param_group["weight_decay"] = 0
-        # for param_group in self.trainer.optimizers["conf_optim"]:
-        #     param_group["lr"] = self.conf_learning_rate
-        #     param_group["betas"] = (0.9, 0.999)
-        #     param_group["eps"] = 1e-08
-        #     param_group["weight_decay"] = 0
-        # for param_group in self.trainer.optimizers["dm_optim"]:
-        #     param_group["lr"] = self.dm_learning_rate
-        #     param_group["betas"] = (0.9, 0.999)
-        #     param_group["eps"] = 1e-08
-        #     param_group["weight_decay"] = 0
-
-        # for optimizer in self.trainer.optimizers:
-        #     for param_group in optimizer:
-        #         for param in param_group["params"]:
-        #             state = optimizer.state[param]
-        #             state["exp_avg"] = torch.zeros_like["param"]
-        #             state["exp_avg_sq"] = torch.zeros_like["param"]
 
     ## to be used in the potential case that checkpoint is trained with adam but you don't want to begin unlearning immediately
     ## currently not called anywhere
@@ -1248,10 +1198,16 @@ class RepLearnerUnlearner(L.LightningModule):
             ]
 
         else:
-            step1_optim = torch.optim.AdamW(
-                encoder_params + predictor_params + domain_classifier_params, 
-                lr=self.learning_rate
-            )
+            if self.no_dm_control:
+                step1_optim = torch.optim.AdamW(
+                    encoder_params + predictor_params, 
+                    lr=self.learning_rate
+                )
+            else:
+                step1_optim = torch.optim.AdamW(
+                    encoder_params + predictor_params + domain_classifier_params, 
+                    lr=self.learning_rate
+                )
 
             optim = torch.optim.Adam(encoder_params + predictor_params, lr=self.task_learning_rate)
             conf_optim = torch.optim.Adam(encoder_params, lr=self.conf_learning_rate)

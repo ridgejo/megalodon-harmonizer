@@ -4,14 +4,14 @@ import matplotlib.patches as mpatches
 import torch
 import os
 
-def plot_tsne(activations, labels, save_dir, file_name):
-    tsne = TSNE(n_components=2, random_state=0)
-    tsne_results = tsne.fit_transform(activations.numpy())
-    
+def plot_tsne(activations, labels, save_dir, file_name, perplexity=30, lr=1000.0, iters=1000,):
+    tsne = TSNE(n_components=2, learning_rate=lr, n_iter=iters, perplexity=perplexity, random_state=0)
+    tsne_results = tsne.fit_transform(activations)
+
     plt.figure(figsize=(10, 8))
     unique_labels = list(set(labels))
     colors = {label: idx for idx, label in enumerate(unique_labels)}
-    scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=[colors[label] for label in labels], cmap='viridis')
+    scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=[colors[label] for label in labels], cmap='viridis', alpha=0.5)
     
     # # Create a colorbar with the unique class names
     # cbar = plt.colorbar(scatter, ticks=range(len(unique_labels)))
@@ -35,10 +35,3 @@ def plot_tsne(activations, labels, save_dir, file_name):
 
     print(f"t-SNE plot saved to {file_path}")
 
-    # plt.figure(figsize=(10, 8))
-    # scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=labels, cmap='viridis')
-    # plt.colorbar(scatter)
-    # plt.title('t-SNE of Model Activations')
-    # plt.xlabel('t-SNE Dimension 1')
-    # plt.ylabel('t-SNE Dimension 2')
-    # plt.show()
