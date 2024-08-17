@@ -56,6 +56,7 @@ parser.add_argument("--ckpt_dset_num", help="Override num classes for loading do
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 parser.add_argument("--harmonization_lr", help="Override lr for harmonization stage", type=float, default=None)
 parser.add_argument("--epoch_stage_1", help="Epoch to begin harmonization at", type=int, default=None)
+parser.add_argument("--batch_size", help="Override batch side", type=int, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
 args = parser.parse_args()
 
@@ -71,6 +72,11 @@ if "finetune" in config:
 
 if args.debug:
     config["datamodule_config"]["debug"] = True
+
+if args.batch_size is not None:
+    config["datamodule_config"]["dataloader_configs"]["batch_size"] = args.batch_size
+config["rep_config"]["batch_size"] = config["datamodule_config"]["dataloader_configs"]["batch_size"]
+
 
 if args.seed is not None:
     config["experiment"]["seed"] = args.seed

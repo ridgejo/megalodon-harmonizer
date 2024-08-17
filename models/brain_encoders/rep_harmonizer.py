@@ -54,6 +54,7 @@ class RepHarmonizer(L.LightningModule):
         self.automatic_optimization = False
         self.epoch_stage_1 = rep_config["epoch_stage_1"]
         self.max_epochs = rep_config["max_epochs"]
+        self.batch_size = rep_config["batch_size"]
         self.run_name = rep_config.get("run_name", "")
 
         self.learning_rate = rep_config["lr"]
@@ -210,7 +211,7 @@ class RepHarmonizer(L.LightningModule):
         if rep_config.get("lsvm") is not None:
             self.domain_classifier = LSVM_DomainClassifier(2560, rep_config.get("num_datasets", 2))
         else:
-            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=512) # nodes = number of datasets (I think)
+            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=rep_config["batch_size"]) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
