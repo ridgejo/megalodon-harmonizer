@@ -379,14 +379,11 @@ class RepHarmonizer(L.LightningModule):
         alpha = self.rep_config["alpha"]
         beta = self.rep_config["beta"]
 
-        print(f"batch shape before slice = {len(batch)}")
         # If datasets being harmonized are heavily biased by demographics, harmonize only over intersections
         # Assumes intersect loader is specified last in config file
         if self.intersect_only:
             intersect_batch = batch[-1]
             batch = batch[:-1]
-        
-        print(f"batch shape after slice = {len(batch)}")
 
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
@@ -433,7 +430,7 @@ class RepHarmonizer(L.LightningModule):
                     d_pred = self.domain_classifier(features.detach())
                 else:
                     d_pred = self.domain_classifier(features)
-                print(f"subset = {subset}")
+
                 d_target = torch.full((subset,), idx).to(self.device)
 
                 domain_targets.append(d_target)
@@ -444,7 +441,6 @@ class RepHarmonizer(L.LightningModule):
                 
             domain_preds = torch.cat(domain_preds)
             domain_targets = torch.cat(domain_targets)
-            print(f"domain_targets shape = {domain_targets.shape}")
             domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
             loss = task_loss + alpha * domain_loss

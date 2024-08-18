@@ -67,7 +67,7 @@ datamodule_config:
       info: ["subject", "subject_id", "dataset"]
       exclude_subjects: ['V1002', 'V1006', 'A2011', 'V1005', 'A2119', 'A2084', 'A2063', 'A2076', 'V1090', 'A2036', 'V1001', 'V1003', 'A2062']
       preload: true
-    shafto2014:
+    shaftoIntersection:
       data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
       preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
       l_freq: 0.5
