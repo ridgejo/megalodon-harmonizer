@@ -687,6 +687,12 @@ class RepHarmonizer(L.LightningModule):
                 )
 
             return loss
+        
+        # If datasets being harmonized are heavily biased by demographics, harmonize only over intersections
+        # Assumes intersect loader is specified last in config file
+        if self.intersect_only:
+            intersect_batch = batch[-1]
+            batch = batch[:-1]
 
         ## Pre-training
         if self.current_epoch < self.epoch_stage_1: 
