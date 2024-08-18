@@ -52,7 +52,8 @@ parser.add_argument("--sdat", help="Use SDAT optimization framework for unlearni
 parser.add_argument("--sgd", help="Use SGD for domain classifier during unlearning", action="store_true", default=False)
 parser.add_argument("--clear_optim", help="Clear optimizer state upon loading checkpoint", action="store_true", default=False)
 parser.add_argument("--clear_betas", help="Clear optimizer state betas, weight decay upon loading checkpoint", action="store_true", default=False)
-parser.add_argument("--ckpt_dset_num", help="Override num classes for loading domain classifier ckpt", type=int, default=None)
+parser.add_argument("--dset_num", help="Override num dataset domains", type=int, default=None)
+parser.add_argument("--intersect_only", help="Only harmonize on intersect of distributions", action="store_true", default=False)
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 parser.add_argument("--harmonization_lr", help="Override lr for harmonization stage", type=float, default=None)
 parser.add_argument("--epoch_stage_1", help="Epoch to begin harmonization at", type=int, default=None)
@@ -87,6 +88,9 @@ if args.name is not None:
 if args.get_tsne:
     config["rep_config"]["tsne"] = True
 
+if args.intersect_only:
+    config["rep_config"]["intersect_only"] = True
+
 if args.no_dm_control:
     config["rep_config"]["no_dm_control"] = True
 
@@ -105,8 +109,8 @@ if args.clear_optim:
 if args.clear_betas:
     config["rep_config"]["clear_betas"] = True
 
-if args.ckpt_dset_num is not None:
-    config["rep_config"]["num_datasets"] = args.ckpt_dset_num
+if args.dset_num is not None:
+    config["rep_config"]["num_datasets"] = args.dset_num
 
 if args.epoch_stage_1 is not None:
     config["rep_config"]["epoch_stage_1"] = args.epoch_stage_1

@@ -69,6 +69,7 @@ class RepHarmonizer(L.LightningModule):
         self.clear_betas = rep_config.get("clear_betas", False)
         self.finetune = rep_config.get("finetune", False)
         self.no_dm_control = rep_config.get("no_dm_control", False)
+        self.intersect_only = rep_config.get("intersect_only", False)
         self.activations = None
         self.weightings = {}
 
@@ -378,6 +379,12 @@ class RepHarmonizer(L.LightningModule):
         alpha = self.rep_config["alpha"]
         beta = self.rep_config["beta"]
 
+        # If datasets being harmonized are heavily biased by demographics, harmonize only over intersections
+        # Assumes intersect loader is specified last in config file
+        if self.intersect_only:
+            intersect_batch = batch[-1]
+            batch = batch[:-1]
+
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
             #TODO investigate implementing normalized total batch size across all 3 dataloaders to 32
@@ -419,7 +426,10 @@ class RepHarmonizer(L.LightningModule):
                 
                 batch_size += subset
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
-                d_pred = self.domain_classifier(features)
+                if self.intersect_only:
+                    d_pred = self.domain_classifier(features.detach())
+                else:
+                    d_pred = self.domain_classifier(features)
                 d_target = torch.full((subset,), idx).to(self.device)
 
                 domain_targets.append(d_target)
@@ -483,6 +493,7 @@ class RepHarmonizer(L.LightningModule):
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
                         subset = len(batch_i["data"]) - subset
@@ -505,7 +516,7 @@ class RepHarmonizer(L.LightningModule):
                 batch_size += len(batch_i["data"])
                 t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
                 d_target = torch.full((subset,), idx).to(self.device)
-                batch_vals.append({"features": features, "d_target": d_target})
+                batch_vals.append((features, d_target))
                 if t_loss is not None:
                     task_loss += t_loss
             # print(f"task_loss before backward: {task_loss}")
@@ -520,8 +531,15 @@ class RepHarmonizer(L.LightningModule):
             domain_loss = 0
             domain_preds = []
             domain_targets = []
-            for vals in batch_vals:
-                feats, targets = vals.values()
+
+            if self.intersect_only:
+                # relies heavily on assumption that Shafto is first
+                intersect_batch = self._take_subset(intersect_batch, split_1)
+                _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
+                targets = torch.full((split_1,), 0).to(self.device)
+                batch_vals[0] = (feats, targets)
+
+            for feats, targets in batch_vals:
 
                 # Check for NaNs or Infs in feats and targets
                 if torch.isnan(feats).any():
@@ -553,8 +571,7 @@ class RepHarmonizer(L.LightningModule):
             domain_preds = []
             domain_targets = []
 
-            for vals in batch_vals:
-                feats, targets = vals.values()
+            for feats, targets in batch_vals:
                 conf_preds = self.domain_classifier(feats)
                 conf_preds = torch.softmax(conf_preds, dim=1)
 
@@ -718,7 +735,7 @@ class RepHarmonizer(L.LightningModule):
                 if save_activations:
                     activations.append(features.detach())
 
-                d_pred = self.domain_classifier(features) 
+                d_pred = self.domain_classifier.forward(features) 
 
                 d_target = torch.full((subset,), idx).to(self.device)
 
@@ -807,6 +824,7 @@ class RepHarmonizer(L.LightningModule):
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
                         subset = len(batch_i["data"]) - subset
@@ -832,6 +850,11 @@ class RepHarmonizer(L.LightningModule):
 
                 if save_activations:
                     activations.append(features.detach())
+
+                if idx == 0 and self.intersect_only:
+                    # relies heavily on assumption that Shafto is first
+                    intersect_batch = self._take_subset(intersect_batch, split_1)
+                    _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
 
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
@@ -1301,7 +1324,7 @@ class RepHarmonizer(L.LightningModule):
 
 
 if __name__ == "__main__":
-    model = RepLearnerUnlearner(
+    model = RepHarmonizer(
         rep_config={
             "lr": 0.001,
             "dataset_block": {
@@ -1335,7 +1358,7 @@ if __name__ == "__main__":
         )
 
     def test_with_real_data():
-        from dataloaders.multi_dataloader import MultiDataLoader
+        from dataloaders import MultiDataLoader
 
         datamodule = MultiDataLoader(
             dataset_preproc_configs={

@@ -7,9 +7,9 @@ rep_config:
   alpha: 1
   beta: 0.0001
   lr: 0.000066
-  dm_lr: 0.000066
-  conf_lr: 0.000066
-  task_lr: 0.000066
+  dm_lr: 0.00001
+  conf_lr: 0.00001
+  task_lr: 0.00001
   dataset_block:
     dataset_sizes:
       armeni2022: 269
