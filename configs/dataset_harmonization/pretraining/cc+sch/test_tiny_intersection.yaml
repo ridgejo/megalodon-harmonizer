@@ -87,7 +87,7 @@ datamodule_config:
         "A2003",
         "A2004"]
       preload: true
-    shafto2014:
+    shaftoIntersection:
       data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
       preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
       l_freq: 0.5

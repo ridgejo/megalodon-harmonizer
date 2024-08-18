@@ -12,6 +12,7 @@ DATASET_CLASSES = {
     "gwilliams2022": Gwilliams2022,
     "schoffelen2019": Schoffelen2019,
     "shafto2014": Shafto2014,
+    "shaftoIntersection": Shafto2014
 }
 
 
