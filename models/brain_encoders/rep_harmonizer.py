@@ -379,14 +379,14 @@ class RepHarmonizer(L.LightningModule):
         alpha = self.rep_config["alpha"]
         beta = self.rep_config["beta"]
 
-        print(f"batch shape before slice = {batch.shape}")
+        print(f"batch shape before slice = {len(batch)}")
         # If datasets being harmonized are heavily biased by demographics, harmonize only over intersections
         # Assumes intersect loader is specified last in config file
         if self.intersect_only:
             intersect_batch = batch[-1]
             batch = batch[:-1]
         
-        print(f"batch shape after slice = {batch.shape}")
+        print(f"batch shape after slice = {len(batch)}")
 
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
