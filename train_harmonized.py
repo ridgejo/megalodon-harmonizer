@@ -109,9 +109,6 @@ if args.clear_optim:
 if args.clear_betas:
     config["rep_config"]["clear_betas"] = True
 
-if args.dset_num is not None:
-    config["rep_config"]["num_datasets"] = args.dset_num
-
 if args.epoch_stage_1 is not None:
     config["rep_config"]["epoch_stage_1"] = args.epoch_stage_1
 
@@ -194,7 +191,10 @@ else:
         **config["datamodule_config"],
         seed=config["experiment"]["seed"],
     )
-    config["rep_config"]["num_datasets"] = len(config["datamodule_config"]["dataset_preproc_configs"].keys())
+    if args.dset_num is not None:
+        config["rep_config"]["num_datasets"] = args.dset_num
+    else:
+        config["rep_config"]["num_datasets"] = len(config["datamodule_config"]["dataset_preproc_configs"].keys())
 
 ddp_strategy = DDPStrategy(
     find_unused_parameters=True, static_graph=False
