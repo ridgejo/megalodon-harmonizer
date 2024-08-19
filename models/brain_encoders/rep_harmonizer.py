@@ -476,9 +476,9 @@ class RepHarmonizer(L.LightningModule):
 
         ## begin unlearning
         else:
-            if self.current_epoch == self.epoch_stage_1 and batch_idx == 0:
-                if not self.clear_optim and not self.sdat: # make sure optim state wasn't already cleared on checkpoint load
-                    self.reset_optims() 
+            # if self.current_epoch == self.epoch_stage_1 and batch_idx == 0:
+            #     if not self.clear_optim and not self.sdat: # make sure optim state wasn't already cleared on checkpoint load
+            #         self.reset_optims() 
 
             #with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
             # update encoder / task heads
