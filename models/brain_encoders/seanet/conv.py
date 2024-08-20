@@ -287,7 +287,7 @@ class SConv1d(nn.Module):
         self.causal = causal
         self.pad_mode = pad_mode
 
-    def forward(self, x):
+    def forward(self, x, stage="encode"):
         B, C, T = x.shape
         kernel_size = self.conv.conv.kernel_size[0]
         stride = self.conv.conv.stride[0]
@@ -309,7 +309,7 @@ class SConv1d(nn.Module):
             x = pad1d(
                 x, (padding_left, padding_right + extra_padding), mode=self.pad_mode
             )
-        return self.conv(x)
+        return self.conv(x, stage)
 
 
 class SConvTranspose1d(nn.Module):
