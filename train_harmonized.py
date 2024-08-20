@@ -194,7 +194,12 @@ else:
     if args.dset_num is not None:
         config["rep_config"]["num_datasets"] = args.dset_num
     else:
-        config["rep_config"]["num_datasets"] = len(config["datamodule_config"]["dataset_preproc_configs"].keys())
+        dset_names = config["datamodule_config"]["dataset_preproc_configs"].keys()
+        if "shaftoIntersection" in dset_names:
+            num_dsets = len(dset_names) - 1
+        else:
+            num_dsets = len(dset_names)
+        config["rep_config"]["num_datasets"] = num_dsets
 
 ddp_strategy = DDPStrategy(
     find_unused_parameters=True, static_graph=False
