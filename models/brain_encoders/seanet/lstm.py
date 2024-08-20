@@ -26,70 +26,31 @@ class SLSTM(nn.Module):
 
     def forward(self, x):
         x = x.permute(2, 0, 1)
-        # y, _ = self.lstm(x)
+        y, _ = self.lstm(x)
 
-       # Clone the LSTM parameters to avoid in-place operations
-        lstm_params = []
-        for name, param in self.lstm.named_parameters():
-            lstm_params.append(param.clone())
+    #    # Clone the LSTM parameters to avoid in-place operations
+    #     lstm_params = []
+    #     for name, param in self.lstm.named_parameters():
+    #         lstm_params.append(param.clone())
 
-        # Initialize hidden and cell states
-        h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
-        c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
+    #     # Initialize hidden and cell states
+    #     h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
+    #     c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
         
-        # Manually call functional LSTM using torch._VF.lstm
-        y, _, _ = torch._VF.lstm(
-            x, 
-            (h_0, c_0), 
-            lstm_params, 
-            self.lstm.bias, 
-            self.lstm.num_layers, 
-            self.lstm.dropout, 
-            self.lstm.training, 
-            self.lstm.bidirectional, 
-            False  # batch_first
-        )
+    #     # Manually call functional LSTM using torch._VF.lstm
+    #     y, _, _ = torch._VF.lstm(
+    #         x, 
+    #         (h_0, c_0), 
+    #         lstm_params, 
+    #         self.lstm.bias, 
+    #         self.lstm.num_layers, 
+    #         self.lstm.dropout, 
+    #         self.lstm.training, 
+    #         self.lstm.bidirectional, 
+    #         False  # batch_first
+    #     )
         
-        # # Initialize hidden and cell states
-        # h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.input_size, device=x.device)
-        # c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.input_size, device=x.device)
         
-        # # Extract LSTM parameters and clone them
-        # weight_ih_l = [param.clone() for name, param in self.lstm.named_parameters() if 'weight_ih' in name]
-        # weight_hh_l = [param.clone() for name, param in self.lstm.named_parameters() if 'weight_hh' in name]
-        # bias_ih_l = [param.clone() for name, param in self.lstm.named_parameters() if 'bias_ih' in name]
-        # bias_hh_l = [param.clone() for name, param in self.lstm.named_parameters() if 'bias_hh' in name]
-
-        # # LSTM computation step by step
-        # all_hidden_states = []
-        # hx = h_0
-        # cx = c_0
-        # for t in range(x.size(0)):  # iterate over time steps
-        #     layer_hidden_states = []
-        #     for layer in range(self.lstm.num_layers):
-        #         # Input-to-hidden
-        #         gates = torch.mm(x[t] if layer == 0 else all_hidden_states[-1][layer][0], weight_ih_l[layer].t()) + bias_ih_l[layer]
-                
-        #         # Hidden-to-hidden
-        #         gates += torch.mm(hx[layer], weight_hh_l[layer].t()) + bias_hh_l[layer]
-                
-        #         # Gates are i, f, g, o
-        #         i_gate, f_gate, g_gate, o_gate = gates.chunk(4, 1)
-                
-        #         i_gate = torch.sigmoid(i_gate)
-        #         f_gate = torch.sigmoid(f_gate)
-        #         g_gate = torch.tanh(g_gate)
-        #         o_gate = torch.sigmoid(o_gate)
-                
-        #         cx[layer] = f_gate * cx[layer] + i_gate * g_gate
-        #         hx[layer] = o_gate * torch.tanh(cx[layer])
-                
-        #         layer_hidden_states.append((hx[layer], cx[layer]))
-            
-        #     all_hidden_states.append(layer_hidden_states)
-        
-        # # Collect final hidden states for each time step
-        # y = torch.stack([all_hidden_states[t][-1][0] for t in range(x.size(0))], dim=0)
         
         if self.skip:
             y = y + x
