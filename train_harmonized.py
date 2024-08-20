@@ -273,7 +273,10 @@ if args.checkpoint:
             ]  # Find latest checkpoint file within the directory
 
         # Load the checkpoint to log epoch
-        print(f"Checkpoint loading model saved at epoch{torch.load(checkpoint)['epoch']}", flush=True)
+        if args.get_tsne:
+            print(f"Checkpoint loading model saved at epoch{torch.load(checkpoint, map_location=torch.device('cpu'))['epoch']}", flush=True)
+        else:
+            print(f"Checkpoint loading model saved at epoch{torch.load(checkpoint)['epoch']}", flush=True)
 
         # Load model from the pre-trained checkpoint and resume training
         model = RepHarmonizer.load_from_checkpoint(
