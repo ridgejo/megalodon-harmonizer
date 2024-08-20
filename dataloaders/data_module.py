@@ -167,22 +167,24 @@ class HarmonizationDataModule(L.LightningModule):
                         DataLoader(
                             train,
                             batch_size=self.batch_size,
-                            shuffle=True,
+                            # shuffle=True,
                             pin_memory=True,
                             num_workers=8,
                             persistent_workers=True,
                             sampler=train_sampler
+                            # replacement=True
                         )
                     )
                     val_loaders.append(
                         DataLoader(
                             val,
                             batch_size=self.batch_size,
-                            shuffle=False,
+                            # shuffle=False,
                             pin_memory=True,
                             num_workers=8,
                             persistent_workers=True,
                             sampler=val_sampler
+                            # replacement=True
                         )
                     )
                 else:
@@ -190,18 +192,20 @@ class HarmonizationDataModule(L.LightningModule):
                         DataLoader(
                             train,
                             batch_size=self.batch_size,
-                            shuffle=True,
+                            # shuffle=True,
                             pin_memory=True,
                             sampler=train_sampler
+                            # replacement=True
                         )
                     )
                     val_loaders.append(
                         DataLoader(
                             val,
                             batch_size=self.batch_size,
-                            shuffle=False,
+                            # shuffle=False,
                             pin_memory=True,
                             sampler=val_sampler
+                            # replacement=True
                         )
                     )
             else:
