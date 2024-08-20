@@ -236,7 +236,7 @@ class RepHarmonizer(L.LightningModule):
 
         # Subject FiLM conditioning
         z = self.encoder_models["subject_film_module"](z, subject_embedding)
-        z = z.clone()
+
         # Subject embedding concatentation
         z = self.encoder_models["attach_subject"](z, subject_embedding)
 
@@ -633,6 +633,7 @@ class RepHarmonizer(L.LightningModule):
                     targets = torch.full((split_1,), 0).to(self.device)
                     batch_vals[0] = (feats, targets)
 
+                cloned_feats = []
                 for feats, targets in batch_vals:
 
                     # Check for NaNs or Infs in feats and targets
@@ -645,6 +646,7 @@ class RepHarmonizer(L.LightningModule):
                     if torch.isinf(targets).any():
                         raise ValueError("Inf detected in targets before domain classifier")
 
+                    cloned_feats.append(feats.clone())
                     domain_preds.append(self.domain_classifier(feats.detach()))
                     domain_targets.append(targets)
 
@@ -663,9 +665,10 @@ class RepHarmonizer(L.LightningModule):
                 confusion_loss = 0
 
                 domain_preds = []
-                domain_targets = []
+                # domain_targets = []
 
-                for feats, targets in batch_vals:
+                # for feats, targets in batch_vals:
+                for feats in cloned_feats:
                     conf_preds = self.domain_classifier(feats)
                     conf_preds = torch.softmax(conf_preds, dim=1)
 
@@ -676,10 +679,10 @@ class RepHarmonizer(L.LightningModule):
                         raise ValueError("Inf detected in conf_preds from domain classifier")
                     
                     domain_preds.append(conf_preds)
-                    domain_targets.append(targets)
+                    # domain_targets.append(targets)
                 
                 domain_preds = torch.cat(domain_preds)
-                domain_targets = torch.cat(domain_targets)
+                # domain_targets = torch.cat(domain_targets)
                 confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
                 confusion_loss = beta * confusion_loss
