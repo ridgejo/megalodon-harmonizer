@@ -401,12 +401,14 @@ class RepHarmonizer(L.LightningModule):
             for idx, batch_i in enumerate(batch):
                 if len(batch) == 2:
                     if idx == 0:
-                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
-                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        subset = np.random.randint(1, self.batch_size - 1)
+                        # subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        # while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                        #     subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
-                        subset = len(batch_i["data"]) - subset
+                        # subset = len(batch_i["data"]) - subset
+                        subset = self.batch_size - subset
                         batch_i = self._take_subset(batch_i, subset)
                 elif len(batch) == 3:
                     if idx == 0:

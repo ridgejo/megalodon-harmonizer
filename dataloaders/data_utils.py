@@ -1,4 +1,6 @@
 from pathlib import Path
+import torch
+from torch.utils.data import WeightedRandomSampler
 
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
 
@@ -25,3 +27,47 @@ def get_dset_encoding(dataset):
         return 3
     else:
         raise ValueError("Dataset not supported")
+    
+class ComboLoader:
+    def __init__(self, dataloaders):
+        self.dataloaders = dataloaders
+        self.iterators = [iter(dataloader) for dataloader in dataloaders]
+        self.num_batches = min(len(dataloader) for dataloader in dataloaders)
+
+    def __iter__(self):
+        self.iterators = [iter(dataloader) for dataloader in self.dataloaders]
+        self.batch_count = 0
+        return self
+
+    def __next__(self):
+        if self.batch_count >= self.num_batches:
+            raise StopIteration
+
+        batches = []
+        for iterator in self.iterators:
+            try:
+                batch = next(iterator)
+            except StopIteration:
+                batch = None
+            batches.append(batch)
+
+        self.batch_count += 1
+        return tuple(batches)
+
+    def __len__(self):
+        return self.num_batches
+    
+def get_oversampler(dataset, target_size):
+    # Calculate the number of samples needed to match the target size
+    num_samples = len(dataset)
+    oversample_factor = target_size // num_samples + 1
+
+    # Create list of oversampled indices 
+    indices = torch.arange(num_samples).repeat(oversample_factor).tolist()
+    
+    # Trim to target size
+    indices = indices[:target_size]
+
+    # Create sampler with indices
+    sampler = WeightedRandomSampler(indices, len(indices), replacement=True)
+    return sampler

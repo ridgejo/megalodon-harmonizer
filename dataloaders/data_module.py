@@ -5,6 +5,7 @@ import torch
 from pnpl.dataloaders import MultiDataLoader
 from pnpl.datasets import Armeni2022, Gwilliams2022, Schoffelen2019, Shafto2014
 from torch.utils.data import DataLoader, random_split
+from .data_utils import ComboLoader, get_oversampler
 
 
 DATASET_CLASSES = {
@@ -132,6 +133,8 @@ class HarmonizationDataModule(L.LightningModule):
 
     def setup(self, stage: str):
         train_loaders, val_loaders, test_loaders = [], [], []
+
+        splits = {}
         for dataset, config in self.dataset_preproc_configs.items():
             data = DATASET_CLASSES[dataset](**config)
             train, val, test = random_split(
@@ -143,6 +146,20 @@ class HarmonizationDataModule(L.LightningModule):
                 ],
                 generator=torch.Generator().manual_seed(self.seed),
             )
+            splits[dataset] = (train, val, test)
+        print(f"len train = {len(splits['shafto2014'][0])}")
+        print(f"len train data = {len(splits['shafto2014'][0]["data"])}")
+        print(splits["shafto2014"][0])
+
+        max_train_size = max([splits[dataset][0] for dataset, _ in self.dataset_preproc_configs.items()])
+        max_val_size = max([splits[dataset][1] for dataset, _ in self.dataset_preproc_configs.items()])
+        target_train_size = ((max_train_size + self.batch_size - 1) // self.batch_size) * self.batch_size
+        target_val_size = ((max_val_size + self.batch_size - 1) // self.batch_size) * self.batch_size
+
+        for dataset, split in splits.items():
+            train, val, test = split
+            train_sampler = get_oversampler(train, target_train_size)
+            val_sampler = get_oversampler(val, target_val_size)
 
             if self.dataloader_configs.get("use_workers", False):
                 train_loaders.append(
@@ -153,6 +170,7 @@ class HarmonizationDataModule(L.LightningModule):
                         pin_memory=True,
                         num_workers=8,
                         persistent_workers=True,
+                        sampler=train_sampler
                     )
                 )
                 val_loaders.append(
@@ -163,6 +181,7 @@ class HarmonizationDataModule(L.LightningModule):
                         pin_memory=True,
                         num_workers=8,
                         persistent_workers=True,
+                        sampler=val_sampler
                     )
                 )
             else:
@@ -172,6 +191,7 @@ class HarmonizationDataModule(L.LightningModule):
                         batch_size=self.batch_size,
                         shuffle=True,
                         pin_memory=True,
+                        sampler=train_sampler
                     )
                 )
                 val_loaders.append(
@@ -180,6 +200,7 @@ class HarmonizationDataModule(L.LightningModule):
                         batch_size=self.batch_size,
                         shuffle=False,
                         pin_memory=True,
+                        sampler=val_sampler
                     )
                 )
             test_loaders.append(
@@ -192,9 +213,9 @@ class HarmonizationDataModule(L.LightningModule):
         self.val_loaders = val_loaders
         self.test_loaders = test_loaders
 
-    def _combo_loader(self, loaders):
-        for batches in zip(*loaders):
-            yield tuple(batches)
+    # def _combo_loader(self, loaders):
+    #     for batches in zip(*loaders):
+    #         yield tuple(batches)
 
     def on_after_batch_transfer(self, batch, dataloader_idx):
         # Standard scale the batch before training
@@ -225,31 +246,3 @@ class HarmonizationDataModule(L.LightningModule):
         return ComboLoader(self.test_loaders)
 
 
-class ComboLoader:
-    def __init__(self, dataloaders):
-        self.dataloaders = dataloaders
-        self.iterators = [iter(dataloader) for dataloader in dataloaders]
-        self.num_batches = min(len(dataloader) for dataloader in dataloaders)
-
-    def __iter__(self):
-        self.iterators = [iter(dataloader) for dataloader in self.dataloaders]
-        self.batch_count = 0
-        return self
-
-    def __next__(self):
-        if self.batch_count >= self.num_batches:
-            raise StopIteration
-
-        batches = []
-        for iterator in self.iterators:
-            try:
-                batch = next(iterator)
-            except StopIteration:
-                batch = None
-            batches.append(batch)
-
-        self.batch_count += 1
-        return tuple(batches)
-
-    def __len__(self):
-        return self.num_batches
