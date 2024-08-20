@@ -4,7 +4,7 @@ import lightning as L
 import torch
 from pnpl.dataloaders import MultiDataLoader
 from pnpl.datasets import Armeni2022, Gwilliams2022, Schoffelen2019, Shafto2014
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, RandomSampler
 from .data_utils import ComboLoader, get_oversampler
 
 
@@ -160,19 +160,21 @@ class HarmonizationDataModule(L.LightningModule):
             train, val, test = split
             if dataset == "shaftoIntersection":
                 # train_sampler = get_oversampler(train, target_train_size)
+                train_sampler = RandomSampler(train, replacement=True)
                 # val_sampler = get_oversampler(val, target_val_size)
+                # val_sampler = RandomSampler(val, replacement=True)
 
                 if self.dataloader_configs.get("use_workers", False):
                     train_loaders.append(
                         DataLoader(
                             train,
                             batch_size=self.batch_size,
-                            shuffle=True,
+                            # shuffle=True,
                             pin_memory=True,
                             num_workers=8,
                             persistent_workers=True,
-                            # sampler=train_sampler
-                            replacement=True
+                            sampler=train_sampler
+                            # replacement=True
                         )
                     )
                     val_loaders.append(
@@ -184,7 +186,7 @@ class HarmonizationDataModule(L.LightningModule):
                             num_workers=8,
                             persistent_workers=True,
                             # sampler=val_sampler
-                            replacement=True
+                            # replacement=True
                         )
                     )
                 else:
@@ -192,10 +194,10 @@ class HarmonizationDataModule(L.LightningModule):
                         DataLoader(
                             train,
                             batch_size=self.batch_size,
-                            shuffle=True,
+                            # shuffle=True,
                             pin_memory=True,
-                            # sampler=train_sampler
-                            replacement=True
+                            sampler=train_sampler
+                            # replacement=True
                         )
                     )
                     val_loaders.append(
@@ -205,7 +207,7 @@ class HarmonizationDataModule(L.LightningModule):
                             shuffle=False,
                             pin_memory=True,
                             # sampler=val_sampler
-                            replacement=True
+                            # replacement=True
                         )
                     )
             else:
