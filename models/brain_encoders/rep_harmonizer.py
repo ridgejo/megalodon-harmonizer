@@ -241,7 +241,7 @@ class RepHarmonizer(L.LightningModule):
         z = self.encoder_models["attach_subject"](z, subject_embedding)
 
         # Max Pooling over the entire time dimension T
-        maxpool = nn.MaxPool1d(kernel_size=z.shape(2))  # Pool across the time dimension
+        maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
         pooled_data = maxpool(z)  # Resulting shape will be [B, E, 1]
 
         # Squeeze the last dimension to get [B, E]
