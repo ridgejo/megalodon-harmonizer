@@ -151,8 +151,8 @@ class HarmonizationDataModule(L.LightningModule):
         # print(f"len train data = {len(splits['shafto2014'][0]["data"])}")
         # print(splits["shafto2014"][0])
 
-        max_train_size = max([splits[dataset][0] for dataset, _ in self.dataset_preproc_configs.items()])
-        max_val_size = max([splits[dataset][1] for dataset, _ in self.dataset_preproc_configs.items()])
+        max_train_size = max([len(splits[dataset][0]) for dataset, _ in self.dataset_preproc_configs.items()])
+        max_val_size = max([len(splits[dataset][1]) for dataset, _ in self.dataset_preproc_configs.items()])
         target_train_size = ((max_train_size + self.batch_size - 1) // self.batch_size) * self.batch_size
         target_val_size = ((max_val_size + self.batch_size - 1) // self.batch_size) * self.batch_size
 
