@@ -151,40 +151,40 @@ class HarmonizationDataModule(L.LightningModule):
         # print(f"len train data = {len(splits['shafto2014'][0]["data"])}")
         # print(splits["shafto2014"][0])
 
-        max_train_size = max([len(splits[dataset][0]) for dataset, _ in self.dataset_preproc_configs.items()])
-        max_val_size = max([len(splits[dataset][1]) for dataset, _ in self.dataset_preproc_configs.items()])
-        target_train_size = ((max_train_size + self.batch_size - 1) // self.batch_size) * self.batch_size
-        target_val_size = ((max_val_size + self.batch_size - 1) // self.batch_size) * self.batch_size
+        # max_train_size = max([len(splits[dataset][0]) for dataset, _ in self.dataset_preproc_configs.items()])
+        # max_val_size = max([len(splits[dataset][1]) for dataset, _ in self.dataset_preproc_configs.items()])
+        # target_train_size = ((max_train_size + self.batch_size - 1) // self.batch_size) * self.batch_size
+        # target_val_size = ((max_val_size + self.batch_size - 1) // self.batch_size) * self.batch_size
 
         for dataset, split in splits.items():
             train, val, test = split
             if dataset == "shaftoIntersection":
-                train_sampler = get_oversampler(train, target_train_size)
-                val_sampler = get_oversampler(val, target_val_size)
+                # train_sampler = get_oversampler(train, target_train_size)
+                # val_sampler = get_oversampler(val, target_val_size)
 
                 if self.dataloader_configs.get("use_workers", False):
                     train_loaders.append(
                         DataLoader(
                             train,
                             batch_size=self.batch_size,
-                            # shuffle=True,
+                            shuffle=True,
                             pin_memory=True,
                             num_workers=8,
                             persistent_workers=True,
-                            sampler=train_sampler
-                            # replacement=True
+                            # sampler=train_sampler
+                            replacement=True
                         )
                     )
                     val_loaders.append(
                         DataLoader(
                             val,
                             batch_size=self.batch_size,
-                            # shuffle=False,
+                            shuffle=False,
                             pin_memory=True,
                             num_workers=8,
                             persistent_workers=True,
-                            sampler=val_sampler
-                            # replacement=True
+                            # sampler=val_sampler
+                            replacement=True
                         )
                     )
                 else:
@@ -192,20 +192,20 @@ class HarmonizationDataModule(L.LightningModule):
                         DataLoader(
                             train,
                             batch_size=self.batch_size,
-                            # shuffle=True,
+                            shuffle=True,
                             pin_memory=True,
-                            sampler=train_sampler
-                            # replacement=True
+                            # sampler=train_sampler
+                            replacement=True
                         )
                     )
                     val_loaders.append(
                         DataLoader(
                             val,
                             batch_size=self.batch_size,
-                            # shuffle=False,
+                            shuffle=False,
                             pin_memory=True,
-                            sampler=val_sampler
-                            # replacement=True
+                            # sampler=val_sampler
+                            replacement=True
                         )
                     )
             else:
