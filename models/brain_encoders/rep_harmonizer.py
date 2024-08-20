@@ -223,16 +223,16 @@ class RepHarmonizer(L.LightningModule):
                 self.add_classifier(k, v)
 
     def apply_encoder(self, z, dataset, subject, stage="encode"):
-        z = self.encoder_models["dataset_block"](z, dataset)
-        z = self.encoder_models["encoder"](z)
+        z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
+        z = self.encoder_models["encoder"](z, stage=stage)
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
 
         # Generic subject embedding
         subject_embedding = self.encoder_models["subject_embedding"](dataset, subject)
 
-        if stage == "task":
-            subject_embedding = subject_embedding.clone()
+        # if stage == "task":
+        #     subject_embedding = subject_embedding.clone()
 
         # Subject block
         z = self.encoder_models["subject_block"](z, dataset, subject)

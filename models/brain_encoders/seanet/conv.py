@@ -139,20 +139,21 @@ class NormConv1d(nn.Module):
         self.norm = get_norm_module(self.conv, causal, norm, **norm_kwargs)
         self.norm_type = norm
 
-    def forward(self, x):
-        x = self.conv(x)
-        
-        # bias = self.conv.bias.clone() if self.conv.bias is not None else None
+    def forward(self, x, stage="encode"):
+        if stage == "encode":
+            x = self.conv(x)
+        elif stage == "task":
+            bias = self.conv.bias.clone() if self.conv.bias is not None else None
 
-        # # Manually compute the weight from weight_g and weight_v
-        # weight_g = self.conv.weight_g.clone().view(-1, 1, 1).to(x.device)
-        # weight_v = self.conv.weight_v.clone().to(x.device)
-        # weight_norm = torch.norm(weight_v, dim=(1, 2), keepdim=True)
-        # weight = weight_v * (weight_g / weight_norm)
+            # Manually compute the weight from weight_g and weight_v
+            weight_g = self.conv.weight_g.clone().view(-1, 1, 1).to(x.device)
+            weight_v = self.conv.weight_v.clone().to(x.device)
+            weight_norm = torch.norm(weight_v, dim=(1, 2), keepdim=True)
+            weight = weight_v * (weight_g / weight_norm)
 
-        # # Perform the convolution manually
-        # x = F.conv1d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
-        #               dilation=self.conv.dilation, groups=self.conv.groups)
+            # Perform the convolution manually
+            x = F.conv1d(x, weight, bias, stride=self.conv.stride, padding=self.conv.padding,
+                        dilation=self.conv.dilation, groups=self.conv.groups)
 
         x = self.norm(x)
         return x
