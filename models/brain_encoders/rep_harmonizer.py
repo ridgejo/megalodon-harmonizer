@@ -210,9 +210,9 @@ class RepHarmonizer(L.LightningModule):
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
         if rep_config.get("lsvm") is not None:
-            self.domain_classifier = LSVM_DomainClassifier(2560, rep_config.get("num_datasets", 2))
+            self.domain_classifier = LSVM_DomainClassifier(38, rep_config.get("num_datasets", 2)) # was 2560
         else:
-            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=2560, batch_size=rep_config["batch_size"]) # nodes = number of datasets (I think)
+            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=38, batch_size=rep_config["batch_size"]) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
