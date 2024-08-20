@@ -158,51 +158,91 @@ class HarmonizationDataModule(L.LightningModule):
 
         for dataset, split in splits.items():
             train, val, test = split
-            train_sampler = get_oversampler(train, target_train_size)
-            val_sampler = get_oversampler(val, target_val_size)
+            if dataset == "shaftoIntersection":
+                train_sampler = get_oversampler(train, target_train_size)
+                val_sampler = get_oversampler(val, target_val_size)
 
-            if self.dataloader_configs.get("use_workers", False):
-                train_loaders.append(
-                    DataLoader(
-                        train,
-                        batch_size=self.batch_size,
-                        shuffle=True,
-                        pin_memory=True,
-                        num_workers=8,
-                        persistent_workers=True,
-                        sampler=train_sampler
+                if self.dataloader_configs.get("use_workers", False):
+                    train_loaders.append(
+                        DataLoader(
+                            train,
+                            batch_size=self.batch_size,
+                            shuffle=True,
+                            pin_memory=True,
+                            num_workers=8,
+                            persistent_workers=True,
+                            sampler=train_sampler
+                        )
                     )
-                )
-                val_loaders.append(
-                    DataLoader(
-                        val,
-                        batch_size=self.batch_size,
-                        shuffle=False,
-                        pin_memory=True,
-                        num_workers=8,
-                        persistent_workers=True,
-                        sampler=val_sampler
+                    val_loaders.append(
+                        DataLoader(
+                            val,
+                            batch_size=self.batch_size,
+                            shuffle=False,
+                            pin_memory=True,
+                            num_workers=8,
+                            persistent_workers=True,
+                            sampler=val_sampler
+                        )
                     )
-                )
+                else:
+                    train_loaders.append(
+                        DataLoader(
+                            train,
+                            batch_size=self.batch_size,
+                            shuffle=True,
+                            pin_memory=True,
+                            sampler=train_sampler
+                        )
+                    )
+                    val_loaders.append(
+                        DataLoader(
+                            val,
+                            batch_size=self.batch_size,
+                            shuffle=False,
+                            pin_memory=True,
+                            sampler=val_sampler
+                        )
+                    )
             else:
-                train_loaders.append(
-                    DataLoader(
-                        train,
-                        batch_size=self.batch_size,
-                        shuffle=True,
-                        pin_memory=True,
-                        sampler=train_sampler
+                if self.dataloader_configs.get("use_workers", False):
+                    train_loaders.append(
+                        DataLoader(
+                            train,
+                            batch_size=self.batch_size,
+                            shuffle=True,
+                            pin_memory=True,
+                            num_workers=8,
+                            persistent_workers=True,
+                        )
                     )
-                )
-                val_loaders.append(
-                    DataLoader(
-                        val,
-                        batch_size=self.batch_size,
-                        shuffle=False,
-                        pin_memory=True,
-                        sampler=val_sampler
+                    val_loaders.append(
+                        DataLoader(
+                            val,
+                            batch_size=self.batch_size,
+                            shuffle=False,
+                            pin_memory=True,
+                            num_workers=8,
+                            persistent_workers=True,
+                        )
                     )
-                )
+                else:
+                    train_loaders.append(
+                        DataLoader(
+                            train,
+                            batch_size=self.batch_size,
+                            shuffle=True,
+                            pin_memory=True,
+                        )
+                    )
+                    val_loaders.append(
+                        DataLoader(
+                            val,
+                            batch_size=self.batch_size,
+                            shuffle=False,
+                            pin_memory=True,
+                        )
+                    )
             test_loaders.append(
                 DataLoader(
                     test, batch_size=self.batch_size, shuffle=False, pin_memory=True

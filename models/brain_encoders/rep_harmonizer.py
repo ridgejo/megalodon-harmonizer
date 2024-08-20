@@ -399,16 +399,18 @@ class RepHarmonizer(L.LightningModule):
             domain_preds = []
             domain_targets = []
             for idx, batch_i in enumerate(batch):
+                if len(batch_i["data"]) < self.batch_size:
+                    print(f"Train dataset {idx} batch is less than batch_size", flush=True)
                 if len(batch) == 2:
                     if idx == 0:
-                        subset = np.random.randint(1, self.batch_size - 1)
-                        # subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        # while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
-                        #     subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        # subset = np.random.randint(1, self.batch_size - 1)
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
-                        # subset = len(batch_i["data"]) - subset
-                        subset = self.batch_size - subset
+                        subset = len(batch_i["data"]) - subset
+                        # subset = self.batch_size - subset
                         batch_i = self._take_subset(batch_i, subset)
                 elif len(batch) == 3:
                     if idx == 0:
@@ -491,15 +493,17 @@ class RepHarmonizer(L.LightningModule):
             subset = 0
             split_1 = 0
             for idx, batch_i in enumerate(batch):
+                if len(batch_i["data"]) < self.batch_size:
+                    print(f"Train dataset {idx} batch is less than batch_size", flush=True)
                 if len(batch) == 2:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        if self.intersect_only:
-                            while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        else:
-                            while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        # if self.intersect_only:
+                        #     while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                        #         subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        # else:
+                        while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
@@ -508,12 +512,12 @@ class RepHarmonizer(L.LightningModule):
                 elif len(batch) == 3:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        if self.intersect_only:
-                            while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        else:
-                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        # if self.intersect_only:
+                        #     while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                        #         subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        # else:
+                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 2)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
@@ -721,15 +725,17 @@ class RepHarmonizer(L.LightningModule):
             if save_activations:
                 activations = []
             for idx, batch_i in enumerate(batch):
+                if len(batch_i["data"]) < self.batch_size:
+                    print(f"Val dataset {idx} batch is less than batch_size", flush=True)
                 if len(batch) == 2:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        if self.intersect_only:
-                            while subset >= len(batch[1]["data"]) or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        else:
-                            while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        # if self.intersect_only:
+                        #     while subset >= len(batch[1]["data"]) or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                        #         subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        # else:
+                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
                         subset = len(batch_i["data"]) - subset
@@ -737,12 +743,12 @@ class RepHarmonizer(L.LightningModule):
                 elif len(batch) == 3:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        if self.intersect_only:
-                            while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        else:
-                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        # if self.intersect_only:
+                        #     while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                        #         subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        # else:
+                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                            subset = np.random.randint(1, len(batch_i["data"]) - 2)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
@@ -844,6 +850,8 @@ class RepHarmonizer(L.LightningModule):
             if save_activations:
                 activations = []
             for idx, batch_i in enumerate(batch):
+                if len(batch_i["data"]) < self.batch_size:
+                    print(f"Val dataset {idx} batch is less than batch_size", flush=True)
                 if len(batch) == 2:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
