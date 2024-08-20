@@ -254,7 +254,7 @@ class RepHarmonizer(L.LightningModule):
         # Apply SSL projector to z_sequence
         T, E = z_sequence.shape[1:]
         z_sequence = torch.unflatten(
-            self.active_models["projector"](
+            self.encoder_models["projector"](
                 z_sequence.flatten(start_dim=1, end_dim=-1)
             ),
             dim=-1,
