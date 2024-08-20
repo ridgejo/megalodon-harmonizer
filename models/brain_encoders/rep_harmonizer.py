@@ -231,6 +231,9 @@ class RepHarmonizer(L.LightningModule):
         # Generic subject embedding
         subject_embedding = self.encoder_models["subject_embedding"](dataset, subject)
 
+        if stage == "task":
+            subject_embedding = subject_embedding.clone()
+
         # Subject block
         z = self.encoder_models["subject_block"](z, dataset, subject)
 
@@ -370,7 +373,7 @@ class RepHarmonizer(L.LightningModule):
 
         data_key = get_key_from_batch_identifier(batch["info"])
         dataset = batch["info"]["dataset"][0]
-        subject = batch["info"]["subject_id"]
+        # subject = batch["info"]["subject_id"]
 
         return_values = self(batch, z_sequence, z_independent, commit_loss)
         # features = return_values.pop("classifier features")
