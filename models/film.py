@@ -21,7 +21,7 @@ class FiLM(nn.Module):
         )
 
 
-    def forward(self, x, cond_embedding):
+    def forward(self, x, cond_embedding, stage="encode"):
         """
         x : activations from the network [B, C, T]
         cond_embedding : conditional embedding
@@ -29,11 +29,12 @@ class FiLM(nn.Module):
 
         # Get Film conditioning factors
         # warning: Does not need batching as conditioning should be the same for the entire batch
-        # out = nn.functional.linear(cond_embedding, self.film_projector.weight.clone(), self.film_projector.bias)
-        out = self.film_projector(cond_embedding)
-        out2 = out.clone()
+        if stage == "task":
+            out = nn.functional.linear(cond_embedding, self.film_projector.weight.clone(), self.film_projector.bias)
+        elif stage == "encode":
+            out = self.film_projector(cond_embedding)
         gamma = out[:, : self.feature_dim]  # [B, C]
-        beta = out2[:, self.feature_dim :] # [B, C]
+        beta = out[:, self.feature_dim :] # [B, C]
 
         return x * gamma[:, :, None] + beta[:, :, None]
 

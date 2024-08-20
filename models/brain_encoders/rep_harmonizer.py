@@ -222,7 +222,7 @@ class RepHarmonizer(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-    def apply_encoder(self, z, dataset, subject):
+    def apply_encoder(self, z, dataset, subject, stage="encode"):
         z = self.encoder_models["dataset_block"](z, dataset)
         z = self.encoder_models["encoder"](z)
         z = self.encoder_models["transformer"](z)
@@ -235,7 +235,7 @@ class RepHarmonizer(L.LightningModule):
         z = self.encoder_models["subject_block"](z, dataset, subject)
 
         # Subject FiLM conditioning
-        z = self.encoder_models["subject_film_module"](z, subject_embedding)
+        z = self.encoder_models["subject_film_module"](z, subject_embedding, stage=stage)
 
         # Subject embedding concatentation
         z = self.encoder_models["attach_subject"](z, subject_embedding)
@@ -295,7 +295,7 @@ class RepHarmonizer(L.LightningModule):
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
                 x, sample_rate=250
             )  # warning: hardcoded
-            _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
+            _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject, stage="task")
             return_values["band_predictor"] = self.predictor_models["band_predictor"](
                 z_filtered_sequence, band_label
             )
@@ -304,7 +304,7 @@ class RepHarmonizer(L.LightningModule):
             x_shifted, phase_label = self.predictor_models[
                 "phase_diff_predictor"
             ].apply_random_phase_shift(x)
-            _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
+            _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject, stage="task")
             return_values["phase_diff_predictor"] = self.predictor_models[
                 "phase_diff_predictor"
             ](z_shifted_sequence, phase_label)
@@ -314,7 +314,7 @@ class RepHarmonizer(L.LightningModule):
                 "masked_channel_predictor"
             ].mask_input(x, sensor_pos)
             # todo: do something with commit loss
-            _, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
+            _, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject, stage="task")
             return_values["masked_channel_pred"] = self.predictor_models[
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
@@ -323,7 +323,7 @@ class RepHarmonizer(L.LightningModule):
             x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
                 x
             )
-            _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
+            _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject, stage="task")
             return_values["amp_scale_predictor"] = self.predictor_models[
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
