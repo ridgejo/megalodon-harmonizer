@@ -235,7 +235,7 @@ class RepHarmonizer(L.LightningModule):
         #     subject_embedding = subject_embedding.clone()
 
         # Subject block
-        z = self.encoder_models["subject_block"](z, dataset, subject)
+        z = self.encoder_models["subject_block"](z, dataset, subject, stage=stage)
 
         # Subject FiLM conditioning
         z = self.encoder_models["subject_film_module"](z, subject_embedding, stage=stage)
