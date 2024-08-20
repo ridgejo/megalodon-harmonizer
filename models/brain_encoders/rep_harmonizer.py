@@ -235,10 +235,10 @@ class RepHarmonizer(L.LightningModule):
         z = self.encoder_models["subject_block"](z, dataset, subject)
 
         # Subject FiLM conditioning
-        z = self.encoder_models["subject_film_module"](z, subject_embedding.clone())
-
+        z = self.encoder_models["subject_film_module"](z, subject_embedding)
+        z = z.clone()
         # Subject embedding concatentation
-        z = self.encoder_models["attach_subject"](z, subject_embedding.clone())
+        z = self.encoder_models["attach_subject"](z, subject_embedding)
 
         # Max Pooling over the entire time dimension T
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
