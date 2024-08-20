@@ -147,9 +147,9 @@ class HarmonizationDataModule(L.LightningModule):
                 generator=torch.Generator().manual_seed(self.seed),
             )
             splits[dataset] = (train, val, test)
-        print(f"len train = {len(splits['shafto2014'][0])}")
-        print(f"len train data = {len(splits['shafto2014'][0]["data"])}")
-        print(splits["shafto2014"][0])
+        # print(f"len train = {len(splits['shafto2014'][0])}")
+        # print(f"len train data = {len(splits['shafto2014'][0]["data"])}")
+        # print(splits["shafto2014"][0])
 
         max_train_size = max([splits[dataset][0] for dataset, _ in self.dataset_preproc_configs.items()])
         max_val_size = max([splits[dataset][1] for dataset, _ in self.dataset_preproc_configs.items()])
