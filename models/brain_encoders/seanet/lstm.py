@@ -25,11 +25,11 @@ class SLSTM(nn.Module):
         self.lstm = nn.LSTM(dimension, dimension, num_layers)
 
     def forward(self, x, stage="encode"):
+        x = x.permute(2, 0, 1)
         if stage == "encode":
-            x = x.permute(2, 0, 1)
             y, _ = self.lstm(x)
         elif stage == "task":
-        # Clone the LSTM parameters to avoid in-place operations
+            # Clone the LSTM parameters to avoid in-place operations
             lstm_params = []
             for name, param in self.lstm.named_parameters():
                 lstm_params.append(param.clone())
