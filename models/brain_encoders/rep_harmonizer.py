@@ -653,7 +653,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
                 domain_loss = alpha * domain_loss
-                self.manual_backward(domain_loss)
+                self.manual_backward(domain_loss, retain_graph=True)
 
                 dm_optim.step()
 
