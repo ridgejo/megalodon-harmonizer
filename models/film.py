@@ -31,8 +31,9 @@ class FiLM(nn.Module):
         # warning: Does not need batching as conditioning should be the same for the entire batch
         # out = nn.functional.linear(cond_embedding, self.film_projector.weight.clone(), self.film_projector.bias)
         out = self.film_projector(cond_embedding)
-        gamma = out[:, : self.feature_dim].clone()  # [B, C]
-        beta = out[:, self.feature_dim :]  # [B, C]
+        out2 = out.clone()
+        gamma = out[:, : self.feature_dim]  # [B, C]
+        beta = out2[:, self.feature_dim :] # [B, C]
 
         return x * gamma[:, :, None] + beta[:, :, None]
 
