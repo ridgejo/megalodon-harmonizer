@@ -240,23 +240,44 @@ class RepHarmonizer(L.LightningModule):
         # Subject embedding concatentation
         z = self.encoder_models["attach_subject"](z, subject_embedding)
 
+        # Max Pooling over the entire time dimension T
+        maxpool = nn.MaxPool1d(kernel_size=z.shape(2))  # Pool across the time dimension
+        pooled_data = maxpool(z)  # Resulting shape will be [B, E, 1]
+
+        # Squeeze the last dimension to get [B, E]
+        features = pooled_data.squeeze(-1)  # Shape [B, E]
+
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
         z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
 
         # Apply SSL projector to z_sequence
         T, E = z_sequence.shape[1:]
-        z_projected = self.encoder_models["projector"](
-            z_sequence.flatten(start_dim=1, end_dim=-1)
+        z_sequence = torch.unflatten(
+            self.active_models["projector"](
+                z_sequence.flatten(start_dim=1, end_dim=-1)
+            ),
+            dim=-1,
+            sizes=(T, E),
         )
-        z_sequence = torch.unflatten(z_projected, dim=-1, sizes=(T, E))
 
-        # The logits or final features output
-        features = z_projected.view(z.size(0), -1)  # [batch_size, _]
+        # # Create two different views for sequence models and independent classifiers
+        # z_sequence = z.permute(0, 2, 1)  # [B, T, E]
+        # z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
+
+        # # Apply SSL projector to z_sequence
+        # T, E = z_sequence.shape[1:]
+        # z_projected = self.encoder_models["projector"](
+        #     z_sequence.flatten(start_dim=1, end_dim=-1)
+        # )
+        # z_sequence = torch.unflatten(z_projected, dim=-1, sizes=(T, E))
+
+        # # The logits or final features output
+        # features = z_projected.view(z.size(0), -1)  # [batch_size, _]
 
         return features, z_sequence, z_independent, commit_loss
 
-    def forward(self, inputs):
+    def forward(self, inputs, z_sequence, z_independent, commit_loss):
         x = inputs["data"]
 
         # sensor_pos = inputs["sensor_pos"]
@@ -265,10 +286,10 @@ class RepHarmonizer(L.LightningModule):
         dataset = inputs["info"]["dataset"][0]
         subject = inputs["info"]["subject_id"]
 
-        features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
+        # features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
 
-        return_values = {"quantization": {"commit_loss": commit_loss},
-                         "classifier features": features}
+        return_values = {"quantization": {"commit_loss": commit_loss}}
+                        #  "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
@@ -328,13 +349,63 @@ class RepHarmonizer(L.LightningModule):
             )
 
         return return_values
+    
+    def _encode(self, batch):
+        x = batch["data"]
+
+        # sensor_pos = inputs["sensor_pos"]
+        # sensor_pos = None
+
+        dataset = batch["info"]["dataset"][0]
+        subject = batch["info"]["subject_id"]
+
+        features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
+
+        return features, z_sequence, z_independent, commit_loss
+
+    def _shared_step(self, batch, z_sequence, z_independent, commit_loss, stage: str):
+        loss = 0.0
+        losses = {}
+        metrics = {}
+
+        data_key = get_key_from_batch_identifier(batch["info"])
+        dataset = batch["info"]["dataset"][0]
+        subject = batch["info"]["subject_id"]
+
+        return_values = self(batch, z_sequence, z_independent, commit_loss)
+        # features = return_values.pop("classifier features")
+
+        # Compute losses over this data batch
+        for key, val in return_values.items():
+            loss_weighting = self.weightings[key]
+
+            # Each return value from a module contains a dictionary of losses and metrics
+            for k, v in val.items():
+                if "loss" in k:
+                    v = v * loss_weighting
+                    loss += v
+                    losses[f"{stage}+{k}"] = v
+                    losses[f"{stage}_{data_key}+{k}"] = v
+                    losses[f"{stage}_dat={dataset}+{k}"] = v
+                else:
+                    metrics[f"{stage}+{k}"] = v
+                    metrics[f"{stage}_{data_key}+{k}"] = v
+                    metrics[f"{stage}_dat={dataset}+{k}"] = v
+
+        if loss == 0.0:
+            loss = None
+
+        return loss, losses, metrics
 
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
         if self.finetune:
             ft_optim = self.optimizers()
             ft_optim.zero_grad()
-            loss, losses, metrics, features = self._shared_step(batch, batch_idx, "train")
+            features, z_sequence, z_independent, commit_loss = self._encode(batch)
+            loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
+                                                                z_independent=z_independent, 
+                                                                commit_loss=commit_loss, stage="train")
             self.manual_backward(loss)
             ft_optim.step()
 
@@ -429,7 +500,10 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 
                 batch_size += subset
-                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                            z_independent=z_independent, 
+                                                            commit_loss=commit_loss, stage="train")
                 if self.intersect_only:
                     d_pred = self.domain_classifier(features.detach())
                 else:
@@ -529,7 +603,11 @@ class RepHarmonizer(L.LightningModule):
                             subset = len(batch_i["data"]) - split_1 - subset
                             batch_i = self._take_subset(batch_i, subset)
                     batch_size += len(batch_i["data"])
-                    t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+
+                    features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                    t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                                z_independent=z_independent, 
+                                                                commit_loss=commit_loss, stage="train")
                     d_target = torch.full((subset,), idx).to(self.device)
                     batch_vals.append((features, d_target))
                     if t_loss is not None:
@@ -550,7 +628,8 @@ class RepHarmonizer(L.LightningModule):
                 if self.intersect_only:
                     # relies heavily on assumption that Shafto is first
                     intersect_batch = self._take_subset(intersect_batch, split_1)
-                    _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
+                    feats, _, _, _ = self._encode(intersect_batch)
+                    # _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
                     targets = torch.full((split_1,), 0).to(self.device)
                     batch_vals[0] = (feats, targets)
 
@@ -574,7 +653,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
                 domain_loss = alpha * domain_loss
-                self.manual_backward(domain_loss, retain_graph=True)
+                self.manual_backward(domain_loss)
 
                 dm_optim.step()
 
@@ -667,7 +746,10 @@ class RepHarmonizer(L.LightningModule):
         # Using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
-            loss, losses, metrics, features = self._shared_step(batch, batch_idx, "val")
+            features, z_sequence, z_independent, commit_loss = self._encode(batch)
+            loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
+                                                      z_independent=z_independent, 
+                                                      commit_loss=commit_loss, stage="val")
 
             batch_size = len(batch["data"])
 
@@ -761,7 +843,10 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
-                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+                features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                                      z_independent=z_independent, 
+                                                                      commit_loss=commit_loss, stage="val")
 
                 if save_activations:
                     activations.append(features.detach())
@@ -879,7 +964,10 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
-                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "val")
+                features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                            z_independent=z_independent, 
+                                                            commit_loss=commit_loss, stage="val")
 
                 if save_activations:
                     activations.append(features.detach())
@@ -887,7 +975,8 @@ class RepHarmonizer(L.LightningModule):
                 if idx == 0 and self.intersect_only:
                     # relies heavily on assumption that Shafto is first
                     intersect_batch = self._take_subset(intersect_batch, split_1)
-                    _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
+                    features, _, _, _ = self._encode(intersect_batch)
+                    # _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
 
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
@@ -1134,39 +1223,8 @@ class RepHarmonizer(L.LightningModule):
         torch.cuda.empty_cache()
 
         return 
-
-    def _shared_step(self, batch, batch_idx, stage: str):
-        loss = 0.0
-        losses = {}
-        metrics = {}
-
-        data_key = get_key_from_batch_identifier(batch["info"])
-        dataset = batch["info"]["dataset"][0]
-
-        return_values = self(batch)
-        features = return_values.pop("classifier features")
-
-        # Compute losses over this data batch
-        for key, val in return_values.items():
-            loss_weighting = self.weightings[key]
-
-            # Each return value from a module contains a dictionary of losses and metrics
-            for k, v in val.items():
-                if "loss" in k:
-                    v = v * loss_weighting
-                    loss += v
-                    losses[f"{stage}+{k}"] = v
-                    losses[f"{stage}_{data_key}+{k}"] = v
-                    losses[f"{stage}_dat={dataset}+{k}"] = v
-                else:
-                    metrics[f"{stage}+{k}"] = v
-                    metrics[f"{stage}_{data_key}+{k}"] = v
-                    metrics[f"{stage}_dat={dataset}+{k}"] = v
-
-        if loss == 0.0:
-            loss = None
-
-        return loss, losses, metrics, features
+    
+    
     
     def on_load_checkpoint(self, checkpoint):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
