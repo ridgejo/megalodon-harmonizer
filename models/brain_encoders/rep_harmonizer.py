@@ -633,7 +633,7 @@ class RepHarmonizer(L.LightningModule):
                     targets = torch.full((split_1,), 0).to(self.device)
                     batch_vals[0] = (feats, targets)
 
-                cloned_feats = []
+                # cloned_feats = []
                 for feats, targets in batch_vals:
 
                     # Check for NaNs or Infs in feats and targets
@@ -646,7 +646,7 @@ class RepHarmonizer(L.LightningModule):
                     if torch.isinf(targets).any():
                         raise ValueError("Inf detected in targets before domain classifier")
 
-                    cloned_feats.append(feats.clone())
+                    # cloned_feats.append(feats.clone())
                     domain_preds.append(self.domain_classifier(feats.detach()))
                     domain_targets.append(targets)
 
@@ -667,8 +667,8 @@ class RepHarmonizer(L.LightningModule):
                 domain_preds = []
                 # domain_targets = []
 
-                # for feats, targets in batch_vals:
-                for feats in cloned_feats:
+                for feats, targets in batch_vals:
+                # for feats in cloned_feats:
                     conf_preds = self.domain_classifier(feats)
                     conf_preds = torch.softmax(conf_preds, dim=1)
 
