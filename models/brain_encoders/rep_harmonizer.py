@@ -484,172 +484,172 @@ class RepHarmonizer(L.LightningModule):
             #     if not self.clear_optim and not self.sdat: # make sure optim state wasn't already cleared on checkpoint load
             #         self.reset_optims() 
 
-            #with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
-            # update encoder / task heads
-            optim.zero_grad()
-            task_loss = 0
-            batch_vals = []
-            batch_size = 0
-            subset = 0
-            split_1 = 0
-            for idx, batch_i in enumerate(batch):
-                if len(batch_i["data"]) < self.batch_size:
-                    print(f"Train dataset {idx} batch is less than batch_size", flush=True)
-                if len(batch) == 2:
-                    if idx == 0:
-                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        # if self.intersect_only:
-                        #     while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                        #         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        # else:
-                        while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+            with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
+                # update encoder / task heads
+                optim.zero_grad()
+                task_loss = 0
+                batch_vals = []
+                batch_size = 0
+                subset = 0
+                split_1 = 0
+                for idx, batch_i in enumerate(batch):
+                    if len(batch_i["data"]) < self.batch_size:
+                        print(f"Train dataset {idx} batch is less than batch_size", flush=True)
+                    if len(batch) == 2:
+                        if idx == 0:
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        split_1 = subset
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 1:
-                        subset = len(batch_i["data"]) - subset
-                        batch_i = self._take_subset(batch_i, subset)
-                elif len(batch) == 3:
-                    if idx == 0:
-                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        # if self.intersect_only:
-                        #     while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                        #         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        # else:
-                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                            # if self.intersect_only:
+                            #     while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                            #         subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                            # else:
+                            while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                            split_1 = subset
+                            batch_i = self._take_subset(batch_i, subset)
+                        elif idx == 1:
+                            subset = len(batch_i["data"]) - subset
+                            batch_i = self._take_subset(batch_i, subset)
+                    elif len(batch) == 3:
+                        if idx == 0:
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        split_1 = subset
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 1:
-                        subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                        while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
+                            # if self.intersect_only:
+                            #     while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                            #         subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                            # else:
+                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                            split_1 = subset
+                            batch_i = self._take_subset(batch_i, subset)
+                        elif idx == 1:
                             subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 2:
-                        subset = len(batch_i["data"]) - split_1 - subset
-                        batch_i = self._take_subset(batch_i, subset)
-                batch_size += len(batch_i["data"])
-                t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
-                d_target = torch.full((subset,), idx).to(self.device)
-                batch_vals.append((features, d_target))
-                if t_loss is not None:
-                    task_loss += t_loss
-            # print(f"task_loss before backward: {task_loss}")
-            self.manual_backward(task_loss, retain_graph=True)
-            if self.sdat:
-                optim.first_step(zero_grad=True)
-            else:
-                optim.step()
+                            while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
+                            batch_i = self._take_subset(batch_i, subset)
+                        elif idx == 2:
+                            subset = len(batch_i["data"]) - split_1 - subset
+                            batch_i = self._take_subset(batch_i, subset)
+                    batch_size += len(batch_i["data"])
+                    t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "train")
+                    d_target = torch.full((subset,), idx).to(self.device)
+                    batch_vals.append((features, d_target))
+                    if t_loss is not None:
+                        task_loss += t_loss
+                # print(f"task_loss before backward: {task_loss}")
+                self.manual_backward(task_loss, retain_graph=True)
+                if self.sdat:
+                    optim.first_step(zero_grad=True)
+                else:
+                    optim.step()
 
-            # update just domain classifier
-            dm_optim.zero_grad()
-            domain_loss = 0
-            domain_preds = []
-            domain_targets = []
+                # update just domain classifier
+                dm_optim.zero_grad()
+                domain_loss = 0
+                domain_preds = []
+                domain_targets = []
 
-            if self.intersect_only:
-                # relies heavily on assumption that Shafto is first
-                intersect_batch = self._take_subset(intersect_batch, split_1)
-                _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
-                targets = torch.full((split_1,), 0).to(self.device)
-                batch_vals[0] = (feats, targets)
+                if self.intersect_only:
+                    # relies heavily on assumption that Shafto is first
+                    intersect_batch = self._take_subset(intersect_batch, split_1)
+                    _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
+                    targets = torch.full((split_1,), 0).to(self.device)
+                    batch_vals[0] = (feats, targets)
 
-            for feats, targets in batch_vals:
+                for feats, targets in batch_vals:
 
-                # Check for NaNs or Infs in feats and targets
-                if torch.isnan(feats).any():
-                    raise ValueError("NaN detected in features before domain classifier")
-                if torch.isinf(feats).any():
-                    raise ValueError("Inf detected in features before domain classifier")
-                if torch.isnan(targets).any():
-                    raise ValueError("NaN detected in targets before domain classifier")
-                if torch.isinf(targets).any():
-                    raise ValueError("Inf detected in targets before domain classifier")
+                    # Check for NaNs or Infs in feats and targets
+                    if torch.isnan(feats).any():
+                        raise ValueError("NaN detected in features before domain classifier")
+                    if torch.isinf(feats).any():
+                        raise ValueError("Inf detected in features before domain classifier")
+                    if torch.isnan(targets).any():
+                        raise ValueError("NaN detected in targets before domain classifier")
+                    if torch.isinf(targets).any():
+                        raise ValueError("Inf detected in targets before domain classifier")
 
-                domain_preds.append(self.domain_classifier(feats.detach()))
-                domain_targets.append(targets)
+                    domain_preds.append(self.domain_classifier(feats.detach()))
+                    domain_targets.append(targets)
 
-            domain_preds = torch.cat(domain_preds)
-            domain_targets = torch.cat(domain_targets)
-            domain_loss = self.domain_criterion(domain_preds, domain_targets)
+                domain_preds = torch.cat(domain_preds)
+                domain_targets = torch.cat(domain_targets)
+                domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
-            domain_loss = alpha * domain_loss
-            self.manual_backward(domain_loss, retain_graph=True)
+                domain_loss = alpha * domain_loss
+                self.manual_backward(domain_loss, retain_graph=True)
 
-            dm_optim.step()
+                dm_optim.step()
 
-            # update just encoder using domain loss
-            if not self.sdat:
-                conf_optim.zero_grad()
-            confusion_loss = 0
+                # update just encoder using domain loss
+                if not self.sdat:
+                    conf_optim.zero_grad()
+                confusion_loss = 0
 
-            domain_preds = []
-            domain_targets = []
+                domain_preds = []
+                domain_targets = []
 
-            for feats, targets in batch_vals:
-                conf_preds = self.domain_classifier(feats)
-                conf_preds = torch.softmax(conf_preds, dim=1)
+                for feats, targets in batch_vals:
+                    conf_preds = self.domain_classifier(feats)
+                    conf_preds = torch.softmax(conf_preds, dim=1)
 
-                # Check for NaNs in conf_preds
-                if torch.isnan(conf_preds).any():
-                    raise ValueError("NaN detected in conf_preds from domain classifier")
-                if torch.isinf(conf_preds).any():
-                    raise ValueError("Inf detected in conf_preds from domain classifier")
+                    # Check for NaNs in conf_preds
+                    if torch.isnan(conf_preds).any():
+                        raise ValueError("NaN detected in conf_preds from domain classifier")
+                    if torch.isinf(conf_preds).any():
+                        raise ValueError("Inf detected in conf_preds from domain classifier")
+                    
+                    domain_preds.append(conf_preds)
+                    domain_targets.append(targets)
                 
-                domain_preds.append(conf_preds)
-                domain_targets.append(targets)
-            
-            domain_preds = torch.cat(domain_preds)
-            domain_targets = torch.cat(domain_targets)
-            confusion_loss = self.conf_criterion(domain_preds, domain_targets)
+                domain_preds = torch.cat(domain_preds)
+                domain_targets = torch.cat(domain_targets)
+                confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
-            confusion_loss = beta * confusion_loss
+                confusion_loss = beta * confusion_loss
 
-            # Check for NaNs in confusion_loss before backward call in except loop
-            if torch.isnan(confusion_loss).any():
-                raise ValueError("NaN detected in confusion_loss before backward call ")
-            if torch.isinf(confusion_loss).any():
-                raise ValueError("Inf detected in confusion_loss before backward call ")
-            
-            self.manual_backward(confusion_loss, retain_graph=False) 
-            if self.sdat:
-                optim.second_step(zero_grad=True)
-            else:
-                conf_optim.step()
-            
-            self.log(
-                "train_loss",
-                task_loss,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log(
-                "domain_train_loss",
-                domain_loss,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
-            self.log(
-                "confusion_train_loss",
-                confusion_loss,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=batch_size,
-                sync_dist=True,
-            )
+                # Check for NaNs in confusion_loss before backward call in except loop
+                if torch.isnan(confusion_loss).any():
+                    raise ValueError("NaN detected in confusion_loss before backward call ")
+                if torch.isinf(confusion_loss).any():
+                    raise ValueError("Inf detected in confusion_loss before backward call ")
+                
+                self.manual_backward(confusion_loss, retain_graph=False) 
+                if self.sdat:
+                    optim.second_step(zero_grad=True)
+                else:
+                    conf_optim.step()
+                
+                self.log(
+                    "train_loss",
+                    task_loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log(
+                    "domain_train_loss",
+                    domain_loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
+                self.log(
+                    "confusion_train_loss",
+                    confusion_loss,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=batch_size,
+                    sync_dist=True,
+                )
 
-            del task_loss, domain_loss, confusion_loss
-            torch.cuda.empty_cache()
+                del task_loss, domain_loss, confusion_loss
+                torch.cuda.empty_cache()
 
             return 
 
