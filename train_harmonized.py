@@ -267,6 +267,9 @@ if args.checkpoint:
                 0
             ]  # Find latest checkpoint file within the directory
 
+        # Load the checkpoint to log epoch
+        wandb_logger.info(f"Checkpoint loading model saved at epoch{torch.load(checkpoint)['epoch']}")
+
         # Load model from the pre-trained checkpoint and resume training
         model = RepHarmonizer.load_from_checkpoint(
             checkpoint, rep_config=config["rep_config"]
