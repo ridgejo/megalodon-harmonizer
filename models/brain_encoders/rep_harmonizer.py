@@ -235,10 +235,10 @@ class RepHarmonizer(L.LightningModule):
         z = self.encoder_models["subject_block"](z, dataset, subject)
 
         # Subject FiLM conditioning
-        z = self.encoder_models["subject_film_module"](z, subject_embedding)
+        z = self.encoder_models["subject_film_module"](z, subject_embedding.clone())
 
         # Subject embedding concatentation
-        z = self.encoder_models["attach_subject"](z, subject_embedding)
+        z = self.encoder_models["attach_subject"](z, subject_embedding.clone())
 
         # Max Pooling over the entire time dimension T
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
@@ -653,7 +653,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
                 domain_loss = alpha * domain_loss
-                self.manual_backward(domain_loss, retain_graph=True)
+                self.manual_backward(domain_loss)
 
                 dm_optim.step()
 
