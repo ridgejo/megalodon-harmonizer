@@ -46,8 +46,8 @@ class PhaseDiffPredictor(nn.Module):
         channels_to_shift = torch.randperm(C)[: int(C * self.prop)]
 
         # Apply the phase shift to the randomly selected channels
-        freq_x = freq_x[:, channels_to_shift, :] #*= phase_shift_factor
-        freq_x = freq_x * phase_shift_factor
+        # freq_x[:, channels_to_shift, :] *= phase_shift_factor
+        freq_x[:, channels_to_shift, :] = freq_x[:, channels_to_shift, :] * phase_shift_factor
 
         # Inverse FFT to convert back to time domain, using full IFFT
         time_x = torch.fft.ifft(

@@ -39,10 +39,10 @@ class AmpScalePredictor(nn.Module):
         channels_to_scale = torch.randperm(C)[: int(C * self.prop)]
 
         # x_scaled = x.clone()  # Avoids in-place gradient computation error
-        x_scaled = x_scaled[:, channels_to_scale, :] #*= scale
-        x_scaled = x_scaled * scale
+        # x_scaled[:, channels_to_scale, :] *= scale
+        x[:, channels_to_scale, :] = x[:, channels_to_scale, :] * scale
 
-        return x_scaled, scale_label
+        return x, scale_label
 
     def forward(self, x, label):
         x = x.flatten(start_dim=1, end_dim=-1)  # [B, T, E] -> [B, T * E]
