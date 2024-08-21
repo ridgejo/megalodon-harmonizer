@@ -680,6 +680,8 @@ class RepHarmonizer(L.LightningModule):
 
                 if self.intersect_only:
                     print("Intersect Only Called", flush=True)
+                    if len(intersect_batch["data"]) < self.batch_size:
+                        print(f"Intersect batch is less than batch_size", flush=True)
                     # relies heavily on assumption that Shafto is first
                     intersect_batch = self._take_subset(intersect_batch, split_1)
                     feats, _, _, _ = self._encode(intersect_batch)
