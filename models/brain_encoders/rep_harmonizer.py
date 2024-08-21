@@ -230,56 +230,56 @@ class RepHarmonizer(L.LightningModule):
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
 
-        print(f"After quantize z: {z._version}", flush=True)
+        # print(f"After quantize z: {z._version}", flush=True)
 
         # Generic subject embedding
         subject_embedding = self.encoder_models["subject_embedding"](dataset, subject)
-        print(f"Initial version of subject_embedding: {subject_embedding._version}", flush=True)
+        # print(f"Initial version of subject_embedding: {subject_embedding._version}", flush=True)
         # if stage == "task":
         #     subject_embedding = subject_embedding.clone()
 
         # Subject block
         z = self.encoder_models["subject_block"](z, dataset, subject)
-        print(f"After subject block subject_embedding: {subject_embedding._version}", flush=True)
-        print(f"After subject block z: {z._version}", flush=True)
+        # print(f"After subject block subject_embedding: {subject_embedding._version}", flush=True)
+        # print(f"After subject block z: {z._version}", flush=True)
 
         # Subject FiLM conditioning
         z = self.encoder_models["subject_film_module"](z, subject_embedding, stage=stage)
-        print(f"After FiLM subject_embedding: {subject_embedding._version}", flush=True)
-        print(f"After FiLM z: {z._version}", flush=True)
+        # print(f"After FiLM subject_embedding: {subject_embedding._version}", flush=True)
+        # print(f"After FiLM z: {z._version}", flush=True)
 
         # Subject embedding concatentation
         z = self.encoder_models["attach_subject"](z, subject_embedding)
-        print(f"After sub concat subject_embedding: {subject_embedding._version}", flush=True)
-        print(f"After sub concat z: {z._version}", flush=True)
+        # print(f"After sub concat subject_embedding: {subject_embedding._version}", flush=True)
+        # print(f"After sub concat z: {z._version}", flush=True)
 
         # Max Pooling over the entire time dimension T
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
         pooled_data = maxpool(z)  # Resulting shape will be [B, E, 1]
 
-        print(f"After maxpool z: {z._version}", flush=True)
-        print(f"After maxpool pooled: {pooled_data._version}", flush=True)
+        # print(f"After maxpool z: {z._version}", flush=True)
+        # print(f"After maxpool pooled: {pooled_data._version}", flush=True)
 
         # Squeeze the last dimension to get [B, E]
         features = pooled_data.squeeze(-1)  # Shape [B, E]
 
-        print(f"After squeeze pooled: {pooled_data._version}", flush=True)
-        print(f"After squeeze features: {features._version}", flush=True)
+        # print(f"After squeeze pooled: {pooled_data._version}", flush=True)
+        # print(f"After squeeze features: {features._version}", flush=True)
 
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
-        print(f"After permute z: {z._version}", flush=True)
-        print(f"After permute z_seq: {z_sequence._version}", flush=True)
+        # print(f"After permute z: {z._version}", flush=True)
+        # print(f"After permute z_seq: {z_sequence._version}", flush=True)
         z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
-        print(f"After flatten z: {z._version}", flush=True)
-        print(f"After flatten z_seq: {z_sequence._version}", flush=True)
-        print(f"After flatten z_ind: {z_independent._version}", flush=True)
+        # print(f"After flatten z: {z._version}", flush=True)
+        # print(f"After flatten z_seq: {z_sequence._version}", flush=True)
+        # print(f"After flatten z_ind: {z_independent._version}", flush=True)
 
         # Apply SSL projector to z_sequence
         T, E = z_sequence.shape[1:]
-        print(f"After shape z: {z._version}", flush=True)
-        print(f"After shape z_seq: {z_sequence._version}", flush=True)
-        print(f"After shape z_ind: {z_independent._version}", flush=True)
+        # print(f"After shape z: {z._version}", flush=True)
+        # print(f"After shape z_seq: {z_sequence._version}", flush=True)
+        # print(f"After shape z_ind: {z_independent._version}", flush=True)
         z_sequence = torch.unflatten(
             self.encoder_models["projector"](
                 z_sequence.flatten(start_dim=1, end_dim=-1)
@@ -287,9 +287,9 @@ class RepHarmonizer(L.LightningModule):
             dim=-1,
             sizes=(T, E),
         )
-        print(f"After projector z: {z._version}", flush=True)
-        print(f"After projector z_seq: {z_sequence._version}", flush=True)
-        print(f"After projector z_ind: {z_independent._version}", flush=True)
+        # print(f"After projector z: {z._version}", flush=True)
+        # print(f"After projector z_seq: {z_sequence._version}", flush=True)
+        # print(f"After projector z_ind: {z_independent._version}", flush=True)
 
         # # Create two different views for sequence models and independent classifiers
         # z_sequence = z.permute(0, 2, 1)  # [B, T, E]

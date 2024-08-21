@@ -34,21 +34,21 @@ class FiLM(nn.Module):
         if stage == "task":
             out = nn.functional.linear(cond_embedding, self.lin.weight.clone(), self.lin.bias)
         elif stage == "encode":
-            print(f"Before projector cond_emb: {cond_embedding._version}", flush=True)
+            # print(f"Before projector cond_emb: {cond_embedding._version}", flush=True)
             out = self.film_projector(cond_embedding)
-            print(f"After projector cond_emb: {cond_embedding._version}", flush=True)
-        print(f"Before gamma out: {out._version}", flush=True)
+            # print(f"After projector cond_emb: {cond_embedding._version}", flush=True)
+        # print(f"Before gamma out: {out._version}", flush=True)
         gamma = out[:, : self.feature_dim]  # [B, C]
-        print(f"After gamma out: {out._version}", flush=True)
-        print(f"Before beta out: {out._version}", flush=True)
-        print(f"Before beta gamma: {gamma._version}", flush=True)
+        # print(f"After gamma out: {out._version}", flush=True)
+        # print(f"Before beta out: {out._version}", flush=True)
+        # print(f"Before beta gamma: {gamma._version}", flush=True)
         beta = out[:, self.feature_dim :] # [B, C]
-        print(f"After beta out: {out._version}", flush=True)
-        print(f"After beta gamma: {gamma._version}", flush=True)
+        # print(f"After beta out: {out._version}", flush=True)
+        # print(f"After beta gamma: {gamma._version}", flush=True)
 
-        print(f"Before film x: {x._version}", flush=True)
+        # print(f"Before film x: {x._version}", flush=True)
         film = x * gamma[:, :, None] + beta[:, :, None]
-        print(f"After film x: {x._version}", flush=True)
+        # print(f"After film x: {x._version}", flush=True)
 
         return film
 
