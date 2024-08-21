@@ -657,6 +657,7 @@ class RepHarmonizer(L.LightningModule):
                 else:
                     print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     optim.step()
+                    self.zero_grad()
                     print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
 
 
@@ -701,7 +702,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_loss = alpha * domain_loss
                 print("Second backward", flush=True)
                 print(f"Version of film linear weight before second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                self.manual_backward(domain_loss, retain_graph=True)
+                self.manual_backward(domain_loss)
                 print(f"Version of film linear weight after second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
 
                 dm_optim.step()
