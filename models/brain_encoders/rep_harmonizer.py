@@ -223,7 +223,7 @@ class RepHarmonizer(L.LightningModule):
                 self.add_classifier(k, v)
 
     def apply_encoder(self, z, dataset, subject, stage="encode"):
-        print(f"Initial version of z: {z._version}", flush=True)
+        # print(f"Initial version of z: {z._version}", flush=True)
         
         z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
         z = self.encoder_models["encoder"](z, stage=stage)
@@ -809,6 +809,15 @@ class RepHarmonizer(L.LightningModule):
             else:
                 batch[key] = value[:subset]
         return batch
+    
+    def _pad_subset(self, batch, subset):
+        for key, value in batch.items():
+            if key == "info":
+                batch[key]= self._take_subset(value, subset)
+            else:
+                pad = value[:subset]
+                batch[key] = torch.cat(value, pad)
+        return batch
 
     def validation_step(self, batch, batch_idx):
         #TODO investigate implement normalized total batch size across all 3 dataloaders to 32
@@ -1046,7 +1055,11 @@ class RepHarmonizer(L.LightningModule):
                     if len(intersect_batch["data"]) < self.batch_size:
                         print(f"Val Intersect batch is less than batch_size", flush=True)
                     # relies heavily on assumption that Shafto is first
-                    intersect_batch = self._take_subset(intersect_batch, split_1)
+                    print(f"split_1 len = {split_1}")
+                    if split_1 > len(intersect_batch["data"]):
+                        intersect_batch = self._pad_subset(intersect_batch, split_1 - len(intersect_batch["data"]))
+                    else:
+                        intersect_batch = self._take_subset(intersect_batch, split_1)
                     features, _, _, _ = self._encode(intersect_batch)
                     print(f"feat len = {len(features)}")
                     # _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
