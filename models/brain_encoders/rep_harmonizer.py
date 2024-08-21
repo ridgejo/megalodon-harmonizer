@@ -223,39 +223,63 @@ class RepHarmonizer(L.LightningModule):
                 self.add_classifier(k, v)
 
     def apply_encoder(self, z, dataset, subject, stage="encode"):
+        print(f"Initial version of z: {z.storage()._version}", flush=True)
+        
         z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
         z = self.encoder_models["encoder"](z, stage=stage)
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
 
+        print(f"After quantize z: {z.storage()._version}", flush=True)
+
         # Generic subject embedding
         subject_embedding = self.encoder_models["subject_embedding"](dataset, subject)
-
+        print(f"Initial version of subject_embedding: {subject_embedding.storage()._version}", flush=True)
         # if stage == "task":
         #     subject_embedding = subject_embedding.clone()
 
         # Subject block
-        z = self.encoder_models["subject_block"](z, dataset, subject, stage=stage)
+        z = self.encoder_models["subject_block"](z, dataset, subject)
+
+        print(f"After subject block z: {z.storage()._version}", flush=True)
 
         # Subject FiLM conditioning
         z = self.encoder_models["subject_film_module"](z, subject_embedding, stage=stage)
 
+        print(f"After FiLM z: {z.storage()._version}", flush=True)
+
         # Subject embedding concatentation
         z = self.encoder_models["attach_subject"](z, subject_embedding)
+
+        print(f"After sub concat z: {z.storage()._version}", flush=True)
 
         # Max Pooling over the entire time dimension T
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
         pooled_data = maxpool(z)  # Resulting shape will be [B, E, 1]
 
+        print(f"After maxpool z: {z.storage()._version}", flush=True)
+        print(f"After maxpool pooled: {pooled_data.storage()._version}", flush=True)
+
         # Squeeze the last dimension to get [B, E]
         features = pooled_data.squeeze(-1)  # Shape [B, E]
 
+        print(f"After squeeze pooled: {pooled_data.storage()._version}", flush=True)
+        print(f"After squeeze features: {features.storage()._version}", flush=True)
+
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
+        print(f"After permute z: {z.storage()._version}", flush=True)
+        print(f"After permute z_seq: {z_sequence.storage()._version}", flush=True)
         z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
+        print(f"After flatten z: {z.storage()._version}", flush=True)
+        print(f"After flatten z_seq: {z_sequence.storage()._version}", flush=True)
+        print(f"After flatten z_ind: {z_independent.storage()._version}", flush=True)
 
         # Apply SSL projector to z_sequence
         T, E = z_sequence.shape[1:]
+        print(f"After shape z: {z.storage()._version}", flush=True)
+        print(f"After shape z_seq: {z_sequence.storage()._version}", flush=True)
+        print(f"After shape z_ind: {z_independent.storage()._version}", flush=True)
         z_sequence = torch.unflatten(
             self.encoder_models["projector"](
                 z_sequence.flatten(start_dim=1, end_dim=-1)
@@ -263,6 +287,9 @@ class RepHarmonizer(L.LightningModule):
             dim=-1,
             sizes=(T, E),
         )
+        print(f"After projector z: {z.storage()._version}", flush=True)
+        print(f"After projector z_seq: {z_sequence.storage()._version}", flush=True)
+        print(f"After projector z_ind: {z_independent.storage()._version}", flush=True)
 
         # # Create two different views for sequence models and independent classifiers
         # z_sequence = z.permute(0, 2, 1)  # [B, T, E]
@@ -281,6 +308,7 @@ class RepHarmonizer(L.LightningModule):
         return features, z_sequence, z_independent, commit_loss
 
     def forward(self, inputs, z_sequence, z_independent, commit_loss):
+        print("Forward call", flush=True)
         x = inputs["data"]
 
         # sensor_pos = inputs["sensor_pos"]
@@ -354,6 +382,7 @@ class RepHarmonizer(L.LightningModule):
         return return_values
     
     def _encode(self, batch):
+        print("Encode call", flush=True)
         x = batch["data"]
 
         # sensor_pos = inputs["sensor_pos"]
@@ -367,6 +396,7 @@ class RepHarmonizer(L.LightningModule):
         return features, z_sequence, z_independent, commit_loss
 
     def _shared_step(self, batch, z_sequence, z_independent, commit_loss, stage: str):
+        print("Shared call", flush=True)
         loss = 0.0
         losses = {}
         metrics = {}
@@ -616,6 +646,7 @@ class RepHarmonizer(L.LightningModule):
                     if t_loss is not None:
                         task_loss += t_loss
                 # print(f"task_loss before backward: {task_loss}")
+                print("First backward", flush=True)
                 self.manual_backward(task_loss, retain_graph=True)
                 if self.sdat:
                     optim.first_step(zero_grad=True)
@@ -658,6 +689,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
                 domain_loss = alpha * domain_loss
+                print("Second backward", flush=True)
                 self.manual_backward(domain_loss)
 
                 dm_optim.step()
@@ -696,6 +728,7 @@ class RepHarmonizer(L.LightningModule):
                 if torch.isinf(confusion_loss).any():
                     raise ValueError("Inf detected in confusion_loss before backward call ")
                 
+                print("Third backward", flush=True)
                 self.manual_backward(confusion_loss, retain_graph=False) 
                 if self.sdat:
                     optim.second_step(zero_grad=True)
