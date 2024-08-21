@@ -816,7 +816,7 @@ class RepHarmonizer(L.LightningModule):
                 batch[key]= self._take_subset(value, subset)
             else:
                 pad = value[:subset]
-                batch[key] = torch.cat(value, pad)
+                batch[key] = torch.cat((value, pad))
         return batch
 
     def validation_step(self, batch, batch_idx):
@@ -1054,6 +1054,7 @@ class RepHarmonizer(L.LightningModule):
                 if idx == 0 and self.intersect_only:
                     if len(intersect_batch["data"]) < self.batch_size:
                         print(f"Val Intersect batch is less than batch_size", flush=True)
+                        print(f"Len intersect batch data = {len(intersect_batch["data"])}")
                     # relies heavily on assumption that Shafto is first
                     print(f"split_1 len = {split_1}")
                     if split_1 > len(intersect_batch["data"]):
