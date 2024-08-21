@@ -494,69 +494,71 @@ class RepHarmonizer(L.LightningModule):
             #TODO investigate implementing normalized total batch size across all 3 dataloaders to 32
             # skipping for now to get the framework up and running
             # Using MEGalodon loss instead of regressor loss criterion
-            step1_optim.zero_grad()
-            task_loss = 0
-            domain_loss = 0
-            batch_size = 0
-            subset = 0
-            split_1 = 0
-            domain_preds = []
-            domain_targets = []
-            for idx, batch_i in enumerate(batch):
-                if len(batch_i["data"]) < self.batch_size:
-                    print(f"Train dataset {idx} batch is less than batch_size", flush=True)
-                if len(batch) == 2:
-                    if idx == 0:
-                        # subset = np.random.randint(1, self.batch_size - 1)
-                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+
+            with torch.autograd.detect_anomaly():
+                step1_optim.zero_grad()
+                task_loss = 0
+                domain_loss = 0
+                batch_size = 0
+                subset = 0
+                split_1 = 0
+                domain_preds = []
+                domain_targets = []
+                for idx, batch_i in enumerate(batch):
+                    if len(batch_i["data"]) < self.batch_size:
+                        print(f"Train dataset {idx} batch is less than batch_size", flush=True)
+                    if len(batch) == 2:
+                        if idx == 0:
+                            # subset = np.random.randint(1, self.batch_size - 1)
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 1:
-                        subset = len(batch_i["data"]) - subset
-                        # subset = self.batch_size - subset
-                        batch_i = self._take_subset(batch_i, subset)
-                elif len(batch) == 3:
-                    if idx == 0:
-                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                            while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                            batch_i = self._take_subset(batch_i, subset)
+                        elif idx == 1:
+                            subset = len(batch_i["data"]) - subset
+                            # subset = self.batch_size - subset
+                            batch_i = self._take_subset(batch_i, subset)
+                    elif len(batch) == 3:
+                        if idx == 0:
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        split_1 = subset
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 1:
-                        subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                        while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
+                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                            split_1 = subset
+                            batch_i = self._take_subset(batch_i, subset)
+                        elif idx == 1:
                             subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                        batch_i = self._take_subset(batch_i, subset)
-                    elif idx == 2:
-                        subset = len(batch_i["data"]) - split_1 - subset
-                        batch_i = self._take_subset(batch_i, subset)
-                
-                batch_size += subset
-                features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                            z_independent=z_independent, 
-                                                            commit_loss=commit_loss, stage="train")
-                if self.intersect_only:
-                    d_pred = self.domain_classifier(features.detach())
-                else:
-                    d_pred = self.domain_classifier(features)
+                            while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
+                            batch_i = self._take_subset(batch_i, subset)
+                        elif idx == 2:
+                            subset = len(batch_i["data"]) - split_1 - subset
+                            batch_i = self._take_subset(batch_i, subset)
+                    
+                    batch_size += subset
+                    features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                    t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                                z_independent=z_independent, 
+                                                                commit_loss=commit_loss, stage="train")
+                    if self.intersect_only:
+                        d_pred = self.domain_classifier(features.detach())
+                    else:
+                        d_pred = self.domain_classifier(features)
 
-                d_target = torch.full((subset,), idx).to(self.device)
+                    d_target = torch.full((subset,), idx).to(self.device)
 
-                domain_targets.append(d_target)
-                domain_preds.append(d_pred)
+                    domain_targets.append(d_target)
+                    domain_preds.append(d_pred)
 
-                if t_loss is not None:
-                    task_loss += t_loss
-                
-            domain_preds = torch.cat(domain_preds)
-            domain_targets = torch.cat(domain_targets)
-            domain_loss = self.domain_criterion(domain_preds, domain_targets)
+                    if t_loss is not None:
+                        task_loss += t_loss
+                    
+                domain_preds = torch.cat(domain_preds)
+                domain_targets = torch.cat(domain_targets)
+                domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
-            loss = task_loss + alpha * domain_loss
-            self.manual_backward(loss)
-            step1_optim.step()
+                loss = task_loss + alpha * domain_loss
+                self.manual_backward(loss)
+                step1_optim.step()
 
             self.log(
                 "train_loss",
