@@ -38,8 +38,9 @@ class AmpScalePredictor(nn.Module):
         # Randomly select a proportion of the channels to apply the amplitude scaling to
         channels_to_scale = torch.randperm(C)[: int(C * self.prop)]
 
-        x_scaled = x.clone()  # Avoids in-place gradient computation error
-        x_scaled[:, channels_to_scale, :] *= scale
+        # x_scaled = x.clone()  # Avoids in-place gradient computation error
+        x_scaled = x_scaled[:, channels_to_scale, :] #*= scale
+        x_scaled = x_scaled * scale
 
         return x_scaled, scale_label
 
