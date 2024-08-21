@@ -1019,8 +1019,12 @@ class RepHarmonizer(L.LightningModule):
                 if len(batch) == 2:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
-                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        if self.intersect_only:
+                            while subset >= len(batch[1]["data"]) or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        else:
+                            while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
@@ -1057,10 +1061,10 @@ class RepHarmonizer(L.LightningModule):
                         print(f"Len intersect batch data = {len(intersect_batch["data"])}")
                     # relies heavily on assumption that Shafto is first
                     print(f"split_1 len = {split_1}")
-                    if split_1 > len(intersect_batch["data"]):
-                        intersect_batch = self._pad_subset(intersect_batch, split_1 - len(intersect_batch["data"]))
-                    else:
-                        intersect_batch = self._take_subset(intersect_batch, split_1)
+                    # if split_1 > len(intersect_batch["data"]):
+                    #     intersect_batch = self._pad_subset(intersect_batch, split_1 - len(intersect_batch["data"]))
+                    # else:
+                    intersect_batch = self._take_subset(intersect_batch, split_1)
                     features, _, _, _ = self._encode(intersect_batch)
                     print(f"feat len = {len(features)}")
                     # _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
