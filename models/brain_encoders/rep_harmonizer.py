@@ -656,9 +656,10 @@ class RepHarmonizer(L.LightningModule):
                     optim.first_step(zero_grad=True)
                 else:
                     print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
+                    print(f"Version of seannet conv1 weight before step: {self.encoder_models["encoder"].model[0].conv.weight._version}")
                     optim.step()
-                    self.zero_grad()
                     print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
+                    print(f"Version of seannet conv1 weight after step: {self.encoder_models["encoder"].model[0].conv.weight._version}")
 
 
                 # update just domain classifier
