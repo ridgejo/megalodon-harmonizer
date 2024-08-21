@@ -650,21 +650,21 @@ class RepHarmonizer(L.LightningModule):
                 # print(f"task_loss before backward: {task_loss}")
                 print("First backward", flush=True)
                 print(f"Version of film linear weight before first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                self.manual_backward(task_loss, retain_graph=True)
+                self.manual_backward(task_loss)
                 print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 if self.sdat:
                     optim.first_step(zero_grad=True)
                 else:
-                    # print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
+                    print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     # print(f"Version of seannet conv1 weight before step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
-                    pre_step_v = []
-                    for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
-                        pre_step_v.append((param, param._version))
+                    # pre_step_v = []
+                    # for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
+                    #     pre_step_v.append((param, param._version))
                     optim.step()
-                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
-                        if param._version != pre_step_v[idx][1]:
-                            print(f"Version of {param} before step is {pre_step_v[idx][1]} and after is {param._version}", flush=True)
-                    # print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
+                    # for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
+                    #     if param._version != pre_step_v[idx][1]:
+                    #         print(f"Version of {param} before step is {pre_step_v[idx][1]} and after is {param._version}", flush=True)
+                    print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     # print(f"Version of seannet conv1 weight after step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
 
 
