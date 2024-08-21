@@ -162,6 +162,7 @@ class HarmonizationDataModule(L.LightningModule):
                 # train_sampler = get_oversampler(train, target_train_size)
                 # train_sampler = RandomSampler(train, replacement=True)
                 train_sampler = Oversampler(train, batch_size=self.batch_size)
+                val_sampler = Oversampler(val, batch_size=self.batch_size)
                 # val_sampler = get_oversampler(val, target_val_size)
                 # val_sampler = RandomSampler(val, replacement=True)
 
@@ -182,11 +183,11 @@ class HarmonizationDataModule(L.LightningModule):
                         DataLoader(
                             val,
                             batch_size=self.batch_size,
-                            shuffle=False,
+                            # shuffle=False,
                             pin_memory=True,
                             num_workers=8,
                             persistent_workers=True,
-                            # sampler=val_sampler
+                            sampler=val_sampler
                             # replacement=True
                         )
                     )
