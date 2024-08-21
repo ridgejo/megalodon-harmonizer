@@ -87,9 +87,13 @@ class Oversampler(Sampler):
         # Generate indices with replacement if necessary
         indices = torch.randint(0, self.num_samples, (self.total_samples,))
         
-        # Yield batches of indices
-        for i in range(0, len(indices), self.batch_size):
-            yield indices[i:i + self.batch_size].tolist()
+        # # Yield batches of indices
+        # for i in range(0, len(indices), self.batch_size):
+        #     yield indices[i:i + self.batch_size].tolist()
+
+        # Yield one index at a time
+        for i in range(0, len(indices)):
+            yield indices[i].item()
 
     def __len__(self):
         return self.total_samples
