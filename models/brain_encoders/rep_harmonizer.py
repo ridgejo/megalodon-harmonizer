@@ -664,6 +664,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_targets = []
 
                 if self.intersect_only:
+                    print("Intersect Only Called", flush=True)
                     # relies heavily on assumption that Shafto is first
                     intersect_batch = self._take_subset(intersect_batch, split_1)
                     feats, _, _, _ = self._encode(intersect_batch)
@@ -673,7 +674,7 @@ class RepHarmonizer(L.LightningModule):
 
                 # cloned_feats = []
                 for feats, targets in batch_vals:
-
+                    import copy
                     # Check for NaNs or Infs in feats and targets
                     if torch.isnan(feats).any():
                         raise ValueError("NaN detected in features before domain classifier")
@@ -683,9 +684,11 @@ class RepHarmonizer(L.LightningModule):
                         raise ValueError("NaN detected in targets before domain classifier")
                     if torch.isinf(targets).any():
                         raise ValueError("Inf detected in targets before domain classifier")
-
+                    
+                    # temp = feats.clone().detach()
+                    temp = copy.deepcopy(feats.detach)
                     # cloned_feats.append(feats.clone())
-                    domain_preds.append(self.domain_classifier(feats.clone().detach()))
+                    domain_preds.append(self.domain_classifier(temp))
                     domain_targets.append(targets.detach())
 
                 domain_preds = torch.cat(domain_preds)
