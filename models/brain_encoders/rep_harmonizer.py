@@ -493,8 +493,8 @@ class RepHarmonizer(L.LightningModule):
             intersect_batch = batch[-1]
             batch = batch[:-1]
         
-        print(intersect_batch["info"])
-        print(batch[0]["info"])
+        # print(intersect_batch["info"])
+        # print(batch[0]["info"])
 
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
@@ -757,10 +757,10 @@ class RepHarmonizer(L.LightningModule):
                 if torch.isinf(confusion_loss).any():
                     raise ValueError("Inf detected in confusion_loss before backward call ")
                 
-                print("Third backward", flush=True)
-                print(f"Version of film linear weight before third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+                # print("Third backward", flush=True)
+                # print(f"Version of film linear weight before third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 self.manual_backward(confusion_loss, retain_graph=False) 
-                print(f"Version of film linear weight after third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+                # print(f"Version of film linear weight after third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 if self.sdat:
                     optim.second_step(zero_grad=True)
                 else:
@@ -1043,13 +1043,17 @@ class RepHarmonizer(L.LightningModule):
                     activations.append(features.detach())
 
                 if idx == 0 and self.intersect_only:
+                    if len(intersect_batch["data"]) < self.batch_size:
+                        print(f"Val Intersect batch is less than batch_size", flush=True)
                     # relies heavily on assumption that Shafto is first
                     intersect_batch = self._take_subset(intersect_batch, split_1)
                     features, _, _, _ = self._encode(intersect_batch)
+                    print(f"feat len = {len(features)}")
                     # _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
 
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
+                print(f"d_pred len = {len(d_pred)}")
 
                 d_target = torch.full((subset,), idx).to(self.device)
 
@@ -1059,9 +1063,12 @@ class RepHarmonizer(L.LightningModule):
                     task_loss += t_loss
             domain_preds = torch.cat(domain_preds)
             domain_targets = torch.cat(domain_targets)
+            print(f"domain preds len = {len(domain_preds)}")
 
             domain_preds = torch.softmax(domain_preds, dim=1)
+            print(f"domain preds len after softmax = {len(domain_preds)}")
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+            print(f"domain preds len after argmax = {len(pred_domains)}")
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
             true_domains = domain_targets.detach().cpu().numpy()
 
