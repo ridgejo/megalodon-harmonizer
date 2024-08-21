@@ -225,8 +225,8 @@ class RepHarmonizer(L.LightningModule):
     def apply_encoder(self, z, dataset, subject, stage="encode"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
-        z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
-        z = self.encoder_models["encoder"](z, stage=stage)
+        z = self.encoder_models["dataset_block"](z, dataset)
+        z = self.encoder_models["encoder"](z)
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
 
@@ -244,7 +244,7 @@ class RepHarmonizer(L.LightningModule):
         # print(f"After subject block z: {z._version}", flush=True)
 
         # Subject FiLM conditioning
-        z = self.encoder_models["subject_film_module"](z, subject_embedding, stage=stage)
+        z = self.encoder_models["subject_film_module"](z, subject_embedding)
         # print(f"After FiLM subject_embedding: {subject_embedding._version}", flush=True)
         # print(f"After FiLM z: {z._version}", flush=True)
 
@@ -614,12 +614,12 @@ class RepHarmonizer(L.LightningModule):
                     if len(batch) == 2:
                         if idx == 0:
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                            # if self.intersect_only:
-                            #     while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                            #         subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                            # else:
-                            while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                            if self.intersect_only:
+                                while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                            else:
+                                while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
                             split_1 = subset
                             batch_i = self._take_subset(batch_i, subset)
                         elif idx == 1:
@@ -628,12 +628,12 @@ class RepHarmonizer(L.LightningModule):
                     elif len(batch) == 3:
                         if idx == 0:
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                            # if self.intersect_only:
-                            #     while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                            #         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                            # else:
-                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                            if self.intersect_only:
+                                while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                                    subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                            else:
+                                while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                                    subset = np.random.randint(1, len(batch_i["data"]) - 2)
                             split_1 = subset
                             batch_i = self._take_subset(batch_i, subset)
                         elif idx == 1:
@@ -895,7 +895,7 @@ class RepHarmonizer(L.LightningModule):
                         #     while subset >= len(batch[1]["data"]) or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
                         #         subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         # else:
-                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                        while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
@@ -1020,10 +1020,10 @@ class RepHarmonizer(L.LightningModule):
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         if self.intersect_only:
-                            while subset >= len(batch[1]["data"]) or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                            while subset >= len(batch[1]["data"]) -1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
                                 subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         else:
-                            while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
+                            while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
                                 subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
@@ -1033,8 +1033,12 @@ class RepHarmonizer(L.LightningModule):
                 elif len(batch) == 3:
                     if idx == 0:
                         subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
-                            subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        if self.intersect_only:
+                            while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        else:
+                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
                         split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
@@ -1060,18 +1064,18 @@ class RepHarmonizer(L.LightningModule):
                         print(f"Val Intersect batch is less than batch_size", flush=True)
                         print(f"Len intersect batch data = {len(intersect_batch["data"])}")
                     # relies heavily on assumption that Shafto is first
-                    print(f"split_1 len = {split_1}")
+                    # print(f"split_1 len = {split_1}")
                     # if split_1 > len(intersect_batch["data"]):
                     #     intersect_batch = self._pad_subset(intersect_batch, split_1 - len(intersect_batch["data"]))
                     # else:
                     intersect_batch = self._take_subset(intersect_batch, split_1)
                     features, _, _, _ = self._encode(intersect_batch)
-                    print(f"feat len = {len(features)}")
+                    # print(f"feat len = {len(features)}")
                     # _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
 
                 # explicitly call forward to avoid hooks
                 d_pred = self.domain_classifier.forward(features) 
-                print(f"d_pred len = {len(d_pred)}")
+                # print(f"d_pred len = {len(d_pred)}")
 
                 d_target = torch.full((subset,), idx).to(self.device)
 
@@ -1081,12 +1085,12 @@ class RepHarmonizer(L.LightningModule):
                     task_loss += t_loss
             domain_preds = torch.cat(domain_preds)
             domain_targets = torch.cat(domain_targets)
-            print(f"domain preds len = {len(domain_preds)}")
+            # print(f"domain preds len = {len(domain_preds)}")
 
             domain_preds = torch.softmax(domain_preds, dim=1)
-            print(f"domain preds len after softmax = {len(domain_preds)}")
+            # print(f"domain preds len after softmax = {len(domain_preds)}")
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-            print(f"domain preds len after argmax = {len(pred_domains)}")
+            # print(f"domain preds len after argmax = {len(pred_domains)}")
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
             true_domains = domain_targets.detach().cpu().numpy()
 

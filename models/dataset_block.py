@@ -38,18 +38,18 @@ class DatasetBlock(nn.Module):
         )
 
     def forward(self, data, dataset_id, stage="encode"):
-        if stage == "encode":
-            return self.dataset_encoders[dataset_id](data)
-        elif stage == "task":
-            if self.use_data_block:
-                weight = self.dataset_encoders[dataset_id].weight.clone()
-                bias = self.dataset_encoders[dataset_id].bias.clone()
-                return nn.functional.conv1d(data, weight, bias, stride=self.dataset_encoders[dataset_id].stride,
-                                            padding=self.dataset_encoders[dataset_id].padding, 
-                                            dilation=self.dataset_encoders[dataset_id].dilation,
-                                            groups=self.dataset_encoders[dataset_id].groups)
-            else:
-                return self.dataset_encoders[dataset_id](data)
+        # if stage == "encode":
+        return self.dataset_encoders[dataset_id](data)
+        # elif stage == "task":
+        #     if self.use_data_block:
+        #         weight = self.dataset_encoders[dataset_id].weight.clone()
+        #         bias = self.dataset_encoders[dataset_id].bias.clone()
+        #         return nn.functional.conv1d(data, weight, bias, stride=self.dataset_encoders[dataset_id].stride,
+        #                                     padding=self.dataset_encoders[dataset_id].padding, 
+        #                                     dilation=self.dataset_encoders[dataset_id].dilation,
+        #                                     groups=self.dataset_encoders[dataset_id].groups)
+        #     else:
+        #         return self.dataset_encoders[dataset_id](data)
 
     def decode(self, data, dataset_id):
         return self.dataset_decoders[dataset_id](data)

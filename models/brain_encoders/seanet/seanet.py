@@ -83,20 +83,20 @@ class SEANetResnetBlock(nn.Module):
             )
 
     def forward(self, x, stage="encode"):
-        if stage == "encode":
-            return self.shortcut(x) + self.block(x)
-        elif stage == "task":
-            if isinstance(self.shortcut, SConv1d):
-                sc = self.shortcut(x, stage)
-            else:
-                sc = self.shortcut(x)
+        # if stage == "encode":
+        return self.shortcut(x) + self.block(x)
+        # elif stage == "task":
+        #     if isinstance(self.shortcut, SConv1d):
+        #         sc = self.shortcut(x, stage)
+        #     else:
+        #         sc = self.shortcut(x)
 
-            for layer in self.block:
-                if isinstance(layer, SConv1d):
-                    x = layer(x, stage)
-                else:
-                    x = layer(x)
-            return sc + x
+        #     for layer in self.block:
+        #         if isinstance(layer, SConv1d):
+        #             x = layer(x, stage)
+        #         else:
+        #             x = layer(x)
+        #     return sc + x
                 
 
 
@@ -222,28 +222,29 @@ class SEANetBrainEncoder(nn.Module):
         self.model = nn.Sequential(*model)
 
     def forward(self, x, stage="encode"):
-        if stage == "encode":
-            return self.model(x)
-        elif stage == "task":
-            # for layer in self.model:
-            #     if isinstance(layer, SConv1d) or isinstance(layer, SEANetResnetBlock):
-            #         # Clone weights and biases for custom layers to avoid in-place modifications
-            #         layer_weight = layer.conv.weight.clone()
-            #         layer_bias = layer.conv.bias.clone() if layer.conv.bias is not None else None
-            #         x = nn.functional.conv1d(x, layer_weight, layer_bias, stride=layer.conv.stride,
-            #                     padding=layer.conv.padding, dilation=layer.conv.dilation, groups=layer.conv.groups)
-            #     elif isinstance(layer, SLSTM):
-            #         # Handle LSTM layer appropriately if it exists
-            #         x, _ = layer(x, stage)
-            #     else:
-            #         x = layer(x)
-            # return x
-            for layer in self.model:
-                if isinstance(layer, SConv1d) or isinstance(layer, SEANetResnetBlock) or isinstance(layer, SLSTM):
-                    x = layer(x, stage)
-                else:
-                    x = layer(x)
-            return x
+        # if stage == "encode":
+        return self.model(x)
+        # elif stage == "task":
+        #     # for layer in self.model:
+        #     #     if isinstance(layer, SConv1d) or isinstance(layer, SEANetResnetBlock):
+        #     #         # Clone weights and biases for custom layers to avoid in-place modifications
+        #     #         layer_weight = layer.conv.weight.clone()
+        #     #         layer_bias = layer.conv.bias.clone() if layer.conv.bias is not None else None
+        #     #         x = nn.functional.conv1d(x, layer_weight, layer_bias, stride=layer.conv.stride,
+        #     #                     padding=layer.conv.padding, dilation=layer.conv.dilation, groups=layer.conv.groups)
+        #     #     elif isinstance(layer, SLSTM):
+        #     #         # Handle LSTM layer appropriately if it exists
+        #     #         x, _ = layer(x, stage)
+        #     #     else:
+        #     #         x = layer(x)
+        #     # return x
+
+        #     for layer in self.model:
+        #         if isinstance(layer, SConv1d) or isinstance(layer, SEANetResnetBlock) or isinstance(layer, SLSTM):
+        #             x = layer(x, stage)
+        #         else:
+        #             x = layer(x)
+        #     return x
 
 
 
