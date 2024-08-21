@@ -686,7 +686,7 @@ class RepHarmonizer(L.LightningModule):
                         raise ValueError("Inf detected in targets before domain classifier")
                     
                     # temp = feats.clone().detach()
-                    temp = copy.deepcopy(feats.detach)
+                    temp = copy.deepcopy(feats.detach())
                     # cloned_feats.append(feats.clone())
                     domain_preds.append(self.domain_classifier(temp))
                     domain_targets.append(targets.detach())
