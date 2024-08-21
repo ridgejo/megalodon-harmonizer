@@ -649,7 +649,9 @@ class RepHarmonizer(L.LightningModule):
                         task_loss += t_loss
                 # print(f"task_loss before backward: {task_loss}")
                 print("First backward", flush=True)
+                print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 self.manual_backward(task_loss, retain_graph=True)
+                print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 if self.sdat:
                     optim.first_step(zero_grad=True)
                 else:
@@ -692,7 +694,9 @@ class RepHarmonizer(L.LightningModule):
 
                 domain_loss = alpha * domain_loss
                 print("Second backward", flush=True)
+                print(f"Version of film linear weight before second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 self.manual_backward(domain_loss)
+                print(f"Version of film linear weight after second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
 
                 dm_optim.step()
 
@@ -731,7 +735,9 @@ class RepHarmonizer(L.LightningModule):
                     raise ValueError("Inf detected in confusion_loss before backward call ")
                 
                 print("Third backward", flush=True)
+                print(f"Version of film linear weight before third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 self.manual_backward(confusion_loss, retain_graph=False) 
+                print(f"Version of film linear weight after third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 if self.sdat:
                     optim.second_step(zero_grad=True)
                 else:
