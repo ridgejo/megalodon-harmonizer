@@ -40,7 +40,9 @@ class AmpScalePredictor(nn.Module):
 
         # x_scaled = x.clone()  # Avoids in-place gradient computation error
         # x_scaled[:, channels_to_scale, :] *= scale
+        print(f"Before scale x: {x._version}", flush=True)
         x[:, channels_to_scale, :] = x[:, channels_to_scale, :] * scale
+        print(f"After scale x: {x._version}", flush=True)
 
         return x, scale_label
 
