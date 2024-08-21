@@ -1,6 +1,7 @@
 from pathlib import Path
 import torch
-from torch.utils.data import WeightedRandomSampler
+from torch.utils.data import WeightedRandomSampler, Sampler
+import math
 
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
 
@@ -71,3 +72,24 @@ def get_oversampler(dataset, target_size):
     # Create sampler with indices
     sampler = WeightedRandomSampler(indices, len(indices), replacement=True)
     return sampler
+
+class Oversampler(Sampler):
+    def __init__(self, data_source, batch_size):
+        self.data_source = data_source
+        self.batch_size = batch_size
+        self.num_samples = len(data_source)
+        
+        # Calculate how many batches we need and the total number of samples
+        self.num_batches = math.ceil(self.num_samples / self.batch_size)
+        self.total_samples = self.num_batches * self.batch_size
+        
+    def __iter__(self):
+        # Generate indices with replacement if necessary
+        indices = torch.randint(0, self.num_samples, (self.total_samples,))
+        
+        # Yield batches of indices
+        for i in range(0, len(indices), self.batch_size):
+            yield indices[i:i + self.batch_size].tolist()
+
+    def __len__(self):
+        return self.total_samples

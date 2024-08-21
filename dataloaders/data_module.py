@@ -5,7 +5,7 @@ import torch
 from pnpl.dataloaders import MultiDataLoader
 from pnpl.datasets import Armeni2022, Gwilliams2022, Schoffelen2019, Shafto2014
 from torch.utils.data import DataLoader, random_split, RandomSampler
-from .data_utils import ComboLoader, get_oversampler
+from .data_utils import ComboLoader, get_oversampler, Oversampler
 
 
 DATASET_CLASSES = {
@@ -160,7 +160,8 @@ class HarmonizationDataModule(L.LightningModule):
             train, val, test = split
             if dataset == "shaftoIntersection":
                 # train_sampler = get_oversampler(train, target_train_size)
-                train_sampler = RandomSampler(train, replacement=True)
+                # train_sampler = RandomSampler(train, replacement=True)
+                train_sampler = Oversampler(train, batch_size=self.batch_size)
                 # val_sampler = get_oversampler(val, target_val_size)
                 # val_sampler = RandomSampler(val, replacement=True)
 
