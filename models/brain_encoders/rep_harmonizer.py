@@ -649,13 +649,16 @@ class RepHarmonizer(L.LightningModule):
                         task_loss += t_loss
                 # print(f"task_loss before backward: {task_loss}")
                 print("First backward", flush=True)
-                print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+                print(f"Version of film linear weight before first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 self.manual_backward(task_loss, retain_graph=True)
                 print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 if self.sdat:
                     optim.first_step(zero_grad=True)
                 else:
+                    print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     optim.step()
+                    print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
+
 
                 # update just domain classifier
                 dm_optim.zero_grad()
@@ -674,7 +677,7 @@ class RepHarmonizer(L.LightningModule):
 
                 # cloned_feats = []
                 for feats, targets in batch_vals:
-                    import copy
+                    # import copy
                     # Check for NaNs or Infs in feats and targets
                     if torch.isnan(feats).any():
                         raise ValueError("NaN detected in features before domain classifier")
@@ -686,9 +689,9 @@ class RepHarmonizer(L.LightningModule):
                         raise ValueError("Inf detected in targets before domain classifier")
                     
                     # temp = feats.clone().detach()
-                    temp = copy.deepcopy(feats.detach())
+                    # temp = copy.deepcopy(feats.detach())
                     # cloned_feats.append(feats.clone())
-                    domain_preds.append(self.domain_classifier(temp))
+                    domain_preds.append(self.domain_classifier(feats.detach()))
                     domain_targets.append(targets.detach())
 
                 domain_preds = torch.cat(domain_preds)
@@ -698,7 +701,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_loss = alpha * domain_loss
                 print("Second backward", flush=True)
                 print(f"Version of film linear weight before second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                self.manual_backward(domain_loss)
+                self.manual_backward(domain_loss, retain_graph=True)
                 print(f"Version of film linear weight after second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
 
                 dm_optim.step()
