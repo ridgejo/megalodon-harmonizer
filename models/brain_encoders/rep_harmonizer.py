@@ -323,38 +323,42 @@ class RepHarmonizer(L.LightningModule):
                         #  "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
-            x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
-                x, sample_rate=250
-            )  # warning: hardcoded
-            _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
+            with torch.no_grad():
+                x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
+                    x, sample_rate=250
+                )  # warning: hardcoded
+                _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
             return_values["band_predictor"] = self.predictor_models["band_predictor"](
                 z_filtered_sequence, band_label
             )
 
         if "phase_diff_predictor" in self.predictor_models:
-            x_shifted, phase_label = self.predictor_models[
-                "phase_diff_predictor"
-            ].apply_random_phase_shift(x)
-            _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
+            with torch.no_grad():
+                x_shifted, phase_label = self.predictor_models[
+                    "phase_diff_predictor"
+                ].apply_random_phase_shift(x)
+                _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
             return_values["phase_diff_predictor"] = self.predictor_models[
                 "phase_diff_predictor"
             ](z_shifted_sequence, phase_label)
 
         if "masked_channel_predictor" in self.predictor_models:
-            x_masked, mask_label = self.predictor_models[
-                "masked_channel_predictor"
-            ].mask_input(x, sensor_pos)
-            # todo: do something with commit loss
-            _, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
+            with torch.no_grad():
+                x_masked, mask_label = self.predictor_models[
+                    "masked_channel_predictor"
+                ].mask_input(x, sensor_pos)
+                # todo: do something with commit loss
+                _, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
             return_values["masked_channel_pred"] = self.predictor_models[
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
 
         if "amp_scale_predictor" in self.predictor_models:
-            x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
-                x
-            )
-            _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
+            with torch.no_grad():
+                x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
+                    x
+                )
+                _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
             return_values["amp_scale_predictor"] = self.predictor_models[
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
@@ -650,7 +654,7 @@ class RepHarmonizer(L.LightningModule):
                 # print(f"task_loss before backward: {task_loss}")
                 print("First backward", flush=True)
                 print(f"Version of film linear weight before first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                self.manual_backward(task_loss)
+                self.manual_backward(task_loss, retain_graph=True)
                 print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
                 if self.sdat:
                     optim.first_step(zero_grad=True)
