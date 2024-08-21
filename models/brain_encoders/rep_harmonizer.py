@@ -1160,7 +1160,12 @@ class RepHarmonizer(L.LightningModule):
                     batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
 
-            t_loss, losses, metrics, features = self._shared_step(batch=batch_i, batch_idx=0, stage="val")
+            features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+            t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                            z_independent=z_independent, 
+                                                            commit_loss=commit_loss, stage="test")
+
+            # t_loss, losses, metrics, features = self._shared_step(batch=batch_i, batch_idx=0, stage="val")
 
             if self.tsne:
                 activations.append(features.detach())
@@ -1208,7 +1213,12 @@ class RepHarmonizer(L.LightningModule):
         # also using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
-            loss, losses, metrics, features = self._shared_step(batch, batch_idx, "test")
+            features, z_sequence, z_independent, commit_loss = self._encode(batch)
+            loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                            z_independent=z_independent, 
+                                                            commit_loss=commit_loss, stage="test")
+
+            # loss, losses, metrics, features = self._shared_step(batch, batch_idx, "test")
 
             batch_size = len(batch["data"])
 
@@ -1277,7 +1287,12 @@ class RepHarmonizer(L.LightningModule):
                     subset = len(batch_i["data"]) - split_1 - subset
                     batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
-            t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "test")
+            features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+            t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                                                            z_independent=z_independent, 
+                                                            commit_loss=commit_loss, stage="test")
+
+            # t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "test")
             d_pred = self.domain_classifier(features)
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
             # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
