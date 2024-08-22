@@ -230,6 +230,13 @@ class RepHarmonizer(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
+    ### NOTE ###
+    # 'task' is not the most intuitive value for stage anymore
+    # refers to cloning all params and implementing functional variants on
+    # forward passes to avoid errors with backprop and multiple optimizers 
+    # in a single training step. 
+    # Set to 'encode' if you want to avoid this behavior, though without
+    # further changes training will fail on stage 2 training
     def apply_encoder(self, z, dataset, subject, stage="task"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
