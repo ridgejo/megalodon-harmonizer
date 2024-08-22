@@ -37,7 +37,7 @@ class DatasetBlock(nn.Module):
             }
         )
 
-    def forward(self, data, dataset_id, stage="encode"):
+    def forward(self, data, dataset_id, stage="task"):
         if stage == "encode":
             return self.dataset_encoders[dataset_id](data)
         elif stage == "task":

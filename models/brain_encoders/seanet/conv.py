@@ -139,7 +139,7 @@ class NormConv1d(nn.Module):
         self.norm = get_norm_module(self.conv, causal, norm, **norm_kwargs)
         self.norm_type = norm
 
-    def forward(self, x, stage="encode"):
+    def forward(self, x, stage="task"):
         if stage == "encode":
             x = self.conv(x)
         elif stage == "task":
@@ -176,7 +176,7 @@ class NormConv2d(nn.Module):
         self.norm = get_norm_module(self.conv, causal=False, norm=norm, **norm_kwargs)
         self.norm_type = norm
 
-    def forward(self, x, stage="encode"):
+    def forward(self, x, stage="task"):
         if stage == "encode":
             x = self.conv(x)
         elif stage == "task":
@@ -287,7 +287,7 @@ class SConv1d(nn.Module):
         self.causal = causal
         self.pad_mode = pad_mode
 
-    def forward(self, x, stage="encode"):
+    def forward(self, x, stage="task"):
         B, C, T = x.shape
         kernel_size = self.conv.conv.kernel_size[0]
         stride = self.conv.conv.stride[0]

@@ -24,7 +24,7 @@ class SLSTM(nn.Module):
         self.skip = skip
         self.lstm = nn.LSTM(dimension, dimension, num_layers)
 
-    def forward(self, x, stage="encode"):
+    def forward(self, x, stage="task"):
         x = x.permute(2, 0, 1)
         if stage == "encode":
             y, _ = self.lstm(x)

@@ -23,7 +23,7 @@ class FiLM(nn.Module):
         self.film_projector.add_module("lin", self.lin)
 
 
-    def forward(self, x, cond_embedding, stage="encode"):
+    def forward(self, x, cond_embedding, stage="task"):
         """
         x : activations from the network [B, C, T]
         cond_embedding : conditional embedding

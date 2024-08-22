@@ -29,12 +29,14 @@ class Projector(nn.Module):
             ),
         )
 
-    def forward(self, z):
-        return self.ssl_projector(z)
-        # out = nn.functional.linear(z, self.lin1.weight.clone(), self.lin1.bias)
-        # out = self.act_fn(out)
-        # out = nn.functional.linear(out, self.lin2.weight.clone(), self.lin2.bias)
-        # return out
+    def forward(self, z, stage="task"):
+        if stage == "encode":
+            return self.ssl_projector(z)
+        elif stage == "task":
+            out = nn.functional.linear(z, self.lin1.weight.clone(), self.lin1.bias)
+            out = self.act_fn(out)
+            out = nn.functional.linear(out, self.lin2.weight.clone(), self.lin2.bias)
+            return out
 
 
 

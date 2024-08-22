@@ -82,7 +82,7 @@ class SEANetResnetBlock(nn.Module):
                 pad_mode=pad_mode,
             )
 
-    def forward(self, x, stage="encode"):
+    def forward(self, x, stage="task"):
         if stage == "encode":
             return self.shortcut(x) + self.block(x)
         elif stage == "task":
@@ -221,7 +221,7 @@ class SEANetBrainEncoder(nn.Module):
 
         self.model = nn.Sequential(*model)
 
-    def forward(self, x, stage="encode"):
+    def forward(self, x, stage="task"):
         if stage == "encode":
             return self.model(x)
         elif stage == "task":
