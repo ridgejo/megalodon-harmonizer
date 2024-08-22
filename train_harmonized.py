@@ -58,7 +58,7 @@ parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="sto
 parser.add_argument("--harmonization_lr", help="Override lr for harmonization stage", type=float, default=None)
 parser.add_argument("--epoch_stage_1", help="Epoch to begin harmonization at", type=int, default=None)
 parser.add_argument("--batch_size", help="Override batch side", type=int, default=None)
-parser.add_argument("--alpha", help="Override alpha", type=int, default=None)
+parser.add_argument("--alpha", help="Override alpha", type=float, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
 parser.add_argument("--multi_dm_pred", help="Use one classifier per task representation", action="store_true", default=False)
 args = parser.parse_args()
