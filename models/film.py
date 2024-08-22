@@ -32,10 +32,10 @@ class FiLM(nn.Module):
         # Get Film conditioning factors
         # warning: Does not need batching as conditioning should be the same for the entire batch
 
-        # if stage == "task":
-        #     out = nn.functional.linear(cond_embedding, self.lin.weight.clone(), self.lin.bias)
-        # elif stage == "encode":
-        out = self.film_projector(cond_embedding)
+        if stage == "task":
+            out = nn.functional.linear(cond_embedding, self.lin.weight.clone(), self.lin.bias)
+        elif stage == "encode":
+            out = self.film_projector(cond_embedding)
 
         gamma = out[:, : self.feature_dim]  # [B, C]
         beta = out[:, self.feature_dim :] # [B, C]

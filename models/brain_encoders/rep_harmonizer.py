@@ -212,7 +212,13 @@ class RepHarmonizer(L.LightningModule):
         if rep_config.get("lsvm") is not None:
             self.domain_classifier = LSVM_DomainClassifier(self.batch_size, rep_config.get("num_datasets", 2)) # was 2560
         else:
-            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"]) # nodes = number of datasets (I think)
+            domain_classifiers = {}
+            domain_classifiers["backbone"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
+            domain_classifiers["band_predictor"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
+            domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
+            domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
+            # self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"]) # nodes = number of datasets (I think)
+            self.domain_classifiers = nn.ModuleDict(domain_classifiers)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
@@ -225,8 +231,8 @@ class RepHarmonizer(L.LightningModule):
     def apply_encoder(self, z, dataset, subject, stage="encode"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
-        z = self.encoder_models["dataset_block"](z, dataset)
-        z = self.encoder_models["encoder"](z)
+        z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
+        z = self.encoder_models["encoder"](z, stage=stage)
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
 
@@ -235,8 +241,8 @@ class RepHarmonizer(L.LightningModule):
         # Generic subject embedding
         subject_embedding = self.encoder_models["subject_embedding"](dataset, subject)
         # print(f"Initial version of subject_embedding: {subject_embedding._version}", flush=True)
-        # if stage == "task":
-        #     subject_embedding = subject_embedding.clone()
+        if stage == "task":
+            subject_embedding = subject_embedding.clone()
 
         # Subject block
         z = self.encoder_models["subject_block"](z, dataset, subject)
@@ -318,6 +324,10 @@ class RepHarmonizer(L.LightningModule):
         subject = inputs["info"]["subject_id"]
 
         return_values = {}
+        features = {}
+        backbone_feats, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
+        return_values["quantization"] = {"commit_loss": commit_loss}
+        features["backbone"] = backbone_feats
                         #  "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
@@ -325,20 +335,22 @@ class RepHarmonizer(L.LightningModule):
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
                 x, sample_rate=250
             )  # warning: hardcoded
-            _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered.detach(), dataset, subject)
+            filtered_feats, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
             return_values["band_predictor"] = self.predictor_models["band_predictor"](
                 z_filtered_sequence, band_label
             )
+            features["band_predictor"] = filtered_feats
 
         if "phase_diff_predictor" in self.predictor_models:
             # with torch.no_grad():
             x_shifted, phase_label = self.predictor_models[
                 "phase_diff_predictor"
             ].apply_random_phase_shift(x)
-            _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted.detach(), dataset, subject)
+            shifted_feats, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
             return_values["phase_diff_predictor"] = self.predictor_models[
                 "phase_diff_predictor"
             ](z_shifted_sequence, phase_label)
+            features["phase_diff"] = shifted_feats
 
         if "masked_channel_predictor" in self.predictor_models:
             # with torch.no_grad():
@@ -346,23 +358,22 @@ class RepHarmonizer(L.LightningModule):
                 "masked_channel_predictor"
             ].mask_input(x, sensor_pos)
             # todo: do something with commit loss
-            _, z_mask_sequence, _, _ = self.apply_encoder(x_masked.detach(), dataset, subject)
+            masked_feats, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
             return_values["masked_channel_pred"] = self.predictor_models[
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
+            features["masked_channel"] = masked_feats
 
         if "amp_scale_predictor" in self.predictor_models:
             # with torch.no_grad():
             x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
                 x
             )
-            _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled.detach(), dataset, subject)
+            scaled_feats, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
             return_values["amp_scale_predictor"] = self.predictor_models[
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
-
-        features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
-        return_values["quantization"] = {"commit_loss": commit_loss}
+            features["amp_scale"] = scaled_feats
 
         if "vad_classifier" in self.predictor_models and "speech" in inputs:
             vad_labels = inputs["speech"]  # [B, T]
@@ -512,7 +523,7 @@ class RepHarmonizer(L.LightningModule):
                 batch_size = 0
                 subset = 0
                 split_1 = 0
-                domain_preds = []
+                domain_preds = {}
                 domain_targets = []
                 for idx, batch_i in enumerate(batch):
                     if len(batch_i["data"]) < self.batch_size:
@@ -553,19 +564,27 @@ class RepHarmonizer(L.LightningModule):
                     if self.intersect_only:
                         d_pred = self.domain_classifier(features.detach())
                     else:
-                        d_pred = self.domain_classifier(features)
+                        for key, feats in features.items():
+                            pred_list = domain_preds.get(key)
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifiers[key](feats)] 
+                            else:
+                                domain_preds[key] = pred_list.append(self.domain_classifiers[key](feats))
+                        # d_pred = self.domain_classifier(features)
 
                     d_target = torch.full((subset,), idx).to(self.device)
-
                     domain_targets.append(d_target)
-                    domain_preds.append(d_pred)
+                    # domain_preds.append(d_pred)
 
                     if t_loss is not None:
                         task_loss += t_loss
                     
-                domain_preds = torch.cat(domain_preds)
+                # domain_preds = torch.cat(domain_preds)
                 domain_targets = torch.cat(domain_targets)
-                domain_loss = self.domain_criterion(domain_preds, domain_targets)
+                domain_loss = 0
+                for key, pred_list in domain_preds.items():
+                    domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+                # domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
                 loss = task_loss + alpha * domain_loss
                 self.manual_backward(loss)
@@ -683,7 +702,7 @@ class RepHarmonizer(L.LightningModule):
                 # update just domain classifier
                 dm_optim.zero_grad()
                 domain_loss = 0
-                domain_preds = []
+                domain_preds = {}
                 domain_targets = []
 
                 if self.intersect_only:
@@ -692,13 +711,13 @@ class RepHarmonizer(L.LightningModule):
                         print(f"Intersect batch is less than batch_size", flush=True)
                     # relies heavily on assumption that Shafto is first
                     intersect_batch = self._take_subset(intersect_batch, split_1)
-                    feats, _, _, _ = self._encode(intersect_batch)
+                    features, _, _, _ = self._encode(intersect_batch)
                     # _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
                     targets = torch.full((split_1,), 0).to(self.device)
-                    batch_vals[0] = (feats, targets)
+                    batch_vals[0] = (features, targets)
 
                 # cloned_feats = []
-                for feats, targets in batch_vals:
+                for features, targets in batch_vals:
                     # import copy
                     # Check for NaNs or Infs in feats and targets
                     if torch.isnan(feats).any():
@@ -713,12 +732,22 @@ class RepHarmonizer(L.LightningModule):
                     # temp = feats.clone().detach()
                     # temp = copy.deepcopy(feats.detach())
                     # cloned_feats.append(feats.clone())
-                    domain_preds.append(self.domain_classifier(feats.detach()))
-                    domain_targets.append(targets.detach())
 
-                domain_preds = torch.cat(domain_preds)
+                    # domain_preds.append(self.domain_classifier(feats.detach()))
+                    for key, feats in features.items():
+                            pred_list = domain_preds.get(key)
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifiers[key](feats.detach())] 
+                            else:
+                                domain_preds[key] = pred_list.append(self.domain_classifiers[key](feats.detach()))
+                    domain_targets.append(targets) # was targets.detach()
+
+                # domain_preds = torch.cat(domain_preds)
                 domain_targets = torch.cat(domain_targets)
-                domain_loss = self.domain_criterion(domain_preds, domain_targets)
+                domain_loss = 0
+                for key, pred_list in domain_preds.items():
+                    domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+                # domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
                 domain_loss = alpha * domain_loss
                 # print("Second backward", flush=True)
@@ -733,26 +762,39 @@ class RepHarmonizer(L.LightningModule):
                     conf_optim.zero_grad()
                 confusion_loss = 0
 
-                domain_preds = []
+                domain_preds = {}
                 # domain_targets = []
 
-                for feats, targets in batch_vals:
+                for features, targets in batch_vals:
                 # for feats in cloned_feats:
-                    conf_preds = self.domain_classifier(feats)
-                    conf_preds = torch.softmax(conf_preds, dim=1)
+                    for key, feats in features.items():
+                        pred_list = domain_preds.get(key)
+                        if pred_list is None:
+                            pred = self.domain_classifiers[key](feats)
+                            pred = torch.softmax(pred, dim=1)
+                            domain_preds[key] = [pred] 
+                        else:
+                            pred = self.domain_classifiers[key](feats)
+                            pred = torch.softmax(pred, dim=1)
+                            domain_preds[key] = pred_list.append(pred)
+                    # conf_preds = self.domain_classifier(feats)
+                    # conf_preds = torch.softmax(conf_preds, dim=1)
 
                     # Check for NaNs in conf_preds
-                    if torch.isnan(conf_preds).any():
-                        raise ValueError("NaN detected in conf_preds from domain classifier")
-                    if torch.isinf(conf_preds).any():
-                        raise ValueError("Inf detected in conf_preds from domain classifier")
+                    # if torch.isnan(conf_preds).any():
+                    #     raise ValueError("NaN detected in conf_preds from domain classifier")
+                    # if torch.isinf(conf_preds).any():
+                    #     raise ValueError("Inf detected in conf_preds from domain classifier")
                     
-                    domain_preds.append(conf_preds)
+                    # domain_preds.append(conf_preds)
                     # domain_targets.append(targets)
                 
-                domain_preds = torch.cat(domain_preds)
+                # domain_preds = torch.cat(domain_preds)
                 # domain_targets = torch.cat(domain_targets)
-                confusion_loss = self.conf_criterion(domain_preds, domain_targets)
+                confusion_loss = 0
+                for key, pred_list in domain_preds.items():
+                    confusion_loss += self.conf_criterion(torch.cat(pred_list), domain_targets)
+                # confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
                 confusion_loss = beta * confusion_loss
 
@@ -884,7 +926,7 @@ class RepHarmonizer(L.LightningModule):
             task_loss = 0
             domain_loss = 0
             batch_size = 0
-            domain_preds = []
+            domain_preds = {}
             domain_targets = []
             subset = 0
             split_1 = 0
@@ -937,25 +979,41 @@ class RepHarmonizer(L.LightningModule):
                 if save_activations:
                     activations.append(features.detach())
 
-                d_pred = self.domain_classifier.forward(features) 
+                for key, feats in features.items():
+                    pred_list = domain_preds.get(key)
+                    if pred_list is None:
+                        domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
+                    else:
+                        domain_preds[key] = pred_list.append(self.domain_classifiers[key].forward(feats))
+
+                # d_pred = self.domain_classifier.forward(features) 
 
                 d_target = torch.full((subset,), idx).to(self.device)
 
-                domain_preds.append(d_pred)
+                # domain_preds.append(d_pred)
                 domain_targets.append(d_target)
 
                 if t_loss is not None:
                     task_loss += t_loss
                 
-            domain_preds = torch.cat(domain_preds)
+            # domain_preds = torch.cat(domain_preds)
             domain_targets = torch.cat(domain_targets)
+            domain_loss = 0
+            for key, pred_list in domain_preds.items():
+                domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+                domain_preds[key] = torch.softmax(pred_list, dim=1)
+            # domain_loss = self.domain_criterion(domain_preds, domain_targets)
+            # domain_preds = torch.softmax(domain_preds, dim=1)
 
-            domain_loss = self.domain_criterion(domain_preds, domain_targets)
-            domain_preds = torch.softmax(domain_preds, dim=1)
-
-            pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+            # pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             true_domains = domain_targets.detach().cpu().numpy()
+            acc = []
+            for key, pred_list in domain_preds.items():
+                pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
+                acc.append(accuracy_score(true_domains, pred_domains))
+            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+            avg_acc = sum(acc) / len(acc)
+            
 
             if save_activations:
                 activations = torch.cat(activations).to("cpu")
@@ -969,7 +1027,7 @@ class RepHarmonizer(L.LightningModule):
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, 
                           file_name=f"{self.run_name}_task_tsne.png")
 
-            acc = accuracy_score(true_domains, pred_domains)
+            # acc = accuracy_score(true_domains, pred_domains)
         
             self.log(
                 "val_loss",
@@ -993,7 +1051,7 @@ class RepHarmonizer(L.LightningModule):
             )
             self.log(
                 "classifier_acc",
-                acc,
+                avg_acc,
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
@@ -1014,7 +1072,7 @@ class RepHarmonizer(L.LightningModule):
                 save_activations = False
             task_loss = 0
             batch_size = 0
-            domain_preds = []
+            domain_preds = {}
             domain_targets = []
             subset = 0
             split_1 = 0
@@ -1082,25 +1140,39 @@ class RepHarmonizer(L.LightningModule):
                     # _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
 
                 # explicitly call forward to avoid hooks
-                d_pred = self.domain_classifier.forward(features) 
+                # d_pred = self.domain_classifier.forward(features) 
+                for key, feats in features.items():
+                    pred_list = domain_preds.get(key)
+                    if pred_list is None:
+                        domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
+                    else:
+                        domain_preds[key] = pred_list.append(self.domain_classifiers[key].forward(feats))
                 # print(f"d_pred len = {len(d_pred)}")
 
                 d_target = torch.full((subset,), idx).to(self.device)
 
-                domain_preds.append(d_pred)
+                # domain_preds.append(d_pred)
                 domain_targets.append(d_target)
                 if t_loss is not None:
                     task_loss += t_loss
-            domain_preds = torch.cat(domain_preds)
+            # domain_preds = torch.cat(domain_preds)
             domain_targets = torch.cat(domain_targets)
+            true_domains = domain_targets.detach().cpu().numpy()
+            acc = []
+            for key, pred_list in domain_preds.items():
+                pred_list = torch.softmax(pred_list, dim=1)
+                pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
+                acc.append(accuracy_score(true_domains, pred_domains))
+            avg_acc = sum(acc) / len(acc)
             # print(f"domain preds len = {len(domain_preds)}")
 
-            domain_preds = torch.softmax(domain_preds, dim=1)
+            # domain_preds = torch.softmax(domain_preds, dim=1)
             # print(f"domain preds len after softmax = {len(domain_preds)}")
-            pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+            # pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+
             # print(f"domain preds len after argmax = {len(pred_domains)}")
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-            true_domains = domain_targets.detach().cpu().numpy()
+            # true_domains = domain_targets.detach().cpu().numpy()
 
             if save_activations:
                 activations = torch.cat(activations).to("cpu")
@@ -1114,7 +1186,7 @@ class RepHarmonizer(L.LightningModule):
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, 
                           file_name=f"{self.run_name}_unlearned_tsne.png")
 
-            acc = accuracy_score(true_domains, pred_domains)
+            # acc = accuracy_score(true_domains, pred_domains)
         
             self.log(
                 "val_loss",
@@ -1128,7 +1200,7 @@ class RepHarmonizer(L.LightningModule):
             )
             self.log(
                 "classifier_acc",
-                acc,
+                avg_acc,
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
@@ -1391,7 +1463,11 @@ class RepHarmonizer(L.LightningModule):
     def configure_optimizers(self):
         encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
         predictor_params = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))
-        domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
+        # domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
+        domain_classifier_params = []
+        for classifier in self.domain_classifiers.values():
+            domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
+
 
         if self.finetune:
             return torch.optim.AdamW(

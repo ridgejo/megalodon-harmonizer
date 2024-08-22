@@ -26,30 +26,30 @@ class SLSTM(nn.Module):
 
     def forward(self, x, stage="encode"):
         x = x.permute(2, 0, 1)
-        # if stage == "encode":
-        y, _ = self.lstm(x)
-        # elif stage == "task":
-        #     # Clone the LSTM parameters to avoid in-place operations
-        #     lstm_params = []
-        #     for name, param in self.lstm.named_parameters():
-        #         lstm_params.append(param.clone())
+        if stage == "encode":
+            y, _ = self.lstm(x)
+        elif stage == "task":
+            # Clone the LSTM parameters to avoid in-place operations
+            lstm_params = []
+            for name, param in self.lstm.named_parameters():
+                lstm_params.append(param.clone())
 
-        #     # Initialize hidden and cell states
-        #     h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
-        #     c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
+            # Initialize hidden and cell states
+            h_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
+            c_0 = torch.zeros(self.lstm.num_layers, x.size(1), self.lstm.hidden_size, device=x.device)
             
-        #     # Manually call functional LSTM using torch._VF.lstm
-        #     y, _, _ = torch._VF.lstm(
-        #         x, 
-        #         (h_0, c_0), 
-        #         lstm_params, 
-        #         self.lstm.bias, 
-        #         self.lstm.num_layers, 
-        #         self.lstm.dropout, 
-        #         self.lstm.training, 
-        #         self.lstm.bidirectional, 
-        #         False  # batch_first
-        #     )
+            # Manually call functional LSTM using torch._VF.lstm
+            y, _, _ = torch._VF.lstm(
+                x, 
+                (h_0, c_0), 
+                lstm_params, 
+                self.lstm.bias, 
+                self.lstm.num_layers, 
+                self.lstm.dropout, 
+                self.lstm.training, 
+                self.lstm.bidirectional, 
+                False  # batch_first
+            )
         
         if self.skip:
             y = y + x
