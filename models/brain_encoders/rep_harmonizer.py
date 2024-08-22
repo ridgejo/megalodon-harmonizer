@@ -1050,8 +1050,9 @@ class RepHarmonizer(L.LightningModule):
                 acc = sum(accs) / len(accs)
             else:
                 pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-                true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
                 acc = accuracy_score(true_domains, pred_domains)
+
+            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
 
             #TODO fix - if not multi then acc needs to be moved below, if is multi then needs overhaul
             if save_activations:
