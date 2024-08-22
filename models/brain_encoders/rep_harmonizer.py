@@ -912,6 +912,8 @@ class RepHarmonizer(L.LightningModule):
                             domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
                     else:
                         domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
+                    for param in domain_classifier_params:
+                        dm_param_versions.append((param, param._version))
 
                     print("Optim 3 step", flush=True)
                     conf_optim.step()
