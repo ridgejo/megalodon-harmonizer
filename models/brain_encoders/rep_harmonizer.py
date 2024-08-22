@@ -230,7 +230,7 @@ class RepHarmonizer(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-    def apply_encoder(self, z, dataset, subject, stage="encode"):
+    def apply_encoder(self, z, dataset, subject, stage="task"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
         z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
