@@ -307,7 +307,7 @@ class RepHarmonizer(L.LightningModule):
 
         return features, z_sequence, z_independent, commit_loss
 
-    def forward(self, inputs, z_sequence, z_independent, commit_loss):
+    def forward(self, inputs):
         # print("Forward call", flush=True)
         x = inputs["data"]
 
@@ -317,9 +317,7 @@ class RepHarmonizer(L.LightningModule):
         dataset = inputs["info"]["dataset"][0]
         subject = inputs["info"]["subject_id"]
 
-        # features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
-
-        return_values = {"quantization": {"commit_loss": commit_loss}}
+        return_values = {}
                         #  "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
@@ -363,6 +361,9 @@ class RepHarmonizer(L.LightningModule):
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
 
+        features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
+        return_values["quantization"] = {"commit_loss": commit_loss}
+
         if "vad_classifier" in self.predictor_models and "speech" in inputs:
             vad_labels = inputs["speech"]  # [B, T]
 
@@ -383,7 +384,7 @@ class RepHarmonizer(L.LightningModule):
                 z_sequence, voiced_labels
             )
 
-        return return_values
+        return features, return_values
     
     def _encode(self, batch):
         # print("Encode call", flush=True)
@@ -395,11 +396,13 @@ class RepHarmonizer(L.LightningModule):
         dataset = batch["info"]["dataset"][0]
         subject = batch["info"]["subject_id"]
 
-        features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
+        # features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
+        features, _, _, _ = self.apply_encoder(x, dataset, subject)
 
-        return features, z_sequence, z_independent, commit_loss
+        # return features, z_sequence, z_independent, commit_loss
+        return features
 
-    def _shared_step(self, batch, z_sequence=None, z_independent=None, commit_loss=None, stage="train"):
+    def _shared_step(self, batch, stage="train"):
         # print("Shared call", flush=True)
         loss = 0.0
         losses = {}
@@ -409,7 +412,7 @@ class RepHarmonizer(L.LightningModule):
         dataset = batch["info"]["dataset"][0]
         # subject = batch["info"]["subject_id"]
 
-        return_values = self(batch, z_sequence, z_independent, commit_loss)
+        features, return_values = self(batch, z_sequence, z_independent, commit_loss)
         # features = return_values.pop("classifier features")
 
         # Compute losses over this data batch
@@ -432,7 +435,7 @@ class RepHarmonizer(L.LightningModule):
         if loss == 0.0:
             loss = None
 
-        return loss, losses, metrics
+        return features, loss, losses, metrics
 
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
@@ -546,7 +549,7 @@ class RepHarmonizer(L.LightningModule):
                     # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                     #                                             z_independent=z_independent, 
                     #                                             commit_loss=commit_loss, stage="train")
-                    t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
+                    _, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
                     if self.intersect_only:
                         d_pred = self.domain_classifier(features.detach())
                     else:
@@ -647,8 +650,8 @@ class RepHarmonizer(L.LightningModule):
                             batch_i = self._take_subset(batch_i, subset)
                     batch_size += len(batch_i["data"])
 
-                    t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
-                    features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                    features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
+                    # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
                     # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                     #                                             z_independent=z_independent, 
                     #                                             commit_loss=commit_loss, stage="train")
@@ -924,8 +927,8 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
-                t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="val")
-                features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="val")
+                # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
                 # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                 #                                                       z_independent=z_independent, 
                 #                                                       commit_loss=commit_loss, stage="val")
@@ -1055,8 +1058,8 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
-                t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="val")
-                features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="val")
+                # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
                 # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                 #                                             z_independent=z_independent, 
                 #                                             commit_loss=commit_loss, stage="val")
