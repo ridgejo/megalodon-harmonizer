@@ -813,10 +813,12 @@ class RepHarmonizer(L.LightningModule):
                     encoder_param_versions.append((param, param._version))
                 dm_param_versions = []
                 if self.multi_dm_pred:
-                    dm = self.domain_classifiers.parameters()
+                    domain_classifier_params = []
+                    for classifier in self.domain_classifiers.values():
+                        domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
                 else:
-                    dm = self.domain_classifier.parameters()
-                for param in list(filter(lambda p: p.requires_grad, dm)):
+                    domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
+                for param in domain_classifier_params:
                     dm_param_versions.append((param, param._version))
 
                 print("Optim 2 step", flush=True)
@@ -832,7 +834,7 @@ class RepHarmonizer(L.LightningModule):
                 if updated_ct < len(updateable):
                     print("Not all encoder params updated", flush=True) 
                 updated_ct = 0
-                updateable = list(filter(lambda p: p.requires_grad, dm))    
+                updateable = domain_classifier_params    
                 for idx, param in enumerate(updateable):
                     if param._version != dm_param_versions[idx][1]:
                         if updated_ct == 0:
@@ -905,11 +907,11 @@ class RepHarmonizer(L.LightningModule):
                         encoder[key] = encoder_param_versions
                     dm_param_versions = []
                     if self.multi_dm_pred:
-                        dm = self.domain_classifiers.parameters()
+                        domain_classifier_params = []
+                        for classifier in self.domain_classifiers.values():
+                            domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
                     else:
-                        dm = self.domain_classifier.parameters()
-                    for param in list(filter(lambda p: p.requires_grad, dm)):
-                        dm_param_versions.append((param, param._version))
+                        domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
 
                     print("Optim 3 step", flush=True)
                     conf_optim.step()
@@ -927,7 +929,7 @@ class RepHarmonizer(L.LightningModule):
                         if updated_ct < len(updateable):
                             print("Not all encoder params updated", flush=True)    
                     updated_ct = 0
-                    updateable = list(filter(lambda p: p.requires_grad, dm))    
+                    updateable = domain_classifier_params    
                     for idx, param in enumerate(updateable):
                         if param._version == dm_param_versions[idx][1]:
                                 print(f"Dm Classifier param not updated shape: {param.shape}")
