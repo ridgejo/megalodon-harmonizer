@@ -722,14 +722,14 @@ class RepHarmonizer(L.LightningModule):
                 for features, targets in batch_vals:
                     # import copy
                     # Check for NaNs or Infs in feats and targets
-                    if torch.isnan(feats).any():
-                        raise ValueError("NaN detected in features before domain classifier")
-                    if torch.isinf(feats).any():
-                        raise ValueError("Inf detected in features before domain classifier")
-                    if torch.isnan(targets).any():
-                        raise ValueError("NaN detected in targets before domain classifier")
-                    if torch.isinf(targets).any():
-                        raise ValueError("Inf detected in targets before domain classifier")
+                    # if torch.isnan(feats).any():
+                    #     raise ValueError("NaN detected in features before domain classifier")
+                    # if torch.isinf(feats).any():
+                    #     raise ValueError("Inf detected in features before domain classifier")
+                    # if torch.isnan(targets).any():
+                    #     raise ValueError("NaN detected in targets before domain classifier")
+                    # if torch.isinf(targets).any():
+                    #     raise ValueError("Inf detected in targets before domain classifier")
                     
                     # temp = feats.clone().detach()
                     # temp = copy.deepcopy(feats.detach())
