@@ -333,25 +333,25 @@ class RepHarmonizer(L.LightningModule):
                         #  "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
-            with torch.no_grad(): # other option is to only put these in place after stage 1
-                x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
-                    x, sample_rate=250
-                )  # warning: hardcoded
-                filtered_feats, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
-                return_values["band_predictor"] = self.predictor_models["band_predictor"](
-                    z_filtered_sequence, band_label
-                )
+            # with torch.no_grad(): # other option is to only put these in place after stage 1
+            x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
+                x, sample_rate=250
+            )  # warning: hardcoded
+            filtered_feats, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
+            return_values["band_predictor"] = self.predictor_models["band_predictor"](
+                z_filtered_sequence, band_label
+            )
             features["band_predictor"] = filtered_feats
 
         if "phase_diff_predictor" in self.predictor_models:
-            with torch.no_grad():
-                x_shifted, phase_label = self.predictor_models[
-                    "phase_diff_predictor"
-                ].apply_random_phase_shift(x)
-                shifted_feats, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
-                return_values["phase_diff_predictor"] = self.predictor_models[
-                    "phase_diff_predictor"
-                ](z_shifted_sequence, phase_label)
+            # with torch.no_grad():
+            x_shifted, phase_label = self.predictor_models[
+                "phase_diff_predictor"
+            ].apply_random_phase_shift(x)
+            shifted_feats, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
+            return_values["phase_diff_predictor"] = self.predictor_models[
+                "phase_diff_predictor"
+            ](z_shifted_sequence, phase_label)
             features["phase_diff"] = shifted_feats
 
         if "masked_channel_predictor" in self.predictor_models:
@@ -367,14 +367,14 @@ class RepHarmonizer(L.LightningModule):
             features["masked_channel"] = masked_feats
 
         if "amp_scale_predictor" in self.predictor_models:
-            with torch.no_grad():
-                x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
-                    x
-                )
-                scaled_feats, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
-                return_values["amp_scale_predictor"] = self.predictor_models[
-                    "amp_scale_predictor"
-                ](z_scaled_sequence, scale_label)
+            # with torch.no_grad():
+            x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
+                x
+            )
+            scaled_feats, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
+            return_values["amp_scale_predictor"] = self.predictor_models[
+                "amp_scale_predictor"
+            ](z_scaled_sequence, scale_label)
             features["amp_scale"] = scaled_feats
 
         if "vad_classifier" in self.predictor_models and "speech" in inputs:
