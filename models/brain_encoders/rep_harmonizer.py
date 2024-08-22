@@ -565,11 +565,13 @@ class RepHarmonizer(L.LightningModule):
                         d_pred = self.domain_classifier(features.detach())
                     else:
                         for key, feats in features.items():
+                            print(f"{key} feats is None = {feats is None}", flush=True)
                             pred_list = domain_preds.get(key)
                             if pred_list is None:
                                 domain_preds[key] = [self.domain_classifiers[key](feats)] 
                             else:
                                 domain_preds[key] = pred_list.append(self.domain_classifiers[key](feats))
+                            print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
                         # d_pred = self.domain_classifier(features)
 
                     d_target = torch.full((subset,), idx).to(self.device)
