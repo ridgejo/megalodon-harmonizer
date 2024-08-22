@@ -1002,7 +1002,8 @@ class RepHarmonizer(L.LightningModule):
             domain_targets = torch.cat(domain_targets)
             domain_loss = 0
             for key, pred_list in domain_preds.items():
-                domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+                pred_list = torch.cat(pred_list)
+                domain_loss += self.domain_criterion(pred_list, domain_targets)
                 domain_preds[key] = torch.softmax(pred_list, dim=1)
             # domain_loss = self.domain_criterion(domain_preds, domain_targets)
             # domain_preds = torch.softmax(domain_preds, dim=1)
@@ -1162,6 +1163,7 @@ class RepHarmonizer(L.LightningModule):
             true_domains = domain_targets.detach().cpu().numpy()
             acc = []
             for key, pred_list in domain_preds.items():
+                pred_list = torch.cat(pred_list)
                 pred_list = torch.softmax(pred_list, dim=1)
                 pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
                 acc.append(accuracy_score(true_domains, pred_domains))
