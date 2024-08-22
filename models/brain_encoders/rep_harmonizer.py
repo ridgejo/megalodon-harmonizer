@@ -233,7 +233,7 @@ class RepHarmonizer(L.LightningModule):
     def apply_encoder(self, z, dataset, subject, stage="encode"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
-        z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
+        z = self.encoder_models["dataset_block"](z, dataset)
         z = self.encoder_models["encoder"](z, stage=stage)
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
