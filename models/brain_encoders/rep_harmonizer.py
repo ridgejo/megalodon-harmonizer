@@ -412,7 +412,7 @@ class RepHarmonizer(L.LightningModule):
         dataset = batch["info"]["dataset"][0]
         # subject = batch["info"]["subject_id"]
 
-        features, return_values = self(batch, z_sequence, z_independent, commit_loss)
+        features, return_values = self(batch)
         # features = return_values.pop("classifier features")
 
         # Compute losses over this data batch
