@@ -604,42 +604,42 @@ class RepHarmonizer(L.LightningModule):
 
                 loss = task_loss + alpha * domain_loss
                 self.manual_backward(loss)
-                # step1_optim.step()
-
-                encoder = {}
-                for key in self.encoder_models.keys():
-                    encoder_param_versions = []
-                    for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
-                        encoder_param_versions.append((param, param._version))
-                    encoder[key] = encoder_param_versions
-                predictor_param_versions = []
-                for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
-                    predictor_param_versions.append((param, param._version))
-                
-                print("Step 1 optim step", flush=True)
                 step1_optim.step()
 
-                for key in self.encoder_models.keys():
-                    updated_ct = 0
-                    updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
-                    for idx, param in enumerate(updateable):
-                        if param._version == encoder[key][idx][1]:
-                            print(f"Encoder {key} param not updated shape: {param.shape}")
-                        elif param._version != encoder[key][idx][1]:
-                            if updated_ct == 0:
-                                print("Encoder param updated", flush=True)
-                            updated_ct += 1
-                    if updated_ct < len(updateable):
-                        print("Not all encoder params updated", flush=True)    
-                updated_ct = 0
-                updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
-                for idx, param in enumerate(updateable):
-                    if param._version != predictor_param_versions[idx][1]:
-                        if updated_ct == 0:
-                            print("Predictor param updated", flush=True)
-                        updated_ct += 1
-                if updated_ct < len(updateable):
-                    print("Not all predictor params updated", flush=True)   
+                # encoder = {}
+                # for key in self.encoder_models.keys():
+                #     encoder_param_versions = []
+                #     for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
+                #         encoder_param_versions.append((param, param._version))
+                #     encoder[key] = encoder_param_versions
+                # predictor_param_versions = []
+                # for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
+                #     predictor_param_versions.append((param, param._version))
+                
+                # print("Step 1 optim step", flush=True)
+                # step1_optim.step()
+
+                # for key in self.encoder_models.keys():
+                #     updated_ct = 0
+                #     updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
+                #     for idx, param in enumerate(updateable):
+                #         if param._version == encoder[key][idx][1]:
+                #             print(f"Encoder {key} param not updated shape: {param.shape}")
+                #         elif param._version != encoder[key][idx][1]:
+                #             if updated_ct == 0:
+                #                 print("Encoder param updated", flush=True)
+                #             updated_ct += 1
+                #     if updated_ct < len(updateable):
+                #         print("Not all encoder params updated", flush=True)    
+                # updated_ct = 0
+                # updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
+                # for idx, param in enumerate(updateable):
+                #     if param._version != predictor_param_versions[idx][1]:
+                #         if updated_ct == 0:
+                #             print("Predictor param updated", flush=True)
+                #         updated_ct += 1
+                # if updated_ct < len(updateable):
+                #     print("Not all predictor params updated", flush=True)   
 
             self.log(
                 "train_loss",
@@ -940,15 +940,15 @@ class RepHarmonizer(L.LightningModule):
                         for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
                             encoder_param_versions.append((param, param._version))
                         encoder[key] = encoder_param_versions
-                    dm_param_versions = []
-                    if self.multi_dm_pred:
-                        domain_classifier_params = []
-                        for classifier in self.domain_classifiers.values():
-                            domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
-                    else:
-                        domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
-                    for param in domain_classifier_params:
-                        dm_param_versions.append((param, param._version))
+                    # dm_param_versions = []
+                    # if self.multi_dm_pred:
+                    #     domain_classifier_params = []
+                    #     for classifier in self.domain_classifiers.values():
+                    #         domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
+                    # else:
+                    #     domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
+                    # for param in domain_classifier_params:
+                    #     dm_param_versions.append((param, param._version))
 
                     print("Optim 3 step", flush=True)
                     conf_optim.step()
@@ -965,17 +965,17 @@ class RepHarmonizer(L.LightningModule):
                                 updated_ct += 1
                         if updated_ct < len(updateable):
                             print("Not all encoder params updated", flush=True)    
-                    updated_ct = 0
-                    updateable = domain_classifier_params    
-                    for idx, param in enumerate(updateable):
-                        if param._version == dm_param_versions[idx][1]:
-                                print(f"Dm Classifier param not updated shape: {param.shape}")
-                        elif param._version != dm_param_versions[idx][1]:
-                            if updated_ct == 0:
-                                print("DM Classifier param updated", flush=True)
-                            updated_ct += 1
-                    if updated_ct < len(updateable):
-                        print("Not all dm classifier params updated", flush=True) 
+                    # updated_ct = 0
+                    # updateable = domain_classifier_params    
+                    # for idx, param in enumerate(updateable):
+                    #     if param._version == dm_param_versions[idx][1]:
+                    #             print(f"Dm Classifier param not updated shape: {param.shape}")
+                    #     elif param._version != dm_param_versions[idx][1]:
+                    #         if updated_ct == 0:
+                    #             print("DM Classifier param updated", flush=True)
+                    #         updated_ct += 1
+                    # if updated_ct < len(updateable):
+                    #     print("Not all dm classifier params updated", flush=True) 
                 
                 self.log(
                     "train_loss",
@@ -1429,9 +1429,9 @@ class RepHarmonizer(L.LightningModule):
             batch_size += subset
 
             features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-            t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                            z_independent=z_independent, 
-                                                            commit_loss=commit_loss, stage="test")
+            # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+            #                                                 z_independent=z_independent, 
+            #                                                 commit_loss=commit_loss, stage="test")
 
             # t_loss, losses, metrics, features = self._shared_step(batch=batch_i, batch_idx=0, stage="val")
 
