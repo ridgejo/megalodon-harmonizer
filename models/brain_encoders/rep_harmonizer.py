@@ -397,7 +397,10 @@ class RepHarmonizer(L.LightningModule):
                 z_sequence, voiced_labels
             )
 
-        return features, return_values
+        if self.multi_dm_pred:
+            return features, return_values
+        else:
+            return features["backbone"], return_values
     
     def _encode(self, batch):
         # print("Encode call", flush=True)
