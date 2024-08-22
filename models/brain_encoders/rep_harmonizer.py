@@ -230,7 +230,7 @@ class RepHarmonizer(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-    def apply_encoder(self, z, dataset, subject, stage="encode"):
+    def apply_encoder(self, z, dataset, subject, stage="task"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
         z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
@@ -674,342 +674,317 @@ class RepHarmonizer(L.LightningModule):
             #     if not self.clear_optim and not self.sdat: # make sure optim state wasn't already cleared on checkpoint load
             #         self.reset_optims() 
 
-            with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
-                # update encoder / task heads
-                optim.zero_grad()
-                task_loss = 0
-                batch_vals = []
-                batch_size = 0
-                subset = 0
-                split_1 = 0
-                for idx, batch_i in enumerate(batch):
-                    if len(batch_i["data"]) < self.batch_size:
-                        print(f"Train dataset {idx} batch is less than batch_size", flush=True)
-                    if len(batch) == 2:
-                        if idx == 0:
-                            subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                            if self.intersect_only:
-                                while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                            else:
-                                while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
-                                    subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                            split_1 = subset
-                            batch_i = self._take_subset(batch_i, subset)
-                        elif idx == 1:
-                            subset = len(batch_i["data"]) - subset
-                            batch_i = self._take_subset(batch_i, subset)
-                    elif len(batch) == 3:
-                        if idx == 0:
-                            subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                            if self.intersect_only:
-                                while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
-                                    subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                            else:
-                                while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
-                                    subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                            split_1 = subset
-                            batch_i = self._take_subset(batch_i, subset)
-                        elif idx == 1:
+            # with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
+            # update encoder / task heads
+            optim.zero_grad()
+            task_loss = 0
+            batch_vals = []
+            batch_size = 0
+            subset = 0
+            split_1 = 0
+            for idx, batch_i in enumerate(batch):
+                if len(batch_i["data"]) < self.batch_size:
+                    print(f"Train dataset {idx} batch is less than batch_size", flush=True)
+                if len(batch) == 2:
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        if self.intersect_only:
+                            while subset >= len(batch[1]["data"]) - 1 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        else:
+                            while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        split_1 = subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                elif len(batch) == 3:
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        if self.intersect_only:
+                            while subset >= len(batch[1]["data"]) - 2 or subset > len(intersect_batch["data"]): ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        else:
+                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
+                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        split_1 = subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
+                        while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                            while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                            batch_i = self._take_subset(batch_i, subset)
-                        elif idx == 2:
-                            subset = len(batch_i["data"]) - split_1 - subset
-                            batch_i = self._take_subset(batch_i, subset)
-                    batch_size += len(batch_i["data"])
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 2:
+                        subset = len(batch_i["data"]) - split_1 - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                batch_size += len(batch_i["data"])
 
-                    features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
-                    # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                    # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                    #                                             z_independent=z_independent, 
-                    #                                             commit_loss=commit_loss, stage="train")
-                    d_target = torch.full((subset,), idx).to(self.device)
-                    batch_vals.append((features, d_target))
-                    if t_loss is not None:
-                        task_loss += t_loss
-                # print(f"task_loss before backward: {task_loss}")
-                # print("First backward", flush=True)
-                # print(f"Version of film linear weight before first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                self.manual_backward(task_loss, retain_graph=True)
-                # print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                if self.sdat:
-                    optim.first_step(zero_grad=True)
-                else:
-                    # print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                    # print(f"Version of seannet conv1 weight before step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
-                    encoder = {}
-                    for key in self.encoder_models.keys():
-                        encoder_param_versions = []
-                        for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
-                            encoder_param_versions.append((param, param._version))
-                        encoder[key] = encoder_param_versions
-                    predictor_param_versions = []
-                    for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
-                        predictor_param_versions.append((param, param._version))
-                    
-                    print("Optim 1 step", flush=True)
-                    optim.step()
+                features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
+                # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                #                                             z_independent=z_independent, 
+                #                                             commit_loss=commit_loss, stage="train")
+                d_target = torch.full((subset,), idx).to(self.device)
+                batch_vals.append((features, d_target))
+                if t_loss is not None:
+                    task_loss += t_loss
+            # print(f"task_loss before backward: {task_loss}")
+            # print("First backward", flush=True)
+            # print(f"Version of film linear weight before first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+            self.manual_backward(task_loss, retain_graph=True)
+            # print(f"Version of film linear weight after first backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+            if self.sdat:
+                optim.first_step(zero_grad=True)
+            else:
+                # encoder = {}
+                # for key in self.encoder_models.keys():
+                #     encoder_param_versions = []
+                #     for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
+                #         encoder_param_versions.append((param, param._version))
+                #     encoder[key] = encoder_param_versions
+                # predictor_param_versions = []
+                # for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
+                #     predictor_param_versions.append((param, param._version))
+                
+                # print("Optim 1 step", flush=True)
+                optim.step()
 
-                    for key in self.encoder_models.keys():
-                        updated_ct = 0
-                        updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
-                        for idx, param in enumerate(updateable):
-                            if param._version == encoder[key][idx][1]:
-                                print(f"Encoder {key} param not updated shape: {param.shape}")
-                            elif param._version != encoder[key][idx][1]:
-                                if updated_ct == 0:
-                                    print("Encoder param updated", flush=True)
-                                updated_ct += 1
-                        if updated_ct < len(updateable):
-                            print("Not all encoder params updated", flush=True)    
-                    updated_ct = 0
-                    updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
-                    for idx, param in enumerate(updateable):
-                        if param._version != predictor_param_versions[idx][1]:
-                            if updated_ct == 0:
-                                print("Predictor param updated", flush=True)
-                            updated_ct += 1
-                    if updated_ct < len(updateable):
-                        print("Not all predictor params updated", flush=True)    
-                    #         print(f"Version of param of shape {param.shape} before step is {pre_step_v[idx][1]} and after is {param._version}", flush=True)
-                    # print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                    # print(f"Version of seannet conv1 weight after step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
+                # for key in self.encoder_models.keys():
+                #     updated_ct = 0
+                #     updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
+                #     for idx, param in enumerate(updateable):
+                #         if param._version == encoder[key][idx][1]:
+                #             print(f"Encoder {key} param not updated shape: {param.shape}")
+                #         elif param._version != encoder[key][idx][1]:
+                #             if updated_ct == 0:
+                #                 print("Encoder param updated", flush=True)
+                #             updated_ct += 1
+                #     if updated_ct < len(updateable):
+                #         print("Not all encoder params updated", flush=True)    
+                # updated_ct = 0
+                # updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
+                # for idx, param in enumerate(updateable):
+                #     if param._version != predictor_param_versions[idx][1]:
+                #         if updated_ct == 0:
+                #             print("Predictor param updated", flush=True)
+                #         updated_ct += 1
+                # if updated_ct < len(updateable):
+                #     print("Not all predictor params updated", flush=True)    
 
+            # update just domain classifier
+            dm_optim.zero_grad()
+            domain_loss = 0
+            if self.multi_dm_pred:
+                domain_preds = {}
+            else:
+                domain_preds = []
+            domain_targets = []
 
-                # update just domain classifier
-                dm_optim.zero_grad()
-                domain_loss = 0
-                if self.multi_dm_pred:
-                    domain_preds = {}
-                else:
-                    domain_preds = []
-                domain_targets = []
+            if self.intersect_only:
+                # print("Intersect Only Called", flush=True)
+                if len(intersect_batch["data"]) < self.batch_size:
+                    print(f"Intersect batch is less than batch_size", flush=True)
+                # relies heavily on assumption that Shafto is first
+                intersect_batch = self._take_subset(intersect_batch, split_1)
+                features, _, _, _ = self._encode(intersect_batch)
+                # _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
+                targets = torch.full((split_1,), 0).to(self.device)
+                batch_vals[0] = (features, targets)
 
-                if self.intersect_only:
-                    # print("Intersect Only Called", flush=True)
-                    if len(intersect_batch["data"]) < self.batch_size:
-                        print(f"Intersect batch is less than batch_size", flush=True)
-                    # relies heavily on assumption that Shafto is first
-                    intersect_batch = self._take_subset(intersect_batch, split_1)
-                    features, _, _, _ = self._encode(intersect_batch)
-                    # _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
-                    targets = torch.full((split_1,), 0).to(self.device)
-                    batch_vals[0] = (features, targets)
-
-                # cloned_feats = []
-                for features, targets in batch_vals:
-                    # import copy
-                    # Check for NaNs or Infs in feats and targets
-                    # if torch.isnan(feats).any():
-                    #     raise ValueError("NaN detected in features before domain classifier")
-                    # if torch.isinf(feats).any():
-                    #     raise ValueError("Inf detected in features before domain classifier")
-                    # if torch.isnan(targets).any():
-                    #     raise ValueError("NaN detected in targets before domain classifier")
-                    # if torch.isinf(targets).any():
-                    #     raise ValueError("Inf detected in targets before domain classifier")
-                    
-                    # temp = feats.clone().detach()
-                    # temp = copy.deepcopy(feats.detach())
-                    # cloned_feats.append(feats.clone())
-
-                    
-                    if self.multi_dm_pred:
-                        for key, feats in features.items():
-                                pred_list = domain_preds.get(key)
-                                if pred_list is None:
-                                    domain_preds[key] = [self.domain_classifiers[key](feats.detach())] 
-                                else:
-                                    domain_preds[key].append(self.domain_classifiers[key](feats.detach()))
-                    else:
-                        domain_preds.append(self.domain_classifier(features.detach()))
-                    domain_targets.append(targets) # was targets.detach()
+            # cloned_feats = []
+            for features, targets in batch_vals:
+                # import copy
+                # Check for NaNs or Infs in feats and targets
+                # if torch.isnan(feats).any():
+                #     raise ValueError("NaN detected in features before domain classifier")
+                # if torch.isinf(feats).any():
+                #     raise ValueError("Inf detected in features before domain classifier")
+                # if torch.isnan(targets).any():
+                #     raise ValueError("NaN detected in targets before domain classifier")
+                # if torch.isinf(targets).any():
+                #     raise ValueError("Inf detected in targets before domain classifier")
+                
+                # temp = feats.clone().detach()
+                # temp = copy.deepcopy(feats.detach())
+                # cloned_feats.append(feats.clone())
 
                 
-                domain_targets = torch.cat(domain_targets)
                 if self.multi_dm_pred:
-                    domain_loss = 0
-                    for key, pred_list in domain_preds.items():
-                        domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
-                else:
-                    domain_preds = torch.cat(domain_preds)
-                    domain_loss = self.domain_criterion(domain_preds, domain_targets)
-
-                domain_loss = alpha * domain_loss
-                # print("Second backward", flush=True)
-                # print(f"Version of film linear weight before second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                self.manual_backward(domain_loss)
-                # print(f"Version of film linear weight after second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-
-                encoder_param_versions = []
-                for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
-                    encoder_param_versions.append((param, param._version))
-                dm_param_versions = []
-                if self.multi_dm_pred:
-                    domain_classifier_params = []
-                    for classifier in self.domain_classifiers.values():
-                        domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
-                else:
-                    domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
-                for param in domain_classifier_params:
-                    dm_param_versions.append((param, param._version))
-
-                print("Optim 2 step", flush=True)
-                dm_optim.step()
-
-                updated_ct = 0
-                updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
-                for idx, param in enumerate(updateable):
-                    if param._version != encoder_param_versions[idx][1]:
-                        if updated_ct == 0:
-                            print("Encoder param updated", flush=True)
-                        updated_ct += 1
-                if updated_ct < len(updateable):
-                    print("Not all encoder params updated", flush=True) 
-                updated_ct = 0
-                updateable = domain_classifier_params    
-                for idx, param in enumerate(updateable):
-                    if param._version != dm_param_versions[idx][1]:
-                        if updated_ct == 0:
-                            print("DM Classifier param updated", flush=True)
-                        updated_ct += 1
-                if updated_ct < len(updateable):
-                    print("Not all dm classifier params updated", flush=True) 
-
-                # update just encoder using domain loss
-                if not self.sdat:
-                    conf_optim.zero_grad()
-                confusion_loss = 0
-
-                if self.multi_dm_pred:
-                    domain_preds = {}
-                else:
-                    domain_preds = []
-                # domain_targets = []
-
-                for features, targets in batch_vals:
-                # for feats in cloned_feats:
-                    if self.multi_dm_pred:
-                        for key, feats in features.items():
+                    for key, feats in features.items():
                             pred_list = domain_preds.get(key)
                             if pred_list is None:
-                                pred = self.domain_classifiers[key](feats)
-                                pred = torch.softmax(pred, dim=1)
-                                domain_preds[key] = [pred] 
+                                domain_preds[key] = [self.domain_classifiers[key](feats.detach())] 
                             else:
-                                pred = self.domain_classifiers[key](feats)
-                                pred = torch.softmax(pred, dim=1)
-                                domain_preds[key].append(pred)
-                    else:
-                        conf_preds = self.domain_classifier(features)
-                        conf_preds = torch.softmax(conf_preds, dim=1)
-                        
-                        domain_preds.append(conf_preds)
-                        # domain_targets.append(targets)
-                
-                
-                # domain_targets = torch.cat(domain_targets)
+                                domain_preds[key].append(self.domain_classifiers[key](feats.detach()))
+                else:
+                    domain_preds.append(self.domain_classifier(features.detach()))
+                domain_targets.append(targets) # was targets.detach()
+
+            
+            domain_targets = torch.cat(domain_targets)
+            if self.multi_dm_pred:
+                domain_loss = 0
+                for key, pred_list in domain_preds.items():
+                    domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+            else:
+                domain_preds = torch.cat(domain_preds)
+                domain_loss = self.domain_criterion(domain_preds, domain_targets)
+
+            domain_loss = alpha * domain_loss
+            # print("Second backward", flush=True)
+            # print(f"Version of film linear weight before second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+            self.manual_backward(domain_loss)
+            # print(f"Version of film linear weight after second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+
+            # encoder_param_versions = []
+            # for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
+            #     encoder_param_versions.append((param, param._version))
+            # dm_param_versions = []
+            # if self.multi_dm_pred:
+            #     domain_classifier_params = []
+            #     for classifier in self.domain_classifiers.values():
+            #         domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
+            # else:
+            #     domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
+            # for param in domain_classifier_params:
+            #     dm_param_versions.append((param, param._version))
+
+            # print("Optim 2 step", flush=True)
+            dm_optim.step()
+
+            # updated_ct = 0
+            # updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
+            # for idx, param in enumerate(updateable):
+            #     if param._version != encoder_param_versions[idx][1]:
+            #         if updated_ct == 0:
+            #             print("Encoder param updated", flush=True)
+            #         updated_ct += 1
+            # if updated_ct < len(updateable):
+            #     print("Not all encoder params updated", flush=True) 
+            # updated_ct = 0
+            # updateable = domain_classifier_params    
+            # for idx, param in enumerate(updateable):
+            #     if param._version != dm_param_versions[idx][1]:
+            #         if updated_ct == 0:
+            #             print("DM Classifier param updated", flush=True)
+            #         updated_ct += 1
+            # if updated_ct < len(updateable):
+            #     print("Not all dm classifier params updated", flush=True) 
+
+            # update just encoder using domain loss
+            if not self.sdat:
+                conf_optim.zero_grad()
+            confusion_loss = 0
+
+            if self.multi_dm_pred:
+                domain_preds = {}
+            else:
+                domain_preds = []
+            # domain_targets = []
+
+            for features, targets in batch_vals:
+            # for feats in cloned_feats:
                 if self.multi_dm_pred:
-                    confusion_loss = 0
-                    for key, pred_list in domain_preds.items():
-                        confusion_loss += self.conf_criterion(torch.cat(pred_list), domain_targets)
+                    for key, feats in features.items():
+                        pred_list = domain_preds.get(key)
+                        if pred_list is None:
+                            pred = self.domain_classifiers[key](feats)
+                            pred = torch.softmax(pred, dim=1)
+                            domain_preds[key] = [pred] 
+                        else:
+                            pred = self.domain_classifiers[key](feats)
+                            pred = torch.softmax(pred, dim=1)
+                            domain_preds[key].append(pred)
                 else:
-                    domain_preds = torch.cat(domain_preds)
-                    confusion_loss = self.conf_criterion(domain_preds, domain_targets)
+                    conf_preds = self.domain_classifier(features)
+                    conf_preds = torch.softmax(conf_preds, dim=1)
+                    
+                    domain_preds.append(conf_preds)
+                    # domain_targets.append(targets)
+            
+            
+            # domain_targets = torch.cat(domain_targets)
+            if self.multi_dm_pred:
+                confusion_loss = 0
+                for key, pred_list in domain_preds.items():
+                    confusion_loss += self.conf_criterion(torch.cat(pred_list), domain_targets)
+            else:
+                domain_preds = torch.cat(domain_preds)
+                confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
-                confusion_loss = beta * confusion_loss
+            confusion_loss = beta * confusion_loss
 
-                # Check for NaNs in confusion_loss before backward call in except loop
-                if torch.isnan(confusion_loss).any():
-                    raise ValueError("NaN detected in confusion_loss before backward call ")
-                if torch.isinf(confusion_loss).any():
-                    raise ValueError("Inf detected in confusion_loss before backward call ")
-                
-                # print("Third backward", flush=True)
-                # print(f"Version of film linear weight before third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                self.manual_backward(confusion_loss, retain_graph=False) 
-                # print(f"Version of film linear weight after third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
-                if self.sdat:
-                    optim.second_step(zero_grad=True)
-                else:
-                    encoder = {}
-                    for key in self.encoder_models.keys():
-                        encoder_param_versions = []
-                        for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
-                            encoder_param_versions.append((param, param._version))
-                        encoder[key] = encoder_param_versions
-                    # dm_param_versions = []
-                    # if self.multi_dm_pred:
-                    #     domain_classifier_params = []
-                    #     for classifier in self.domain_classifiers.values():
-                    #         domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
-                    # else:
-                    #     domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
-                    # for param in domain_classifier_params:
-                    #     dm_param_versions.append((param, param._version))
+            # Check for NaNs in confusion_loss before backward call in except loop
+            if torch.isnan(confusion_loss).any():
+                raise ValueError("NaN detected in confusion_loss before backward call ")
+            if torch.isinf(confusion_loss).any():
+                raise ValueError("Inf detected in confusion_loss before backward call ")
+            
+            # print("Third backward", flush=True)
+            # print(f"Version of film linear weight before third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+            self.manual_backward(confusion_loss, retain_graph=False) 
+            # print(f"Version of film linear weight after third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+            if self.sdat:
+                optim.second_step(zero_grad=True)
+            else:
+                # encoder = {}
+                # for key in self.encoder_models.keys():
+                #     encoder_param_versions = []
+                #     for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
+                #         encoder_param_versions.append((param, param._version))
+                #     encoder[key] = encoder_param_versions
 
-                    print("Optim 3 step", flush=True)
-                    conf_optim.step()
+                # print("Optim 3 step", flush=True)
+                conf_optim.step()
 
-                    for key in self.encoder_models.keys():
-                        updated_ct = 0
-                        updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
-                        for idx, param in enumerate(updateable):
-                            if param._version == encoder[key][idx][1]:
-                                print(f"Encoder {key} param not updated shape: {param.shape}")
-                            elif param._version != encoder[key][idx][1]:
-                                if updated_ct == 0:
-                                    print("Encoder param updated", flush=True)
-                                updated_ct += 1
-                        if updated_ct < len(updateable):
-                            print("Not all encoder params updated", flush=True)    
-                    # updated_ct = 0
-                    # updateable = domain_classifier_params    
-                    # for idx, param in enumerate(updateable):
-                    #     if param._version == dm_param_versions[idx][1]:
-                    #             print(f"Dm Classifier param not updated shape: {param.shape}")
-                    #     elif param._version != dm_param_versions[idx][1]:
-                    #         if updated_ct == 0:
-                    #             print("DM Classifier param updated", flush=True)
-                    #         updated_ct += 1
-                    # if updated_ct < len(updateable):
-                    #     print("Not all dm classifier params updated", flush=True) 
-                
-                self.log(
-                    "train_loss",
-                    task_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
-                self.log(
-                    "domain_train_loss",
-                    domain_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
-                self.log(
-                    "confusion_train_loss",
-                    confusion_loss,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    batch_size=batch_size,
-                    sync_dist=True,
-                )
+                # for key in self.encoder_models.keys():
+                #     updated_ct = 0
+                #     updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
+                #     for idx, param in enumerate(updateable):
+                #         if param._version == encoder[key][idx][1]:
+                #             print(f"Encoder {key} param not updated shape: {param.shape}")
+                #         elif param._version != encoder[key][idx][1]:
+                #             if updated_ct == 0:
+                #                 print("Encoder param updated", flush=True)
+                #             updated_ct += 1
+                #     if updated_ct < len(updateable):
+                #         print("Not all encoder params updated", flush=True)    
 
-                del task_loss, domain_loss, confusion_loss
-                torch.cuda.empty_cache()
+            
+            self.log(
+                "train_loss",
+                task_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "domain_train_loss",
+                domain_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+            self.log(
+                "confusion_train_loss",
+                confusion_loss,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+                sync_dist=True,
+            )
+
+            del task_loss, domain_loss, confusion_loss
+            torch.cuda.empty_cache()
 
             return 
 
