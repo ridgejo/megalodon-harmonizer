@@ -549,7 +549,7 @@ class RepHarmonizer(L.LightningModule):
                     # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                     #                                             z_independent=z_independent, 
                     #                                             commit_loss=commit_loss, stage="train")
-                    _, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
+                    features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
                     if self.intersect_only:
                         d_pred = self.domain_classifier(features.detach())
                     else:
