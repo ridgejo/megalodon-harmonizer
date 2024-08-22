@@ -230,7 +230,7 @@ class RepHarmonizer(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-    def apply_encoder(self, z, dataset, subject, stage="task"):
+    def apply_encoder(self, z, dataset, subject, stage="encode"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
         z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
@@ -922,7 +922,7 @@ class RepHarmonizer(L.LightningModule):
                     updateable = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))    
                     for idx, param in enumerate(updateable):
                         if param._version == dm_param_versions[idx][1]:
-                                print(f"Dm Classifier {key} param not updated shape: {param.shape}")
+                                print(f"Dm Classifier param not updated shape: {param.shape}")
                         elif param._version != dm_param_versions[idx][1]:
                             if updated_ct == 0:
                                 print("DM Classifier param updated", flush=True)
