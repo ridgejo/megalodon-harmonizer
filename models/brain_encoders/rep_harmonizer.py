@@ -761,7 +761,7 @@ class RepHarmonizer(L.LightningModule):
                                 else:
                                     domain_preds[key].append(self.domain_classifiers[key](feats.detach()))
                     else:
-                        domain_preds.append(self.domain_classifier(feats.detach()))
+                        domain_preds.append(self.domain_classifier(features.detach()))
                     domain_targets.append(targets) # was targets.detach()
 
                 
@@ -807,11 +807,11 @@ class RepHarmonizer(L.LightningModule):
                                 pred = torch.softmax(pred, dim=1)
                                 domain_preds[key].append(pred)
                     else:
-                        conf_preds = self.domain_classifier(feats)
+                        conf_preds = self.domain_classifier(features)
                         conf_preds = torch.softmax(conf_preds, dim=1)
                         
                         domain_preds.append(conf_preds)
-                        domain_targets.append(targets)
+                        # domain_targets.append(targets)
                 
                 
                 # domain_targets = torch.cat(domain_targets)
