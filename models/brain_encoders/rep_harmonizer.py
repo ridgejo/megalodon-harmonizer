@@ -717,7 +717,9 @@ class RepHarmonizer(L.LightningModule):
                     updated_ct = 0
                     updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
                     for idx, param in enumerate(updateable):
-                        if param._version != encoder_param_versions[idx][1]:
+                        if param._version == encoder_param_versions[idx][1]:
+                            print(f"Encoder param not updated shape: {param.shape}")
+                        elif param._version != encoder_param_versions[idx][1]:
                             if updated_ct == 0:
                                 print("Encoder param updated", flush=True)
                             updated_ct += 1
@@ -900,7 +902,9 @@ class RepHarmonizer(L.LightningModule):
                     updated_ct = 0
                     updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
                     for idx, param in enumerate(updateable):
-                        if param._version != encoder_param_versions[idx][1]:
+                        if param._version == encoder_param_versions[idx][1]:
+                            print(f"Encoder param not updated shape: {param.shape}")
+                        elif param._version != encoder_param_versions[idx][1]:
                             if updated_ct == 0:
                                 print("Encoder param updated", flush=True)
                             updated_ct += 1
