@@ -230,7 +230,7 @@ class RepHarmonizer(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-    def apply_encoder(self, z, dataset, subject, stage="task"):
+    def apply_encoder(self, z, dataset, subject, stage="encode"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
         z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
@@ -604,7 +604,42 @@ class RepHarmonizer(L.LightningModule):
 
                 loss = task_loss + alpha * domain_loss
                 self.manual_backward(loss)
+                # step1_optim.step()
+
+                encoder = {}
+                for key in self.encoder_models.keys():
+                    encoder_param_versions = []
+                    for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
+                        encoder_param_versions.append((param, param._version))
+                    encoder[key] = encoder_param_versions
+                predictor_param_versions = []
+                for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
+                    predictor_param_versions.append((param, param._version))
+                
+                print("Step 1 optim step", flush=True)
                 step1_optim.step()
+
+                for key in self.encoder_models.keys():
+                    updated_ct = 0
+                    updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
+                    for idx, param in enumerate(updateable):
+                        if param._version == encoder[key][idx][1]:
+                            print(f"Encoder {key} param not updated shape: {param.shape}")
+                        elif param._version != encoder[key][idx][1]:
+                            if updated_ct == 0:
+                                print("Encoder param updated", flush=True)
+                            updated_ct += 1
+                    if updated_ct < len(updateable):
+                        print("Not all encoder params updated", flush=True)    
+                updated_ct = 0
+                updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
+                for idx, param in enumerate(updateable):
+                    if param._version != predictor_param_versions[idx][1]:
+                        if updated_ct == 0:
+                            print("Predictor param updated", flush=True)
+                        updated_ct += 1
+                if updated_ct < len(updateable):
+                    print("Not all predictor params updated", flush=True)   
 
             self.log(
                 "train_loss",
