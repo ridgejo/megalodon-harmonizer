@@ -323,42 +323,42 @@ class RepHarmonizer(L.LightningModule):
                         #  "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
-            with torch.no_grad():
-                x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
-                    x, sample_rate=250
-                )  # warning: hardcoded
-                _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
+            # with torch.no_grad(): # other option is to only put these in place after stage 1
+            x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
+                x, sample_rate=250
+            )  # warning: hardcoded
+            _, z_filtered_sequence, _, _ = self.apply_encoder(x_filtered, dataset, subject)
             return_values["band_predictor"] = self.predictor_models["band_predictor"](
                 z_filtered_sequence, band_label
             )
 
         if "phase_diff_predictor" in self.predictor_models:
-            with torch.no_grad():
-                x_shifted, phase_label = self.predictor_models[
-                    "phase_diff_predictor"
-                ].apply_random_phase_shift(x)
-                _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
+            # with torch.no_grad():
+            x_shifted, phase_label = self.predictor_models[
+                "phase_diff_predictor"
+            ].apply_random_phase_shift(x)
+            _, z_shifted_sequence, _, _ = self.apply_encoder(x_shifted, dataset, subject)
             return_values["phase_diff_predictor"] = self.predictor_models[
                 "phase_diff_predictor"
             ](z_shifted_sequence, phase_label)
 
         if "masked_channel_predictor" in self.predictor_models:
-            with torch.no_grad():
-                x_masked, mask_label = self.predictor_models[
-                    "masked_channel_predictor"
-                ].mask_input(x, sensor_pos)
-                # todo: do something with commit loss
-                _, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
+            # with torch.no_grad():
+            x_masked, mask_label = self.predictor_models[
+                "masked_channel_predictor"
+            ].mask_input(x, sensor_pos)
+            # todo: do something with commit loss
+            _, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
             return_values["masked_channel_pred"] = self.predictor_models[
                 "masked_channel_predictor"
             ](z_mask_sequence, mask_label)
 
         if "amp_scale_predictor" in self.predictor_models:
-            with torch.no_grad():
-                x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
-                    x
-                )
-                _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
+            # with torch.no_grad():
+            x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
+                x
+            )
+            _, z_scaled_sequence, _, _ = self.apply_encoder(x_scaled, dataset, subject)
             return_values["amp_scale_predictor"] = self.predictor_models[
                 "amp_scale_predictor"
             ](z_scaled_sequence, scale_label)
@@ -399,7 +399,7 @@ class RepHarmonizer(L.LightningModule):
 
         return features, z_sequence, z_independent, commit_loss
 
-    def _shared_step(self, batch, z_sequence, z_independent, commit_loss, stage: str):
+    def _shared_step(self, batch, z_sequence=None, z_independent=None, commit_loss=None, stage="train"):
         # print("Shared call", flush=True)
         loss = 0.0
         losses = {}
@@ -542,10 +542,11 @@ class RepHarmonizer(L.LightningModule):
                             batch_i = self._take_subset(batch_i, subset)
                     
                     batch_size += subset
-                    features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                    t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                                z_independent=z_independent, 
-                                                                commit_loss=commit_loss, stage="train")
+                    # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                    # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                    #                                             z_independent=z_independent, 
+                    #                                             commit_loss=commit_loss, stage="train")
+                    t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
                     if self.intersect_only:
                         d_pred = self.domain_classifier(features.detach())
                     else:
@@ -646,10 +647,11 @@ class RepHarmonizer(L.LightningModule):
                             batch_i = self._take_subset(batch_i, subset)
                     batch_size += len(batch_i["data"])
 
+                    t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
                     features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                    t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                                z_independent=z_independent, 
-                                                                commit_loss=commit_loss, stage="train")
+                    # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                    #                                             z_independent=z_independent, 
+                    #                                             commit_loss=commit_loss, stage="train")
                     d_target = torch.full((subset,), idx).to(self.device)
                     batch_vals.append((features, d_target))
                     if t_loss is not None:
@@ -922,10 +924,12 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
+                t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="val")
                 features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                                      z_independent=z_independent, 
-                                                                      commit_loss=commit_loss, stage="val")
+                # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                #                                                       z_independent=z_independent, 
+                #                                                       commit_loss=commit_loss, stage="val")
+                
 
                 if save_activations:
                     activations.append(features.detach())
@@ -1051,10 +1055,11 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 batch_size += subset
 
+                t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="val")
                 features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                            z_independent=z_independent, 
-                                                            commit_loss=commit_loss, stage="val")
+                # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                #                                             z_independent=z_independent, 
+                #                                             commit_loss=commit_loss, stage="val")
 
                 if save_activations:
                     activations.append(features.detach())
@@ -1135,7 +1140,7 @@ class RepHarmonizer(L.LightningModule):
             return
 
     def get_tsne(self, batch, name=None):
-        task_loss = 0
+        # task_loss = 0
         batch_size = 0
         domain_preds = []
         domain_targets = []
@@ -1177,8 +1182,8 @@ class RepHarmonizer(L.LightningModule):
 
             domain_preds.append(d_pred)
             domain_targets.append(d_target)
-            if t_loss is not None:
-                task_loss += t_loss
+            # if t_loss is not None:
+            #     task_loss += t_loss
         domain_preds = torch.cat(domain_preds, 0)
         domain_targets = torch.cat(domain_targets, 0)
 
