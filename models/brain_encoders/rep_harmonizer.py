@@ -704,9 +704,12 @@ class RepHarmonizer(L.LightningModule):
                 else:
                     # print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     # print(f"Version of seannet conv1 weight before step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
-                    encoder_param_versions = []
-                    for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
-                        encoder_param_versions.append((param, param._version))
+                    encoder = {}
+                    for key in self.encoder_models.keys():
+                        encoder_param_versions = []
+                        for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
+                            encoder_param_versions.append((param, param._version))
+                        encoder[key] = encoder_param_versions
                     predictor_param_versions = []
                     for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
                         predictor_param_versions.append((param, param._version))
@@ -714,21 +717,22 @@ class RepHarmonizer(L.LightningModule):
                     print("Optim 1 step", flush=True)
                     optim.step()
 
-                    updated_ct = 0
-                    updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
-                    for idx, param in enumerate(updateable):
-                        if param._version == encoder_param_versions[idx][1]:
-                            print(f"Encoder param not updated shape: {param.shape}")
-                        elif param._version != encoder_param_versions[idx][1]:
-                            if updated_ct == 0:
-                                print("Encoder param updated", flush=True)
-                            updated_ct += 1
-                    if updated_ct < len(updateable):
-                        print("Not all encoder params updated", flush=True)    
+                    for key in self.encoder_models.keys():
+                        updated_ct = 0
+                        updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
+                        for idx, param in enumerate(updateable):
+                            if param._version == encoder[key][idx][1]:
+                                print(f"Encoder {key} param not updated shape: {param.shape}")
+                            elif param._version != encoder[key][idx][1]:
+                                if updated_ct == 0:
+                                    print("Encoder param updated", flush=True)
+                                updated_ct += 1
+                        if updated_ct < len(updateable):
+                            print("Not all encoder params updated", flush=True)    
                     updated_ct = 0
                     updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
                     for idx, param in enumerate(updateable):
-                        if param._version != encoder_param_versions[idx][1]:
+                        if param._version != predictor_param_versions[idx][1]:
                             if updated_ct == 0:
                                 print("Predictor param updated", flush=True)
                             updated_ct += 1
@@ -826,7 +830,7 @@ class RepHarmonizer(L.LightningModule):
                 updated_ct = 0
                 updateable = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))    
                 for idx, param in enumerate(updateable):
-                    if param._version != encoder_param_versions[idx][1]:
+                    if param._version != dm_param_versions[idx][1]:
                         if updated_ct == 0:
                             print("DM Classifier param updated", flush=True)
                         updated_ct += 1
@@ -889,9 +893,12 @@ class RepHarmonizer(L.LightningModule):
                 if self.sdat:
                     optim.second_step(zero_grad=True)
                 else:
-                    encoder_param_versions = []
-                    for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
-                        encoder_param_versions.append((param, param._version))
+                    encoder = {}
+                    for key in self.encoder_models.keys():
+                        encoder_param_versions = []
+                        for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
+                            encoder_param_versions.append((param, param._version))
+                        encoder[key] = encoder_param_versions
                     dm_param_versions = []
                     for param in list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters())):
                         dm_param_versions.append((param, param._version))
@@ -899,21 +906,22 @@ class RepHarmonizer(L.LightningModule):
                     print("Optim 3 step", flush=True)
                     conf_optim.step()
 
-                    updated_ct = 0
-                    updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
-                    for idx, param in enumerate(updateable):
-                        if param._version == encoder_param_versions[idx][1]:
-                            print(f"Encoder param not updated shape: {param.shape}")
-                        elif param._version != encoder_param_versions[idx][1]:
-                            if updated_ct == 0:
-                                print("Encoder param updated", flush=True)
-                            updated_ct += 1
-                    if updated_ct < len(updateable):
-                        print("Not all encoder params updated", flush=True) 
+                    for key in self.encoder_models.keys():
+                        updated_ct = 0
+                        updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
+                        for idx, param in enumerate(updateable):
+                            if param._version == encoder[key][idx][1]:
+                                print(f"Encoder {key} param not updated shape: {param.shape}")
+                            elif param._version != encoder[key][idx][1]:
+                                if updated_ct == 0:
+                                    print("Encoder param updated", flush=True)
+                                updated_ct += 1
+                        if updated_ct < len(updateable):
+                            print("Not all encoder params updated", flush=True)    
                     updated_ct = 0
                     updateable = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))    
                     for idx, param in enumerate(updateable):
-                        if param._version != encoder_param_versions[idx][1]:
+                        if param._version != dm_param_versions[idx][1]:
                             if updated_ct == 0:
                                 print("DM Classifier param updated", flush=True)
                             updated_ct += 1
