@@ -725,7 +725,7 @@ class RepHarmonizer(L.LightningModule):
                         print("Not all encoder params updated", flush=True)    
                     updated_ct = 0
                     updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
-                    for idx, param in enumerate():
+                    for idx, param in enumerate(updateable):
                         if param._version != encoder_param_versions[idx][1]:
                             if updated_ct == 0:
                                 print("Predictor param updated", flush=True)
