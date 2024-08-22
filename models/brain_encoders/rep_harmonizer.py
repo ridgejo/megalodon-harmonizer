@@ -582,13 +582,12 @@ class RepHarmonizer(L.LightningModule):
                                     domain_preds[key].append(self.domain_classifiers[key](feats))
                         else:
                             d_pred = self.domain_classifier(features)
+                            domain_preds.append(d_pred)
                             # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
                         
 
                     d_target = torch.full((subset,), idx).to(self.device)
-                    domain_targets.append(d_target)
-                    if self.multi_dm_pred:
-                        domain_preds.append(d_pred)
+                    domain_targets.append(d_target)                        
 
                     if t_loss is not None:
                         task_loss += t_loss
