@@ -565,13 +565,13 @@ class RepHarmonizer(L.LightningModule):
                         d_pred = self.domain_classifier(features.detach())
                     else:
                         for key, feats in features.items():
-                            print(f"{key} feats is None = {feats is None}", flush=True)
+                            # print(f"{key} feats is None = {feats is None}", flush=True)
                             pred_list = domain_preds.get(key)
                             if pred_list is None:
                                 domain_preds[key] = [self.domain_classifiers[key](feats)] 
                             else:
-                                domain_preds[key] = pred_list.append(self.domain_classifiers[key](feats))
-                            print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
+                                domain_preds[key].append(self.domain_classifiers[key](feats))
+                            # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
                         # d_pred = self.domain_classifier(features)
 
                     d_target = torch.full((subset,), idx).to(self.device)
@@ -741,7 +741,7 @@ class RepHarmonizer(L.LightningModule):
                             if pred_list is None:
                                 domain_preds[key] = [self.domain_classifiers[key](feats.detach())] 
                             else:
-                                domain_preds[key] = pred_list.append(self.domain_classifiers[key](feats.detach()))
+                                domain_preds[key].append(self.domain_classifiers[key](feats.detach()))
                     domain_targets.append(targets) # was targets.detach()
 
                 # domain_preds = torch.cat(domain_preds)
@@ -778,7 +778,7 @@ class RepHarmonizer(L.LightningModule):
                         else:
                             pred = self.domain_classifiers[key](feats)
                             pred = torch.softmax(pred, dim=1)
-                            domain_preds[key] = pred_list.append(pred)
+                            domain_preds[key].append(pred)
                     # conf_preds = self.domain_classifier(feats)
                     # conf_preds = torch.softmax(conf_preds, dim=1)
 
@@ -986,7 +986,7 @@ class RepHarmonizer(L.LightningModule):
                     if pred_list is None:
                         domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
                     else:
-                        domain_preds[key] = pred_list.append(self.domain_classifiers[key].forward(feats))
+                        domain_preds[key].append(self.domain_classifiers[key].forward(feats))
 
                 # d_pred = self.domain_classifier.forward(features) 
 
@@ -1148,7 +1148,7 @@ class RepHarmonizer(L.LightningModule):
                     if pred_list is None:
                         domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
                     else:
-                        domain_preds[key] = pred_list.append(self.domain_classifiers[key].forward(feats))
+                        domain_preds[key].append(self.domain_classifiers[key].forward(feats))
                 # print(f"d_pred len = {len(d_pred)}")
 
                 d_target = torch.full((subset,), idx).to(self.device)
