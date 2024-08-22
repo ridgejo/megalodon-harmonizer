@@ -704,12 +704,24 @@ class RepHarmonizer(L.LightningModule):
                 else:
                     # print(f"Version of film linear weight before step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     # print(f"Version of seannet conv1 weight before step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
-                    # pre_step_v = []
-                    # for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
-                    #     pre_step_v.append((param, param._version))
+                    encoder_param_versions = []
+                    for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
+                        encoder_param_versions.append((param, param._version))
+                    predictor_param_versions = []
+                    for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
+                        predictor_param_versions.append((param, param._version))
+                    
+                    print("Optim 1 step", flush=True)
                     optim.step()
-                    # for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
-                    #     if param._version != pre_step_v[idx][1]:
+
+                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
+                        if param._version != encoder_param_versions[idx][1]:
+                            print("Encoder param updated", flush=True)
+                            break
+                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))):
+                        if param._version != encoder_param_versions[idx][1]:
+                            print("Predictor param updated", flush=True)
+                            break
                     #         print(f"Version of param of shape {param.shape} before step is {pre_step_v[idx][1]} and after is {param._version}", flush=True)
                     # print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     # print(f"Version of seannet conv1 weight after step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
@@ -780,7 +792,24 @@ class RepHarmonizer(L.LightningModule):
                 self.manual_backward(domain_loss)
                 # print(f"Version of film linear weight after second backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
 
+                encoder_param_versions = []
+                for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
+                    encoder_param_versions.append((param, param._version))
+                dm_param_versions = []
+                for param in list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters())):
+                    dm_param_versions.append((param, param._version))
+
+                print("Optim 2 step", flush=True)
                 dm_optim.step()
+
+                for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
+                    if param._version != encoder_param_versions[idx][1]:
+                        print("Encoder param updated", flush=True)
+                        break
+                for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))):
+                    if param._version != encoder_param_versions[idx][1]:
+                        print("DM Classifier param updated", flush=True)
+                        break
 
                 # update just encoder using domain loss
                 if not self.sdat:
@@ -838,7 +867,24 @@ class RepHarmonizer(L.LightningModule):
                 if self.sdat:
                     optim.second_step(zero_grad=True)
                 else:
+                    encoder_param_versions = []
+                    for param in list(filter(lambda p: p.requires_grad, self.encoder_models.parameters())):
+                        encoder_param_versions.append((param, param._version))
+                    dm_param_versions = []
+                    for param in list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters())):
+                        dm_param_versions.append((param, param._version))
+
+                    print("Optim 3 step", flush=True)
                     conf_optim.step()
+
+                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
+                        if param._version != encoder_param_versions[idx][1]:
+                            print("Encoder param updated", flush=True)
+                            break
+                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))):
+                        if param._version != encoder_param_versions[idx][1]:
+                            print("DM Classifier param updated", flush=True)
+                            break
                 
                 self.log(
                     "train_loss",
