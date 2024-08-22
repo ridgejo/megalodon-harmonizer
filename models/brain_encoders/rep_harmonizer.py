@@ -230,10 +230,10 @@ class RepHarmonizer(L.LightningModule):
             if "classifier" in k:
                 self.add_classifier(k, v)
 
-    def apply_encoder(self, z, dataset, subject, stage="encode"):
+    def apply_encoder(self, z, dataset, subject, stage="task"):
         # print(f"Initial version of z: {z._version}", flush=True)
         
-        z = self.encoder_models["dataset_block"](z, dataset)
+        z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
         z = self.encoder_models["encoder"](z, stage=stage)
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
@@ -243,16 +243,16 @@ class RepHarmonizer(L.LightningModule):
         # Generic subject embedding
         subject_embedding = self.encoder_models["subject_embedding"](dataset, subject)
         # print(f"Initial version of subject_embedding: {subject_embedding._version}", flush=True)
-        if stage == "task":
-            subject_embedding = subject_embedding.clone()
+        # if stage == "task":
+        #     subject_embedding = subject_embedding.clone()
 
         # Subject block
-        z = self.encoder_models["subject_block"](z, dataset, subject)
+        z = self.encoder_models["subject_block"](z, dataset, subject, stage=stage)
         # print(f"After subject block subject_embedding: {subject_embedding._version}", flush=True)
         # print(f"After subject block z: {z._version}", flush=True)
 
         # Subject FiLM conditioning
-        z = self.encoder_models["subject_film_module"](z, subject_embedding)
+        z = self.encoder_models["subject_film_module"](z, subject_embedding, stage=stage)
         # print(f"After FiLM subject_embedding: {subject_embedding._version}", flush=True)
         # print(f"After FiLM z: {z._version}", flush=True)
 
@@ -290,7 +290,7 @@ class RepHarmonizer(L.LightningModule):
         # print(f"After shape z_ind: {z_independent._version}", flush=True)
         z_sequence = torch.unflatten(
             self.encoder_models["projector"](
-                z_sequence.flatten(start_dim=1, end_dim=-1)
+                z_sequence.flatten(start_dim=1, end_dim=-1), stage=stage
             ),
             dim=-1,
             sizes=(T, E),
