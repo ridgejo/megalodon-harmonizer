@@ -59,6 +59,7 @@ parser.add_argument("--harmonization_lr", help="Override lr for harmonization st
 parser.add_argument("--epoch_stage_1", help="Epoch to begin harmonization at", type=int, default=None)
 parser.add_argument("--batch_size", help="Override batch side", type=int, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
+parser.add_argument("--multi_dm_pred", help="Use one classifier per task representation", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -87,6 +88,9 @@ if args.name is not None:
 
 if args.get_tsne:
     config["rep_config"]["tsne"] = True
+
+if args.multi_dm_pred:
+    config["rep_config"]["multi_dm_pred"] = True
 
 if args.intersect_only:
     config["rep_config"]["intersect_only"] = True

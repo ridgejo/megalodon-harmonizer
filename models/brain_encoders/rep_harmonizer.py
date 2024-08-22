@@ -714,14 +714,24 @@ class RepHarmonizer(L.LightningModule):
                     print("Optim 1 step", flush=True)
                     optim.step()
 
-                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
+                    updated_ct = 0
+                    updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
+                    for idx, param in enumerate(updateable):
                         if param._version != encoder_param_versions[idx][1]:
-                            print("Encoder param updated", flush=True)
-                            break
-                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))):
+                            if updated_ct == 0:
+                                print("Encoder param updated", flush=True)
+                            updated_ct += 1
+                    if updated_ct < len(updateable):
+                        print("Not all encoder params updated", flush=True)    
+                    updated_ct = 0
+                    updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
+                    for idx, param in enumerate():
                         if param._version != encoder_param_versions[idx][1]:
-                            print("Predictor param updated", flush=True)
-                            break
+                            if updated_ct == 0:
+                                print("Predictor param updated", flush=True)
+                            updated_ct += 1
+                    if updated_ct < len(updateable):
+                        print("Not all predictor params updated", flush=True)    
                     #         print(f"Version of param of shape {param.shape} before step is {pre_step_v[idx][1]} and after is {param._version}", flush=True)
                     # print(f"Version of film linear weight after step: {self.encoder_models["subject_film_module"].lin.weight._version}")
                     # print(f"Version of seannet conv1 weight after step: {self.encoder_models["encoder"].model[0].conv.conv.weight._version}")
@@ -802,14 +812,24 @@ class RepHarmonizer(L.LightningModule):
                 print("Optim 2 step", flush=True)
                 dm_optim.step()
 
-                for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
+                updated_ct = 0
+                updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
+                for idx, param in enumerate(updateable):
                     if param._version != encoder_param_versions[idx][1]:
-                        print("Encoder param updated", flush=True)
-                        break
-                for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))):
+                        if updated_ct == 0:
+                            print("Encoder param updated", flush=True)
+                        updated_ct += 1
+                if updated_ct < len(updateable):
+                    print("Not all encoder params updated", flush=True) 
+                updated_ct = 0
+                updateable = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))    
+                for idx, param in enumerate(updateable):
                     if param._version != encoder_param_versions[idx][1]:
-                        print("DM Classifier param updated", flush=True)
-                        break
+                        if updated_ct == 0:
+                            print("DM Classifier param updated", flush=True)
+                        updated_ct += 1
+                if updated_ct < len(updateable):
+                    print("Not all dm classifier params updated", flush=True) 
 
                 # update just encoder using domain loss
                 if not self.sdat:
@@ -877,14 +897,24 @@ class RepHarmonizer(L.LightningModule):
                     print("Optim 3 step", flush=True)
                     conf_optim.step()
 
-                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))):
+                    updated_ct = 0
+                    updateable = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
+                    for idx, param in enumerate(updateable):
                         if param._version != encoder_param_versions[idx][1]:
-                            print("Encoder param updated", flush=True)
-                            break
-                    for idx, param in enumerate(list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))):
+                            if updated_ct == 0:
+                                print("Encoder param updated", flush=True)
+                            updated_ct += 1
+                    if updated_ct < len(updateable):
+                        print("Not all encoder params updated", flush=True) 
+                    updated_ct = 0
+                    updateable = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))    
+                    for idx, param in enumerate(updateable):
                         if param._version != encoder_param_versions[idx][1]:
-                            print("DM Classifier param updated", flush=True)
-                            break
+                            if updated_ct == 0:
+                                print("DM Classifier param updated", flush=True)
+                            updated_ct += 1
+                    if updated_ct < len(updateable):
+                        print("Not all dm classifier params updated", flush=True) 
                 
                 self.log(
                     "train_loss",
