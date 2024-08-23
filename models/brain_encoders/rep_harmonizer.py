@@ -528,125 +528,125 @@ class RepHarmonizer(L.LightningModule):
             # skipping for now to get the framework up and running
             # Using MEGalodon loss instead of regressor loss criterion
 
-            with torch.autograd.detect_anomaly():
-                step1_optim.zero_grad()
-                task_loss = 0
-                domain_loss = 0
-                batch_size = 0
-                subset = 0
-                split_1 = 0
-                if self.multi_dm_pred:
-                    domain_preds = {}
-                else:
-                    domain_preds = []
-                domain_targets = []
-                for idx, batch_i in enumerate(batch):
-                    if len(batch_i["data"]) < self.batch_size:
-                        print(f"Train dataset {idx} batch is less than batch_size", flush=True)
-                    if len(batch) == 2:
-                        if idx == 0:
-                            # subset = np.random.randint(1, self.batch_size - 1)
+            # with torch.autograd.detect_anomaly():
+            step1_optim.zero_grad()
+            task_loss = 0
+            domain_loss = 0
+            batch_size = 0
+            subset = 0
+            split_1 = 0
+            if self.multi_dm_pred:
+                domain_preds = {}
+            else:
+                domain_preds = []
+            domain_targets = []
+            for idx, batch_i in enumerate(batch):
+                if len(batch_i["data"]) < self.batch_size:
+                    print(f"Train dataset {idx} batch is less than batch_size", flush=True)
+                if len(batch) == 2:
+                    if idx == 0:
+                        # subset = np.random.randint(1, self.batch_size - 1)
+                        subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                            while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 1)
-                            batch_i = self._take_subset(batch_i, subset)
-                        elif idx == 1:
-                            subset = len(batch_i["data"]) - subset
-                            # subset = self.batch_size - subset
-                            batch_i = self._take_subset(batch_i, subset)
-                    elif len(batch) == 3:
-                        if idx == 0:
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = len(batch_i["data"]) - subset
+                        # subset = self.batch_size - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                elif len(batch) == 3:
+                    if idx == 0:
+                        subset = np.random.randint(1, len(batch_i["data"]) - 2)
+                        while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                            while subset >= len(batch[1]["data"]) - 2: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - 2)
-                            split_1 = subset
-                            batch_i = self._take_subset(batch_i, subset)
-                        elif idx == 1:
+                        split_1 = subset
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 1:
+                        subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
+                        while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                            while subset >= len(batch[2]["data"]) - split_1: ## hacky fix for abnormal batch sizes
-                                subset = np.random.randint(1, len(batch_i["data"]) - split_1 - 1)
-                            batch_i = self._take_subset(batch_i, subset)
-                        elif idx == 2:
-                            subset = len(batch_i["data"]) - split_1 - subset
-                            batch_i = self._take_subset(batch_i, subset)
-                    
-                    batch_size += subset
-                    # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                    # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                    #                                             z_independent=z_independent, 
-                    #                                             commit_loss=commit_loss, stage="train")
-                    features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
-                    if self.intersect_only:
-                        d_pred = self.domain_classifier(features.detach())
+                        batch_i = self._take_subset(batch_i, subset)
+                    elif idx == 2:
+                        subset = len(batch_i["data"]) - split_1 - subset
+                        batch_i = self._take_subset(batch_i, subset)
+                
+                batch_size += subset
+                # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+                # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+                #                                             z_independent=z_independent, 
+                #                                             commit_loss=commit_loss, stage="train")
+                features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
+                if self.intersect_only:
+                    d_pred = self.domain_classifier(features.detach())
+                else:
+                    if self.multi_dm_pred:
+                        for key, feats in features.items():
+                            # print(f"{key} feats is None = {feats is None}", flush=True)
+                            pred_list = domain_preds.get(key)
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifiers[key](feats)] 
+                            else:
+                                domain_preds[key].append(self.domain_classifiers[key](feats))
                     else:
-                        if self.multi_dm_pred:
-                            for key, feats in features.items():
-                                # print(f"{key} feats is None = {feats is None}", flush=True)
-                                pred_list = domain_preds.get(key)
-                                if pred_list is None:
-                                    domain_preds[key] = [self.domain_classifiers[key](feats)] 
-                                else:
-                                    domain_preds[key].append(self.domain_classifiers[key](feats))
-                        else:
-                            d_pred = self.domain_classifier(features)
-                            domain_preds.append(d_pred)
-                            # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
-                        
-
-                    d_target = torch.full((subset,), idx).to(self.device)
-                    domain_targets.append(d_target)                        
-
-                    if t_loss is not None:
-                        task_loss += t_loss
+                        d_pred = self.domain_classifier(features)
+                        domain_preds.append(d_pred)
+                        # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
                     
+
+                d_target = torch.full((subset,), idx).to(self.device)
+                domain_targets.append(d_target)                        
+
+                if t_loss is not None:
+                    task_loss += t_loss
                 
-                domain_targets = torch.cat(domain_targets)
-                if self.multi_dm_pred:
-                    domain_loss = 0
-                    for key, pred_list in domain_preds.items():
-                        domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
-                else:   
-                    domain_preds = torch.cat(domain_preds)
-                    domain_loss = self.domain_criterion(domain_preds, domain_targets)
+            
+            domain_targets = torch.cat(domain_targets)
+            if self.multi_dm_pred:
+                domain_loss = 0
+                for key, pred_list in domain_preds.items():
+                    domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+            else:   
+                domain_preds = torch.cat(domain_preds)
+                domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
-                loss = task_loss + alpha * domain_loss
-                self.manual_backward(loss)
-                step1_optim.step()
+            loss = task_loss + alpha * domain_loss
+            self.manual_backward(loss)
+            step1_optim.step()
 
-                # encoder = {}
-                # for key in self.encoder_models.keys():
-                #     encoder_param_versions = []
-                #     for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
-                #         encoder_param_versions.append((param, param._version))
-                #     encoder[key] = encoder_param_versions
-                # predictor_param_versions = []
-                # for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
-                #     predictor_param_versions.append((param, param._version))
-                
-                # print("Step 1 optim step", flush=True)
-                # step1_optim.step()
+            # encoder = {}
+            # for key in self.encoder_models.keys():
+            #     encoder_param_versions = []
+            #     for param in list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters())):
+            #         encoder_param_versions.append((param, param._version))
+            #     encoder[key] = encoder_param_versions
+            # predictor_param_versions = []
+            # for param in list(filter(lambda p: p.requires_grad, self.predictor_models.parameters())):
+            #     predictor_param_versions.append((param, param._version))
+            
+            # print("Step 1 optim step", flush=True)
+            # step1_optim.step()
 
-                # for key in self.encoder_models.keys():
-                #     updated_ct = 0
-                #     updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
-                #     for idx, param in enumerate(updateable):
-                #         if param._version == encoder[key][idx][1]:
-                #             print(f"Encoder {key} param not updated shape: {param.shape}")
-                #         elif param._version != encoder[key][idx][1]:
-                #             if updated_ct == 0:
-                #                 print("Encoder param updated", flush=True)
-                #             updated_ct += 1
-                #     if updated_ct < len(updateable):
-                #         print("Not all encoder params updated", flush=True)    
-                # updated_ct = 0
-                # updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
-                # for idx, param in enumerate(updateable):
-                #     if param._version != predictor_param_versions[idx][1]:
-                #         if updated_ct == 0:
-                #             print("Predictor param updated", flush=True)
-                #         updated_ct += 1
-                # if updated_ct < len(updateable):
-                #     print("Not all predictor params updated", flush=True)   
+            # for key in self.encoder_models.keys():
+            #     updated_ct = 0
+            #     updateable = list(filter(lambda p: p.requires_grad, self.encoder_models[key].parameters()))
+            #     for idx, param in enumerate(updateable):
+            #         if param._version == encoder[key][idx][1]:
+            #             print(f"Encoder {key} param not updated shape: {param.shape}")
+            #         elif param._version != encoder[key][idx][1]:
+            #             if updated_ct == 0:
+            #                 print("Encoder param updated", flush=True)
+            #             updated_ct += 1
+            #     if updated_ct < len(updateable):
+            #         print("Not all encoder params updated", flush=True)    
+            # updated_ct = 0
+            # updateable = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))    
+            # for idx, param in enumerate(updateable):
+            #     if param._version != predictor_param_versions[idx][1]:
+            #         if updated_ct == 0:
+            #             print("Predictor param updated", flush=True)
+            #         updated_ct += 1
+            # if updated_ct < len(updateable):
+            #     print("Not all predictor params updated", flush=True)   
 
             self.log(
                 "train_loss",
