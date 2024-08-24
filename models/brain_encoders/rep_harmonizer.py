@@ -1420,28 +1420,31 @@ class RepHarmonizer(L.LightningModule):
             if self.tsne:
                 activations.append(features.detach())
 
-            # explicitly call forward to avoid hooks
-            if self.multi_dm_pred:
-                d_pred = self.domain_classifiers["backbone"].forward(features)
-            else:
-                d_pred = self.domain_classifier.forward(features) 
+            if not self.no_dm_control:
 
-            d_target = torch.full((subset,), idx).to(self.device)
+                # explicitly call forward to avoid hooks
+                if self.multi_dm_pred:
+                    d_pred = self.domain_classifiers["backbone"].forward(features)
+                else:
+                    d_pred = self.domain_classifier.forward(features) 
 
-            domain_preds.append(d_pred)
-            domain_targets.append(d_target)
-            # if t_loss is not None:
-            #     task_loss += t_loss
-        domain_preds = torch.cat(domain_preds, 0)
-        domain_targets = torch.cat(domain_targets, 0)
+                d_target = torch.full((subset,), idx).to(self.device)
 
-        domain_preds = torch.softmax(domain_preds, dim=1)
-        pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-        # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-        true_domains = domain_targets.cpu().numpy()
-        print(f"Targets = {true_domains}", flush=True)
-        print(f"Preds = {pred_domains}", flush=True)
-        acc = accuracy_score(true_domains, pred_domains)
+                domain_preds.append(d_pred)
+                domain_targets.append(d_target)
+                # if t_loss is not None:
+                #     task_loss += t_loss
+        if not self.no_dm_control:
+            domain_preds = torch.cat(domain_preds, 0)
+            domain_targets = torch.cat(domain_targets, 0)
+
+            domain_preds = torch.softmax(domain_preds, dim=1)
+            pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
+            true_domains = domain_targets.cpu().numpy()
+            print(f"Targets = {true_domains}", flush=True)
+            print(f"Preds = {pred_domains}", flush=True)
+            acc = accuracy_score(true_domains, pred_domains)
 
         activations = torch.cat(activations).to("cpu")
         label_mapping = {0: 'dataset_1', 1: 'dataset_2', 2: 'dataset_3'}
@@ -1456,7 +1459,8 @@ class RepHarmonizer(L.LightningModule):
             labels = "labels.npy"
         np.save(save_path / activs, activations.numpy())
         np.save(save_path / labels, np.array(label_names))
-        print(f"Single batch accuracy: {acc}")
+        if not self.no_dm_control:
+            print(f"Single batch accuracy: {acc}")
         print("Saving activations...")
         plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name=f"{name}_unlearned_tsne.png")
 
