@@ -1421,7 +1421,10 @@ class RepHarmonizer(L.LightningModule):
                 activations.append(features.detach())
 
             # explicitly call forward to avoid hooks
-            d_pred = self.domain_classifier.forward(features) 
+            if self.multi_dm_pred:
+                d_pred = self.domain_classifiers["backbone"].forward(features)
+            else:
+                d_pred = self.domain_classifier.forward(features) 
 
             d_target = torch.full((subset,), idx).to(self.device)
 
