@@ -1410,7 +1410,7 @@ class RepHarmonizer(L.LightningModule):
                     batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
 
-            features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+            features = self._encode(batch_i)
             # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
             #                                                 z_independent=z_independent, 
             #                                                 commit_loss=commit_loss, stage="test")
@@ -1436,7 +1436,8 @@ class RepHarmonizer(L.LightningModule):
         pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
         true_domains = domain_targets.cpu().numpy()
-
+        print(f"Targets = {true_domains}", flush=True)
+        print(f"Preds = {pred_domains}", flush=True)
         acc = accuracy_score(true_domains, pred_domains)
 
         activations = torch.cat(activations).to("cpu")
