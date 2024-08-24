@@ -57,6 +57,7 @@ parser.add_argument("--intersect_only", help="Only harmonize on intersect of dis
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 parser.add_argument("--harmonization_lr", help="Override lr for harmonization stage", type=float, default=None)
 parser.add_argument("--epoch_stage_1", help="Epoch to begin harmonization at", type=int, default=None)
+parser.add_argument("--total_epochs", help="Override total epochs", type=int, default=None)
 parser.add_argument("--batch_size", help="Override batch side", type=int, default=None)
 parser.add_argument("--alpha", help="Override alpha", type=float, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
@@ -66,6 +67,8 @@ args = parser.parse_args()
 config = yaml.safe_load(Path(args.config).read_text())
 
 # share experiment config val with lightning module
+if args.total_epochs is not None:
+    config["experiment"]["epochs"] = args.total_epochs
 config["rep_config"]["max_epochs"] = config["experiment"]["epochs"]
 
 # check fine tuning
