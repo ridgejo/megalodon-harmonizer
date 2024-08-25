@@ -55,6 +55,7 @@ class RepHarmonizer(L.LightningModule):
         self.epoch_stage_1 = rep_config["epoch_stage_1"]
         self.max_epochs = rep_config["max_epochs"]
         self.batch_size = rep_config["batch_size"]
+        self.num_feats = rep_config.get("num_classifier_feats", self.batch_size)
         self.run_name = rep_config.get("run_name", "")
         self.multi_dm_pred = rep_config.get("multi_dm_pred", False)
 
@@ -213,15 +214,14 @@ class RepHarmonizer(L.LightningModule):
         if rep_config.get("lsvm") is not None:
             self.domain_classifier = LSVM_DomainClassifier(self.batch_size, rep_config.get("num_datasets", 2)) # was 2560
         elif self.multi_dm_pred:
-            num_feats = 38
             domain_classifiers = {}
-            domain_classifiers["backbone"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
-            domain_classifiers["band_predictor"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
-            domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
-            domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
+            domain_classifiers["backbone"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
+            domain_classifiers["band_predictor"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
+            domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
+            domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
             self.domain_classifiers = nn.ModuleDict(domain_classifiers)
         else:
-            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=self.batch_size) # nodes = number of datasets (I think)
+            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
@@ -268,6 +268,8 @@ class RepHarmonizer(L.LightningModule):
         z = self.encoder_models["attach_subject"](z, subject_embedding)
         # print(f"After sub concat subject_embedding: {subject_embedding._version}", flush=True)
         # print(f"After sub concat z: {z._version}", flush=True)
+
+        print(f"Z shape = {z.shape}", flush=True)
 
         # Max Pooling over the entire time dimension T
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
@@ -576,6 +578,8 @@ class RepHarmonizer(L.LightningModule):
                 # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                 #                                             z_independent=z_independent, 
                 #                                             commit_loss=commit_loss, stage="train")
+                print(f"subset = {subset}", flush=True)
+                print(f"len data = {len(batch_i["data"])}", flush=True)
                 features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
                 if self.intersect_only:
                     d_pred = self.domain_classifier(features.detach())
