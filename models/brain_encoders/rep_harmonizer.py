@@ -269,8 +269,6 @@ class RepHarmonizer(L.LightningModule):
         # print(f"After sub concat subject_embedding: {subject_embedding._version}", flush=True)
         # print(f"After sub concat z: {z._version}", flush=True)
 
-        print(f"Z shape = {z.shape}", flush=True)
-
         # Max Pooling over the entire time dimension T
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
         pooled_data = maxpool(z)  # Resulting shape will be [B, E, 1]
@@ -578,8 +576,6 @@ class RepHarmonizer(L.LightningModule):
                 # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                 #                                             z_independent=z_independent, 
                 #                                             commit_loss=commit_loss, stage="train")
-                print(f"subset = {subset}", flush=True)
-                print(f"len data = {len(batch_i["data"])}", flush=True)
                 features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
                 if self.intersect_only:
                     d_pred = self.domain_classifier(features.detach())
