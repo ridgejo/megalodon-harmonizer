@@ -55,7 +55,7 @@ class RepHarmonizer(L.LightningModule):
         self.epoch_stage_1 = rep_config["epoch_stage_1"]
         self.max_epochs = rep_config["max_epochs"]
         self.batch_size = rep_config["batch_size"]
-        self.num_feats = rep_config.get("num_classifier_feats", self.batch_size)
+        self.num_feats = rep_config.get("num_classifier_feats", rep_config["dataset_block"]["shared_dim"])
         self.run_name = rep_config.get("run_name", "")
         self.multi_dm_pred = rep_config.get("multi_dm_pred", False)
 
