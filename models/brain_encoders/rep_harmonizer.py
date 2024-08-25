@@ -273,9 +273,6 @@ class RepHarmonizer(L.LightningModule):
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
         pooled_data = maxpool(z)  # Resulting shape will be [B, E, 1]
 
-        # print(f"After maxpool z: {z._version}", flush=True)
-        # print(f"After maxpool pooled: {pooled_data._version}", flush=True)
-
         # Squeeze the last dimension to get [B, E]
         features = pooled_data.squeeze(-1)  # Shape [B, E]
 
@@ -466,10 +463,11 @@ class RepHarmonizer(L.LightningModule):
         if self.finetune:
             ft_optim = self.optimizers()
             ft_optim.zero_grad()
-            features, z_sequence, z_independent, commit_loss = self._encode(batch)
-            loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
-                                                                z_independent=z_independent, 
-                                                                commit_loss=commit_loss, stage="train")
+            features, loss, losses, metrics = self._shared_step(batch=batch, stage="train")
+            # features, z_sequence, z_independent, commit_loss = self._encode(batch)
+            # loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
+            #                                                     z_independent=z_independent, 
+            #                                                     commit_loss=commit_loss, stage="train")
             self.manual_backward(loss)
             ft_optim.step()
 
@@ -550,6 +548,7 @@ class RepHarmonizer(L.LightningModule):
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
                         subset = len(batch_i["data"]) - subset
@@ -577,21 +576,23 @@ class RepHarmonizer(L.LightningModule):
                 #                                             z_independent=z_independent, 
                 #                                             commit_loss=commit_loss, stage="train")
                 features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
-                if self.intersect_only:
-                    d_pred = self.domain_classifier(features.detach())
+                if self.intersect_only and idx == 0:
+                    # d_pred = self.domain_classifier(features.detach())
+                    intersect_batch = self._take_subset(intersect_batch, split_1)
+                    features = self._encode(intersect_batch)
+                
+                if self.multi_dm_pred:
+                    for key, feats in features.items():
+                        # print(f"{key} feats is None = {feats is None}", flush=True)
+                        pred_list = domain_preds.get(key)
+                        if pred_list is None:
+                            domain_preds[key] = [self.domain_classifiers[key](feats)] 
+                        else:
+                            domain_preds[key].append(self.domain_classifiers[key](feats))
                 else:
-                    if self.multi_dm_pred:
-                        for key, feats in features.items():
-                            # print(f"{key} feats is None = {feats is None}", flush=True)
-                            pred_list = domain_preds.get(key)
-                            if pred_list is None:
-                                domain_preds[key] = [self.domain_classifiers[key](feats)] 
-                            else:
-                                domain_preds[key].append(self.domain_classifiers[key](feats))
-                    else:
-                        d_pred = self.domain_classifier(features)
-                        domain_preds.append(d_pred)
-                        # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
+                    d_pred = self.domain_classifier(features)
+                    domain_preds.append(d_pred)
+                    # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
                     
 
                 d_target = torch.full((subset,), idx).to(self.device)
@@ -795,7 +796,7 @@ class RepHarmonizer(L.LightningModule):
                     print(f"Intersect batch is less than batch_size", flush=True)
                 # relies heavily on assumption that Shafto is first
                 intersect_batch = self._take_subset(intersect_batch, split_1)
-                features, _, _, _ = self._encode(intersect_batch)
+                features = self._encode(intersect_batch)
                 # _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
                 targets = torch.full((split_1,), 0).to(self.device)
                 batch_vals[0] = (features, targets)
@@ -1019,10 +1020,11 @@ class RepHarmonizer(L.LightningModule):
         # Using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
-            features, z_sequence, z_independent, commit_loss = self._encode(batch)
-            loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
-                                                      z_independent=z_independent, 
-                                                      commit_loss=commit_loss, stage="val")
+            features, loss, losses, metrics = self._shared_step(batch=batch, stage="val")
+            # features, z_sequence, z_independent, commit_loss = self._encode(batch)
+            # loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
+            #                                           z_independent=z_independent, 
+            #                                           commit_loss=commit_loss, stage="val")
 
             batch_size = len(batch["data"])
 
@@ -1094,6 +1096,7 @@ class RepHarmonizer(L.LightningModule):
                         # else:
                         while subset >= len(batch[1]["data"]) - 1: ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
+                        split_1 = subset
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
                         subset = len(batch_i["data"]) - subset
@@ -1125,6 +1128,10 @@ class RepHarmonizer(L.LightningModule):
                 #                                                       z_independent=z_independent, 
                 #                                                       commit_loss=commit_loss, stage="val")
                 
+                if self.intersect_only and idx == 0:
+                    intersect_batch = self._take_subset(intersect_batch, split_1)
+                    features = self._encode(intersect_batch)
+                    
 
                 if save_activations:
                     activations.append(features.detach())
@@ -1287,19 +1294,10 @@ class RepHarmonizer(L.LightningModule):
                 if save_activations:
                     activations.append(features.detach())
 
-                if idx == 0 and self.intersect_only:
-                    if len(intersect_batch["data"]) < self.batch_size:
-                        print(f"Val Intersect batch is less than batch_size", flush=True)
-                        print(f"Len intersect batch data = {len(intersect_batch["data"])}")
-                    # relies heavily on assumption that Shafto is first
-                    # print(f"split_1 len = {split_1}")
-                    # if split_1 > len(intersect_batch["data"]):
-                    #     intersect_batch = self._pad_subset(intersect_batch, split_1 - len(intersect_batch["data"]))
-                    # else:
+                if self.intersect_only and idx == 0:
+                    # d_pred = self.domain_classifier(features.detach())
                     intersect_batch = self._take_subset(intersect_batch, split_1)
-                    features, _, _, _ = self._encode(intersect_batch)
-                    # print(f"feat len = {len(features)}")
-                    # _, _, _, features = self._shared_step(intersect_batch, batch_idx, "train")
+                    features = self._encode(intersect_batch)
 
                 # explicitly call forward to avoid hooks
                  
@@ -1472,10 +1470,11 @@ class RepHarmonizer(L.LightningModule):
         # also using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
-            features, z_sequence, z_independent, commit_loss = self._encode(batch)
-            loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                            z_independent=z_independent, 
-                                                            commit_loss=commit_loss, stage="test")
+            features, loss, losses, metrics = self._shared_step(batch=batch_i, stage="test")
+            # features, z_sequence, z_independent, commit_loss = self._encode(batch)
+            # loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+            #                                                 z_independent=z_independent, 
+            #                                                 commit_loss=commit_loss, stage="test")
 
             # loss, losses, metrics, features = self._shared_step(batch, batch_idx, "test")
 
@@ -1546,30 +1545,49 @@ class RepHarmonizer(L.LightningModule):
                     subset = len(batch_i["data"]) - split_1 - subset
                     batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
-            features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-            t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                                                            z_independent=z_independent, 
-                                                            commit_loss=commit_loss, stage="test")
+            features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="test")
+            # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
+            # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
+            #                                                 z_independent=z_independent, 
+            #                                                 commit_loss=commit_loss, stage="test")
 
             # t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "test")
             d_pred = self.domain_classifier(features)
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
             # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-            d_target = torch.zeros((subset, len(batch))).to(self.device)
-            d_target[:, idx] = 1
+
+            # d_target = torch.zeros((subset, len(batch))).to(self.device)
+            # d_target[:, idx] = 1
+
+            d_target = torch.full((subset,), idx).to(self.device)
+
             # d_target = d_target.int()
             # d_target.to(self.device)
             domain_preds.append(d_pred)
             domain_targets.append(d_target)
             if t_loss is not None:
                 task_loss += t_loss
-        domain_preds = torch.cat(domain_preds, 0)
+        # domain_preds = torch.cat(domain_preds, 0)
         domain_targets = torch.cat(domain_targets, 0)
 
-        pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+        # pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
         # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-        true_domains = domain_targets.cpu().numpy()
-        acc = accuracy_score(true_domains, pred_domains)
+        # true_domains = domain_targets.cpu().numpy()
+        # acc = accuracy_score(true_domains, pred_domains)
+        true_domains = domain_targets.detach().cpu().numpy()
+        if self.multi_dm_pred:
+            accs = []
+            for key, pred_list in domain_preds.items():
+                pred_list = torch.cat(pred_list)
+                pred_list = torch.softmax(pred_list, dim=1)
+                pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
+                accs.append(accuracy_score(true_domains, pred_domains))
+            acc = sum(accs) / len(accs)
+        else:
+            domain_preds = torch.cat(domain_preds)
+            domain_preds = torch.softmax(domain_preds, dim=1)
+            pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+            acc = accuracy_score(true_domains, pred_domains)
     
         self.log(
             "test_loss",
