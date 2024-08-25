@@ -213,14 +213,15 @@ class RepHarmonizer(L.LightningModule):
         if rep_config.get("lsvm") is not None:
             self.domain_classifier = LSVM_DomainClassifier(self.batch_size, rep_config.get("num_datasets", 2)) # was 2560
         elif self.multi_dm_pred:
+            num_feats = 38
             domain_classifiers = {}
-            domain_classifiers["backbone"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
-            domain_classifiers["band_predictor"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
-            domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
-            domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"])
+            domain_classifiers["backbone"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
+            domain_classifiers["band_predictor"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
+            domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
+            domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=num_feats, batch_size=self.batch_size)
             self.domain_classifiers = nn.ModuleDict(domain_classifiers)
         else:
-            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=rep_config["batch_size"]) # nodes = number of datasets (I think)
+            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.batch_size, batch_size=self.batch_size) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
