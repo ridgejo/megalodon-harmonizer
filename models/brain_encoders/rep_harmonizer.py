@@ -72,6 +72,9 @@ class RepHarmonizer(L.LightningModule):
         self.finetune = rep_config.get("finetune", False)
         self.no_dm_control = rep_config.get("no_dm_control", False)
         self.intersect_only = rep_config.get("intersect_only", False)
+        batch_dim = self.batch_size
+        if self.finetune and "b128" in self.run_name:
+            batch_dim = 128
         self.activations = None
         self.weightings = {}
 
@@ -215,13 +218,13 @@ class RepHarmonizer(L.LightningModule):
             self.domain_classifier = LSVM_DomainClassifier(self.batch_size, rep_config.get("num_datasets", 2)) # was 2560
         elif self.multi_dm_pred:
             domain_classifiers = {}
-            domain_classifiers["backbone"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
-            domain_classifiers["band_predictor"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
-            domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
-            domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size)
+            domain_classifiers["backbone"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim)
+            domain_classifiers["band_predictor"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim)
+            domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim)
+            domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim)
             self.domain_classifiers = nn.ModuleDict(domain_classifiers)
         else:
-            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=self.batch_size) # nodes = number of datasets (I think)
+            self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim) # nodes = number of datasets (I think)
         self.rep_config = rep_config
         self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
@@ -293,13 +296,22 @@ class RepHarmonizer(L.LightningModule):
         # print(f"After shape z: {z._version}", flush=True)
         # print(f"After shape z_seq: {z_sequence._version}", flush=True)
         # print(f"After shape z_ind: {z_independent._version}", flush=True)
-        z_sequence = torch.unflatten(
-            self.encoder_models["projector"](
-                z_sequence.flatten(start_dim=1, end_dim=-1), stage=stage
-            ),
-            dim=-1,
-            sizes=(T, E),
-        )
+        if self.fintune:
+            z_sequence = torch.unflatten(
+                self.encoder_models["projector"](
+                    z_sequence.flatten(start_dim=1, end_dim=-1)
+                ),
+                dim=-1,
+                sizes=(T, E),
+            )
+        else:
+            z_sequence = torch.unflatten(
+                self.encoder_models["projector"](
+                    z_sequence.flatten(start_dim=1, end_dim=-1), stage=stage
+                ),
+                dim=-1,
+                sizes=(T, E),
+            )
         # print(f"After projector z: {z._version}", flush=True)
         # print(f"After projector z_seq: {z_sequence._version}", flush=True)
         # print(f"After projector z_ind: {z_independent._version}", flush=True)
@@ -1433,6 +1445,7 @@ class RepHarmonizer(L.LightningModule):
                 domain_targets.append(d_target)
                 # if t_loss is not None:
                 #     task_loss += t_loss
+        true_domains = domain_targets.cpu().numpy()
         if not self.no_dm_control:
             domain_preds = torch.cat(domain_preds, 0)
             domain_targets = torch.cat(domain_targets, 0)
@@ -1440,7 +1453,6 @@ class RepHarmonizer(L.LightningModule):
             domain_preds = torch.softmax(domain_preds, dim=1)
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-            true_domains = domain_targets.cpu().numpy()
             print(f"Targets = {true_domains}", flush=True)
             print(f"Preds = {pred_domains}", flush=True)
             acc = accuracy_score(true_domains, pred_domains)

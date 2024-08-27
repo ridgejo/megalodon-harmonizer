@@ -336,7 +336,7 @@ if args.lr_find:
     print(lr_finder.results)
 
 if args.get_tsne:
-    # Get one batch from the validation dataloader
+    # Get one batch from the test dataloader
     datamodule.setup('test')
     test_dataloader = datamodule.test_dataloader()
     batch = next(iter(test_dataloader))
