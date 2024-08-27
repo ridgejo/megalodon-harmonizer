@@ -73,8 +73,12 @@ class RepHarmonizer(L.LightningModule):
         self.no_dm_control = rep_config.get("no_dm_control", False)
         self.intersect_only = rep_config.get("intersect_only", False)
         batch_dim = rep_config.get("batch_dim")
+        print(f"batch_dim = {batch_dim}", flush=True)
         if batch_dim is None:
             batch_dim = self.batch_size
+        print(f"batch_dim = {batch_dim}", flush=True)
+        print(f"batch_size = {self.batch_size}", flush=True)
+        print(f"num classifier feats = {self.num_feats}", flush=True)
         self.activations = None
         self.weightings = {}
 
