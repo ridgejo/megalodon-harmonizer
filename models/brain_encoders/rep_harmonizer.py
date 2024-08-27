@@ -72,9 +72,9 @@ class RepHarmonizer(L.LightningModule):
         self.finetune = rep_config.get("finetune", False)
         self.no_dm_control = rep_config.get("no_dm_control", False)
         self.intersect_only = rep_config.get("intersect_only", False)
-        batch_dim = self.batch_size
-        if self.finetune and "b128" in self.run_name:
-            batch_dim = 128
+        batch_dim = rep_config.get("batch_dim")
+        if batch_dim is None:
+            batch_dim = self.batch_size
         self.activations = None
         self.weightings = {}
 
@@ -296,7 +296,7 @@ class RepHarmonizer(L.LightningModule):
         # print(f"After shape z: {z._version}", flush=True)
         # print(f"After shape z_seq: {z_sequence._version}", flush=True)
         # print(f"After shape z_ind: {z_independent._version}", flush=True)
-        if self.fintune:
+        if self.finetune:
             z_sequence = torch.unflatten(
                 self.encoder_models["projector"](
                     z_sequence.flatten(start_dim=1, end_dim=-1)
