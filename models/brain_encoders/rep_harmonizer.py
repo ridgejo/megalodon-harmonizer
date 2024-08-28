@@ -74,12 +74,12 @@ class RepHarmonizer(L.LightningModule):
         self.intersect_only = rep_config.get("intersect_only", False)
         self.no_proj_encode = rep_config.get("no_proj_encode", False)
         batch_dim = rep_config.get("batch_dim")
-        print(f"batch_dim = {batch_dim}", flush=True)
+        # print(f"batch_dim = {batch_dim}", flush=True)
         if batch_dim is None:
             batch_dim = self.batch_size
-        print(f"batch_dim = {batch_dim}", flush=True)
-        print(f"batch_size = {self.batch_size}", flush=True)
-        print(f"num classifier feats = {self.num_feats}", flush=True)
+        # print(f"batch_dim = {batch_dim}", flush=True)
+        # print(f"batch_size = {self.batch_size}", flush=True)
+        # print(f"num classifier feats = {self.num_feats}", flush=True)
         self.activations = None
         self.weightings = {}
 
@@ -222,8 +222,8 @@ class RepHarmonizer(L.LightningModule):
 
         self.encoder_models = nn.ModuleDict(encoder_models)
         self.predictor_models = nn.ModuleDict(predictor_models)
-        # if self.no_dm_control and self.finetune:
-        #     self.domain_classifier = None
+        if batch_dim == -1:
+            self.domain_classifier = None
         if rep_config.get("lsvm") is not None:
             self.domain_classifier = LSVM_DomainClassifier(self.batch_size, rep_config.get("num_datasets", 2)) # was 2560
         elif self.multi_dm_pred:
