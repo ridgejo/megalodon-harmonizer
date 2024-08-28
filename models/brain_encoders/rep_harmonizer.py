@@ -1486,7 +1486,7 @@ class RepHarmonizer(L.LightningModule):
         # also using MEGalodon loss instead of regressor loss criterion
 
         if self.finetune:
-            features, loss, losses, metrics = self._shared_step(batch=batch_i, stage="test")
+            features, loss, losses, metrics = self._shared_step(batch=batch, stage="test")
             # features, z_sequence, z_independent, commit_loss = self._encode(batch)
             # loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
             #                                                 z_independent=z_independent, 
