@@ -224,7 +224,7 @@ class RepHarmonizer(L.LightningModule):
         self.predictor_models = nn.ModuleDict(predictor_models)
         if batch_dim == -1:
             self.domain_classifier = None
-        if rep_config.get("lsvm") is not None:
+        elif rep_config.get("lsvm") is not None:
             self.domain_classifier = LSVM_DomainClassifier(self.batch_size, rep_config.get("num_datasets", 2)) # was 2560
         elif self.multi_dm_pred:
             domain_classifiers = {}
