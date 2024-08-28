@@ -72,6 +72,7 @@ class RepHarmonizer(L.LightningModule):
         self.finetune = rep_config.get("finetune", False)
         self.no_dm_control = rep_config.get("no_dm_control", False)
         self.intersect_only = rep_config.get("intersect_only", False)
+        self.no_proj_encode = rep_config.get("no_proj_encode", False)
         batch_dim = rep_config.get("batch_dim")
         print(f"batch_dim = {batch_dim}", flush=True)
         if batch_dim is None:
@@ -161,7 +162,10 @@ class RepHarmonizer(L.LightningModule):
         if "projector" in rep_config:
             if "subject_embedding" in rep_config:
                 rep_config["projector"]["input_dim"] += subject_embedding_dim
-            encoder_models["projector"] = Projector(**rep_config["projector"])
+            if self.no_proj_encode:
+                predictor_models = Projector(**rep_config["projector"])
+            else:
+                encoder_models["projector"] = Projector(**rep_config["projector"])
         else:
             encoder_models["projector"] = nn.Identity()
 
@@ -1775,7 +1779,10 @@ class RepHarmonizer(L.LightningModule):
                 self.predictor_models.pop(key)
 
         # Also remove the SSL projector for fine-tuning
-        self.encoder_models["projector"] = nn.Identity()
+        if self.no_proj_encode:
+            self.predictor_models["projector"] = nn.Identity()
+        else:
+            self.encoder_models["projector"] = nn.Identity()
 
     def disable_classifiers(self):
         keys = list(self.predictor_models.keys())

@@ -64,6 +64,7 @@ parser.add_argument("--num_classifier_feats", help="Override num feats for class
 parser.add_argument("--alpha", help="Override alpha", type=float, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
 parser.add_argument("--multi_dm_pred", help="Use one classifier per task representation", action="store_true", default=False)
+parser.add_argument("--no_proj_encode", help="Group projector with predictor instead of encoder", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -120,6 +121,9 @@ if args.sgd:
 
 if args.lsvm:
     config["rep_config"]["lsvm"] = True
+
+if args.no_proj_encode:
+    config["rep_config"]["no_proj_encode"] = True 
 
 if args.clear_optim:
     config["rep_config"]["clear_optim"] = True
