@@ -1452,16 +1452,15 @@ class RepHarmonizer(L.LightningModule):
                 else:
                     d_pred = self.domain_classifier.forward(features) 
                 domain_preds.append(d_pred)
-                
+
             d_target = torch.full((subset,), idx).to(self.device)
             domain_targets.append(d_target)
                 # if t_loss is not None:
                 #     task_loss += t_loss
+        domain_targets = torch.cat(domain_targets, 0)
         true_domains = domain_targets.cpu().numpy()
         if not self.no_dm_control:
             domain_preds = torch.cat(domain_preds, 0)
-            domain_targets = torch.cat(domain_targets, 0)
-
             domain_preds = torch.softmax(domain_preds, dim=1)
             pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
