@@ -1451,11 +1451,10 @@ class RepHarmonizer(L.LightningModule):
                     d_pred = self.domain_classifiers["backbone"].forward(features)
                 else:
                     d_pred = self.domain_classifier.forward(features) 
-
-                d_target = torch.full((subset,), idx).to(self.device)
-
                 domain_preds.append(d_pred)
-                domain_targets.append(d_target)
+                
+            d_target = torch.full((subset,), idx).to(self.device)
+            domain_targets.append(d_target)
                 # if t_loss is not None:
                 #     task_loss += t_loss
         true_domains = domain_targets.cpu().numpy()
