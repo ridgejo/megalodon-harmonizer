@@ -163,7 +163,7 @@ class RepHarmonizer(L.LightningModule):
             if "subject_embedding" in rep_config:
                 rep_config["projector"]["input_dim"] += subject_embedding_dim
             if self.no_proj_encode:
-                predictor_models = Projector(**rep_config["projector"])
+                predictor_models["projector"] = Projector(**rep_config["projector"])
             else:
                 encoder_models["projector"] = Projector(**rep_config["projector"])
         else:
@@ -306,9 +306,9 @@ class RepHarmonizer(L.LightningModule):
         # print(f"After shape z: {z._version}", flush=True)
         # print(f"After shape z_seq: {z_sequence._version}", flush=True)
         # print(f"After shape z_ind: {z_independent._version}", flush=True)
-        if self.finetune:
+        if self.no_proj_encode:
             z_sequence = torch.unflatten(
-                self.encoder_models["projector"](
+                self.predictor_models["projector"](
                     z_sequence.flatten(start_dim=1, end_dim=-1)
                 ),
                 dim=-1,
