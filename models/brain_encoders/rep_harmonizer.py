@@ -553,6 +553,7 @@ class RepHarmonizer(L.LightningModule):
 
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
+            print("Warm-Up Phase", flush=True)
             #TODO investigate implementing normalized total batch size across all 3 dataloaders to 32
             # skipping for now to get the framework up and running
             # Using MEGalodon loss instead of regressor loss criterion
@@ -705,7 +706,7 @@ class RepHarmonizer(L.LightningModule):
                 sync_dist=True,
             )
 
-            del loss, task_loss, domain_loss
+            del loss, task_loss, domain_loss, domain_preds, domain_targets
             torch.cuda.empty_cache()
 
             return 
