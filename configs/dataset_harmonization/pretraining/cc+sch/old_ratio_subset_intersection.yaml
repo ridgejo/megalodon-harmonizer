@@ -1,0 +1,192 @@
+experiment:
+  seed: 1
+  epochs: 200
+
+rep_config:
+  epoch_stage_1: 100
+  alpha: 1
+  beta: 0.0001 
+  lr: 0.000066
+  dm_lr: 0.00001
+  conf_lr: 0.00001
+  task_lr: 0.00001
+  dataset_block:
+    dataset_sizes:
+      armeni2022: 269
+      schoffelen2019: 270
+      gwilliams2022: 208
+      shafto2014: 306
+    shared_dim: 512
+    use_data_block: true
+  encoder:
+    channels: 512
+    conv_channels: [512, 512, 512, 512]
+    ratios: [5, 5, 1]
+    dimension: 512
+  subject_film:
+    subject_embedding:
+      dataset_keys: ["armeni2022", "gwilliams2022", "schoffelen2019", "shafto2014"]
+      embedding_dim: 16
+    film_module:
+      feature_dim: 512
+      embedding_dim: 16
+  projector:
+    input_dim: 2560
+    hidden_dim: 2048
+  band_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+  amp_scale_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.2
+  phase_diff_predictor:
+    input_dim: 2560 # 300 * 5 = 1500
+    prop: 0.5
+
+datamodule_config:
+  dataset_preproc_configs:
+    shafto2014:
+      data_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      preproc_path: "/data/engs-pnpl/lina4368/shafto2014/cc700/meg/pipeline/release005/BIDSsep"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      include_subjects: [
+        'CC110033', 
+        'CC110037', 
+        'CC110045', 
+        'CC110056', 
+        'CC110069', 
+        'CC110087', 
+        'CC110098', 
+        'CC110101', 
+        'CC110126', 
+        'CC110174', 
+        'CC110182', 
+        'CC110187', 
+        'CC110319', 
+        'CC110411', 
+        'CC110606', 
+        'CC112141', 
+        'CC120008', 
+        'CC120049', 
+        'CC120061', 
+        'CC120065', 
+        'CC120120', 
+        'CC120137', 
+        'CC120166', 
+        'CC120182', 
+        'CC120184', 
+        'CC120208', 
+        'CC120212', 
+        'CC120218', 
+        'CC120264', 
+        'CC120276', 
+        'CC120309', 
+        'CC120313', 
+        'CC120319', 
+        'CC120347', 
+        'CC120376', 
+        'CC120409', 
+        'CC120462', 
+        'CC120469', 
+        'CC120470', 
+        'CC120550', 
+        'CC120640', 
+        'CC120727', 
+        'CC120764', 
+        'CC120795', 
+        'CC121106', 
+        'CC121111', 
+        'CC121144', 
+        'CC121158', 
+        'CC121200', 
+        'CC121317', 
+        'CC121397', 
+        'CC121411', 
+        'CC121428', 
+        'CC121479', 
+        'CC121685', 
+        'CC121795', 
+        'CC122016', 
+        'CC122172', 
+        'CC122405', 
+        'CC122620', 
+        'CC210023', 
+        'CC210148', 
+        'CC210172', 
+        'CC210174', 
+        'CC210182', 
+        'CC210250', 
+        'CC210519', 
+        'CC212153', 
+        'CC220098', 
+        'CC220115', 
+        'CC220132', 
+        'CC220151', 
+        'CC220352', 
+        'CC220419', 
+        'CC220511', 
+        'CC220518', 
+        'CC220519', 
+        'CC220526', 
+        'CC220535', 
+        'CC220610', 
+        'CC221033', 
+        'CC221054', 
+        'CC221209',
+        ]
+      preload: true
+    schoffelen2019:
+      data_path: "/data/engs-pnpl/lina4368/schoffelen2019"
+      preproc_path: "/data/engs-pnpl/lina4368/schoffelen2019"
+      l_freq: 0.5
+      h_freq: 125
+      resample_freq: 250
+      notch_freq: 50
+      interpolate_bad_channels: true
+      window_len: 0.5
+      info: ["subject", "subject_id", "dataset"]
+      # exclude_subjects: ['V1002', 'V1006', 'A2011', 'V1005', 'A2119', 'A2084', 'A2063', 'A2076', 'V1090', 'A2036', 'V1001', 'V1003', 'A2062']
+      include_subjects: ["A2002",
+        "A2003",
+        "A2004",
+        "A2005",
+        "A2006",
+        "A2007",
+        "A2008",
+        "A2009",
+        "A2010",
+        "A2013",
+        "A2014",
+        "A2015",
+        "A2016",
+        "A2017",
+        "A2019",
+        "A2020",
+        "A2021",
+        "A2024",
+        "A2025",
+        "A2027",
+        "A2028",
+        "A2029",
+        "A2030",
+        "A2031",
+        "A2032",
+        "A2033",
+        "A2034"]
+      preload: true
+  dataloader_configs:
+    train_ratio: 0.8
+    val_ratio: 0.1
+    test_ratio: 0.1
+    pred_ratio: 0.0
+    batch_size: 512
+    normalisation:
+      n_sample_batches: 8
+      per_channel: true
+      scaler_conf:
+        standard_scaler:
