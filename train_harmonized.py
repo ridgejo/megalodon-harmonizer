@@ -187,7 +187,7 @@ unlearning_checkpoint = ModelCheckpoint(
 if args.early_stop:
     early_stopping = EarlyStopping(
         monitor='val_loss',  # metric to monitor
-        patience=10 if config['rep_config'].get('patience') is None else config['rep_config']['patience'],          # number of epochs with no improvement after which training will be stopped
+        patience=20 if config['rep_config'].get('patience') is None else config['rep_config']['patience'],          # number of epochs with no improvement after which training will be stopped
         mode='min'           # mode can be 'min' or 'max'
     )
 
