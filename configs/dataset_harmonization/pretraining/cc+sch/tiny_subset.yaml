@@ -69,7 +69,7 @@ datamodule_config:
         "CC410101",
         "CC620659",
         "CC721107",
-        "CC620935"
+        "CC110033"
           ]
       preload: true
     schoffelen2019:
@@ -85,7 +85,7 @@ datamodule_config:
       # exclude_subjects: ['V1002', 'V1006', 'A2011', 'V1005', 'A2119', 'A2084', 'A2063', 'A2076', 'V1090', 'A2036', 'V1001', 'V1003', 'A2062']
       include_subjects: ["A2002",
         "A2003",
-        "A2004"]
+        "V1113"]
       preload: true
   dataloader_configs:
     train_ratio: 0.8
