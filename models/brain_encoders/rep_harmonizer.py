@@ -1344,8 +1344,8 @@ class RepHarmonizer(L.LightningModule):
                 pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
                 if self.age_confound:
                     pred_domains = pred_domains + 18
-                print(f"True domains = {true_domains}", flush=True)
-                print(f"Pred domains = {pred_domains}", flush=True)
+                # print(f"True domains = {true_domains}", flush=True)
+                # print(f"Pred domains = {pred_domains}", flush=True)
                 acc = accuracy_score(true_domains, pred_domains)
 
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
