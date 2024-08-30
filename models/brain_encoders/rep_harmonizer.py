@@ -495,6 +495,29 @@ class RepHarmonizer(L.LightningModule):
 
         return features, loss, losses, metrics
 
+    def get_age_targets(self, subjects, dataset):
+        if dataset == "shafto2014":
+            age_dict = CAMCAN_AGES
+        if dataset == "schoffelen2019":
+            age_dict = MOUS_AGES
+
+        subject_ids = list(age_dict.keys())
+        ages = list(age_dict.values())
+
+        # map subjects to their index
+        id_to_index = {id: idx for idx, id in enumerate(subject_ids)}
+
+        # convert ages to a tensor
+        age_tensor = torch.tensor(ages).to(self.device)
+
+        # get indices of the input subject IDs
+        subject_indices = torch.tensor([id_to_index[id] for id in subjects]).to(self.device)
+
+        # gather ages from the age tensor
+        age_targets = age_tensor[subject_indices]
+
+        return age_targets
+
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
         if self.finetune:
@@ -639,10 +662,13 @@ class RepHarmonizer(L.LightningModule):
                     # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
                     
                 if self.age_confound:
-                    print(batch_i["info"], flush=True)
+                    # print(batch_i["info"], flush=True)
+                    ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    ages = get_age_distribution_labels(ages)
+                    d_target = F.softmax(ages, dim=1)
                 else:
                     d_target = torch.full((subset,), idx).to(self.device)
-                    domain_targets.append(d_target)                        
+                domain_targets.append(d_target)                        
 
                 if t_loss is not None:
                     task_loss += t_loss
@@ -652,9 +678,20 @@ class RepHarmonizer(L.LightningModule):
             if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
-                    domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+                    preds = torch.cat(pred_list)
+                    if self.age_confound:
+                        preds = torch.softmax(preds, dim=1)
+                        preds = torch.argmax(preds, dim=1) + 18
+                        preds = get_age_distribution_labels(preds)
+                        preds = F.log_softmax(preds, dim=1)
+                    domain_loss += self.domain_criterion(preds, domain_targets)
             else:   
                 domain_preds = torch.cat(domain_preds)
+                if self.age_confound:
+                    domain_preds = torch.softmax(domain_preds, dim=1)
+                    domain_preds = torch.argmax(domain_preds, dim=1) + 18
+                    domain_preds = get_age_distribution_labels(domain_preds)
+                    domain_preds = F.log_softmax(domain_preds, dim=1)
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
             if self.no_dm_control:
@@ -783,7 +820,14 @@ class RepHarmonizer(L.LightningModule):
                 # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
                 #                                             z_independent=z_independent, 
                 #                                             commit_loss=commit_loss, stage="train")
-                d_target = torch.full((subset,), idx).to(self.device)
+                if self.age_confound:
+                    # print(batch_i["info"], flush=True)
+                    ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    ages = get_age_distribution_labels(ages)
+                    d_target = F.softmax(ages, dim=1)
+                else:
+                    d_target = torch.full((subset,), idx).to(self.device)
+                # d_target = torch.full((subset,), idx).to(self.device)
                 batch_vals.append((features, d_target))
                 if t_loss is not None:
                     task_loss += t_loss
@@ -890,9 +934,20 @@ class RepHarmonizer(L.LightningModule):
             if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
-                    domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
+                    preds = torch.cat(pred_list)
+                    if self.age_confound:
+                        preds = torch.softmax(preds, dim=1)
+                        preds = torch.argmax(preds, dim=1) + 18
+                        preds = get_age_distribution_labels(preds)
+                        preds = F.log_softmax(preds, dim=1)
+                    domain_loss += self.domain_criterion(preds, domain_targets)
             else:
                 domain_preds = torch.cat(domain_preds)
+                if self.age_confound:
+                    domain_preds = torch.softmax(domain_preds, dim=1)
+                    domain_preds = torch.argmax(domain_preds, dim=1) + 18
+                    domain_preds = get_age_distribution_labels(domain_preds)
+                    domain_preds = F.log_softmax(domain_preds, dim=1)
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
             domain_loss = alpha * domain_loss
@@ -982,9 +1037,20 @@ class RepHarmonizer(L.LightningModule):
             if self.agg_task_feats:
                 confusion_loss = 0
                 for key, pred_list in domain_preds.items():
-                    confusion_loss += self.conf_criterion(torch.cat(pred_list), domain_targets)
+                    preds = torch.cat(pred_list)
+                    if self.age_confound:
+                        # preds = torch.softmax(preds, dim=1)
+                        preds = torch.argmax(preds, dim=1) + 18
+                        preds = get_age_distribution_labels(preds)
+                        preds = F.softmax(preds, dim=1)
+                    confusion_loss += self.conf_criterion(preds, domain_targets)
             else:
                 domain_preds = torch.cat(domain_preds)
+                if self.age_confound:
+                    # domain_preds = torch.softmax(domain_preds, dim=1)
+                    domain_preds = torch.argmax(domain_preds, dim=1) + 18
+                    domain_preds = get_age_distribution_labels(domain_preds)
+                    domain_preds = F.softmax(domain_preds, dim=1)
                 confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
             confusion_loss = beta * confusion_loss
@@ -1144,6 +1210,8 @@ class RepHarmonizer(L.LightningModule):
                 domain_preds = {}
             else:
                 domain_preds = []
+            if self.age_confound: 
+                acc_targets = []
             domain_targets = []
             subset = 0
             split_1 = 0
@@ -1218,7 +1286,15 @@ class RepHarmonizer(L.LightningModule):
                     d_pred = self.domain_classifier.forward(features) 
                     domain_preds.append(d_pred)
 
-                d_target = torch.full((subset,), idx).to(self.device)
+                if self.age_confound:
+                    # print(batch_i["info"], flush=True)
+                    ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    acc_targets.append(ages)
+                    ages = get_age_distribution_labels(ages)
+                    d_target = F.softmax(ages, dim=1)
+                else:
+                    d_target = torch.full((subset,), idx).to(self.device)
+                # d_target = torch.full((subset,), idx).to(self.device)
                 domain_targets.append(d_target)
 
                 if t_loss is not None:
@@ -1229,25 +1305,45 @@ class RepHarmonizer(L.LightningModule):
             if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
-                    pred_list = torch.cat(pred_list)
-                    domain_loss += self.domain_criterion(pred_list, domain_targets)
-                    domain_preds[key] = torch.softmax(pred_list, dim=1)
+                    # pred_list = torch.cat(pred_list)
+                    preds = torch.cat(pred_list)
+                    if self.age_confound:
+                        loss_preds = torch.softmax(preds, dim=1)
+                        loss_preds = torch.argmax(loss_preds, dim=1) + 18 # convert to actual age values instead of indices
+                        loss_preds = get_age_distribution_labels(loss_preds)
+                        loss_preds = F.log_softmax(loss_preds, dim=1)
+                        domain_loss += self.domain_criterion(loss_preds, domain_targets)
+                    else:
+                        domain_loss += self.domain_criterion(preds, domain_targets)
+                    domain_preds[key] = torch.softmax(preds, dim=1)
             else:
                 domain_preds = torch.cat(domain_preds)
-                domain_loss = self.domain_criterion(domain_preds, domain_targets)
+                if self.age_confound:
+                    loss_preds = torch.softmax(loss_preds, dim=1)
+                    loss_preds = torch.argmax(loss_preds, dim=1) + 18
+                    loss_preds = get_age_distribution_labels(loss_preds)
+                    loss_preds = F.log_softmax(loss_preds, dim=1)
+                    domain_loss = self.domain_criterion(loss_preds, domain_targets)
+                else:
+                    domain_loss = self.domain_criterion(domain_preds, domain_targets)
                 domain_preds = torch.softmax(domain_preds, dim=1)
 
-            
+            if self.age_confound:
+                domain_targets = torch.cat(acc_targets)
             true_domains = domain_targets.detach().cpu().numpy()
             if self.agg_task_feats:
                 accs = []
                 for key, pred_list in domain_preds.items():
                     pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
+                    if self.age_confound:
+                        pred_domains = pred_domains + 18
                     accs.append(accuracy_score(true_domains, pred_domains))
                 
                 acc = sum(accs) / len(accs)
             else:
                 pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+                if self.age_confound:
+                    pred_domains = pred_domains + 18
                 acc = accuracy_score(true_domains, pred_domains)
 
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
@@ -1390,7 +1486,14 @@ class RepHarmonizer(L.LightningModule):
                     domain_preds.append(d_pred)
                 # print(f"d_pred len = {len(d_pred)}")
 
-                d_target = torch.full((subset,), idx).to(self.device)
+                if self.age_confound:
+                    # print(batch_i["info"], flush=True)
+                    d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    # acc_targets.append(ages)
+                    # ages = get_age_distribution_labels(ages)
+                    # d_target = F.softmax(ages, dim=1)
+                else:
+                    d_target = torch.full((subset,), idx).to(self.device)
                 domain_targets.append(d_target)
 
                 if t_loss is not None:
@@ -1404,12 +1507,16 @@ class RepHarmonizer(L.LightningModule):
                     pred_list = torch.cat(pred_list)
                     pred_list = torch.softmax(pred_list, dim=1)
                     pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
+                    if self.age_confound:
+                        pred_domains = pred_domains + 18
                     accs.append(accuracy_score(true_domains, pred_domains))
                 acc = sum(accs) / len(accs)
             else:
                 domain_preds = torch.cat(domain_preds)
                 domain_preds = torch.softmax(domain_preds, dim=1)
                 pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
+                if self.age_confound:
+                    pred_domains = pred_domains + 18
                 acc = accuracy_score(true_domains, pred_domains)
             # print(f"domain preds len = {len(domain_preds)}")
 
