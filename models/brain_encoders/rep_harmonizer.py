@@ -664,7 +664,7 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     # print(batch_i["info"], flush=True)
                     ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                    ages = get_age_distribution_labels(ages)
+                    ages = get_age_distribution_labels(ages).to(self.device)
                     d_target = F.softmax(ages, dim=1)
                 else:
                     d_target = torch.full((subset,), idx).to(self.device)
@@ -682,7 +682,7 @@ class RepHarmonizer(L.LightningModule):
                     if self.age_confound:
                         preds = torch.softmax(preds, dim=1)
                         preds = torch.argmax(preds, dim=1) + 18
-                        preds = get_age_distribution_labels(preds)
+                        preds = get_age_distribution_labels(preds).to(self.device)
                         preds = F.log_softmax(preds, dim=1)
                     domain_loss += self.domain_criterion(preds, domain_targets)
             else:   
@@ -690,7 +690,7 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     domain_preds = torch.softmax(domain_preds, dim=1)
                     domain_preds = torch.argmax(domain_preds, dim=1) + 18
-                    domain_preds = get_age_distribution_labels(domain_preds)
+                    domain_preds = get_age_distribution_labels(domain_preds).to(self.device)
                     domain_preds = F.log_softmax(domain_preds, dim=1)
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
@@ -823,7 +823,7 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     # print(batch_i["info"], flush=True)
                     ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                    ages = get_age_distribution_labels(ages)
+                    ages = get_age_distribution_labels(ages).to(self.device)
                     d_target = F.softmax(ages, dim=1)
                 else:
                     d_target = torch.full((subset,), idx).to(self.device)
@@ -938,7 +938,7 @@ class RepHarmonizer(L.LightningModule):
                     if self.age_confound:
                         preds = torch.softmax(preds, dim=1)
                         preds = torch.argmax(preds, dim=1) + 18
-                        preds = get_age_distribution_labels(preds)
+                        preds = get_age_distribution_labels(preds).to(self.device)
                         preds = F.log_softmax(preds, dim=1)
                     domain_loss += self.domain_criterion(preds, domain_targets)
             else:
@@ -946,7 +946,7 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     domain_preds = torch.softmax(domain_preds, dim=1)
                     domain_preds = torch.argmax(domain_preds, dim=1) + 18
-                    domain_preds = get_age_distribution_labels(domain_preds)
+                    domain_preds = get_age_distribution_labels(domain_preds).to(self.device)
                     domain_preds = F.log_softmax(domain_preds, dim=1)
                 domain_loss = self.domain_criterion(domain_preds, domain_targets)
 
@@ -1041,7 +1041,7 @@ class RepHarmonizer(L.LightningModule):
                     if self.age_confound:
                         # preds = torch.softmax(preds, dim=1)
                         preds = torch.argmax(preds, dim=1) + 18
-                        preds = get_age_distribution_labels(preds)
+                        preds = get_age_distribution_labels(preds).to(self.device)
                         preds = F.softmax(preds, dim=1)
                     confusion_loss += self.conf_criterion(preds, domain_targets)
             else:
@@ -1049,7 +1049,7 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     # domain_preds = torch.softmax(domain_preds, dim=1)
                     domain_preds = torch.argmax(domain_preds, dim=1) + 18
-                    domain_preds = get_age_distribution_labels(domain_preds)
+                    domain_preds = get_age_distribution_labels(domain_preds).to(self.device)
                     domain_preds = F.softmax(domain_preds, dim=1)
                 confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
@@ -1290,7 +1290,7 @@ class RepHarmonizer(L.LightningModule):
                     # print(batch_i["info"], flush=True)
                     ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
                     acc_targets.append(ages)
-                    ages = get_age_distribution_labels(ages)
+                    ages = get_age_distribution_labels(ages).to(self.device)
                     d_target = F.softmax(ages, dim=1)
                 else:
                     d_target = torch.full((subset,), idx).to(self.device)
@@ -1310,7 +1310,7 @@ class RepHarmonizer(L.LightningModule):
                     if self.age_confound:
                         loss_preds = torch.softmax(preds, dim=1)
                         loss_preds = torch.argmax(loss_preds, dim=1) + 18 # convert to actual age values instead of indices
-                        loss_preds = get_age_distribution_labels(loss_preds)
+                        loss_preds = get_age_distribution_labels(loss_preds).to(self.device)
                         loss_preds = F.log_softmax(loss_preds, dim=1)
                         domain_loss += self.domain_criterion(loss_preds, domain_targets)
                     else:
@@ -1321,7 +1321,7 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     loss_preds = torch.softmax(loss_preds, dim=1)
                     loss_preds = torch.argmax(loss_preds, dim=1) + 18
-                    loss_preds = get_age_distribution_labels(loss_preds)
+                    loss_preds = get_age_distribution_labels(loss_preds).to(self.device)
                     loss_preds = F.log_softmax(loss_preds, dim=1)
                     domain_loss = self.domain_criterion(loss_preds, domain_targets)
                 else:

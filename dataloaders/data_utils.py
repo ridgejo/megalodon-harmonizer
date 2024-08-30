@@ -112,10 +112,10 @@ def get_age_distribution_labels(ages, age_range=(18, 89), sigma=10):
     """
     
     # Define the age bins based on the age range, keeping them as floats
-    age_bins = torch.arange(age_range[0], age_range[1] + 1, step=1).float()
+    age_bins = torch.arange(age_range[0], age_range[1] + 1, step=1).float().to("cpu")
     
     # Convert the list of ages to a tensor
-    ages = torch.tensor(ages).float().view(-1, 1)
+    ages = torch.tensor(ages).float().view(-1, 1).to("cpu")
     
     # Calculate the normal distribution (Gaussian) values for each age in the batch
     gaussian_outputs = torch.exp(-((age_bins - ages)**2) / (2 * sigma**2))
