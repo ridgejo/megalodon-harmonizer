@@ -583,7 +583,7 @@ class RepHarmonizer(L.LightningModule):
 
         ## train main encoder
         if self.current_epoch < self.epoch_stage_1:
-            print("Warm-Up Phase", flush=True)
+            # print("Warm-Up Phase", flush=True)
             #TODO investigate implementing normalized total batch size across all 3 dataloaders to 32
             # skipping for now to get the framework up and running
             # Using MEGalodon loss instead of regressor loss criterion
@@ -1344,6 +1344,8 @@ class RepHarmonizer(L.LightningModule):
                 pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
                 if self.age_confound:
                     pred_domains = pred_domains + 18
+                print(f"True domains = {true_domains}", flush=True)
+                print(f"Pred domains = {pred_domains}", flush=True)
                 acc = accuracy_score(true_domains, pred_domains)
 
             # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
