@@ -1289,7 +1289,7 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     # print(batch_i["info"], flush=True)
                     ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                    acc_targets.append(ages)
+                    acc_targets.append(ages.int())
                     ages = get_age_distribution_labels(ages).to(self.device)
                     d_target = F.softmax(ages, dim=1)
                 else:
@@ -1490,7 +1490,7 @@ class RepHarmonizer(L.LightningModule):
 
                 if self.age_confound:
                     # print(batch_i["info"], flush=True)
-                    d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0]).int()
                     # acc_targets.append(ages)
                     # ages = get_age_distribution_labels(ages)
                     # d_target = F.softmax(ages, dim=1)
