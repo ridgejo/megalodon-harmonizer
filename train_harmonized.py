@@ -66,6 +66,7 @@ parser.add_argument("--no_dm_control", help="Don't include domain classifier in 
 parser.add_argument("--multi_dm_pred", help="Use one classifier per task representation", action="store_true", default=False)
 parser.add_argument("--agg_task_feats", help="Harmonize over all final layer encoder outputs", action="store_true", default=False)
 parser.add_argument("--no_proj_encode", help="Group projector with predictor instead of encoder", action="store_true", default=False)
+parser.add_argument("--age_confound", help="Harmonize for ages not datasets", action="store_true", default=False)
 args = parser.parse_args()
 
 config = yaml.safe_load(Path(args.config).read_text())
@@ -120,6 +121,9 @@ if args.no_dm_control:
 
 if args.sdat:
     config["rep_config"]["sdat"] = True
+
+if args.age_confound:
+    config["rep_config"]["age_confound"] = True
 
 if args.sgd:
     config["rep_config"]["sgd"] = True

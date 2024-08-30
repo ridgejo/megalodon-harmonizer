@@ -97,3 +97,30 @@ class Oversampler(Sampler):
 
     def __len__(self):
         return self.total_samples
+    
+def get_age_distribution_labels(ages, age_range=(18, 89), sigma=10):
+    """
+    Get softmax outputs for a batch of ages, supporting float ages.
+    
+    Parameters:
+    ages (list or Tensor): List or Tensor of true ages (can be floats).
+    age_range (tuple): The minimum and maximum age for the age bins.
+    sigma (float): The standard deviation for the normal distribution.
+    
+    Returns:
+    Tensor: A tensor containing the softmax outputs for each age in the batch.
+    """
+    
+    # Define the age bins based on the age range, keeping them as floats
+    age_bins = torch.arange(age_range[0], age_range[1] + 1, step=1).float()
+    
+    # Convert the list of ages to a tensor
+    ages = torch.tensor(ages).float().view(-1, 1)
+    
+    # Calculate the normal distribution (Gaussian) values for each age in the batch
+    gaussian_outputs = torch.exp(-((age_bins - ages)**2) / (2 * sigma**2))
+    
+    # # Normalize the Gaussian outputs into a softmax distribution
+    # softmax_outputs = F.softmax(gaussian_outputs, dim=1)
+    
+    return gaussian_outputs

@@ -8,7 +8,8 @@ from pathlib import Path
 from torch.optim import SGD
 from torch.optim.lr_scheduler import LambdaLR
 
-from dataloaders.data_utils import get_key_from_batch_identifier, get_dset_encoding
+from dataloaders.data_utils import get_key_from_batch_identifier, get_dset_encoding, get_age_distribution_labels
+from dataloaders.constants import MOUS_AGES, CAMCAN_AGES
 from models.attach_subject import AttachSubject
 from models.brain_encoders.amp_ssl.amp_scale_predictor import AmpScalePredictor
 from models.brain_encoders.freq_ssl.band_predictor import BandPredictor
@@ -59,6 +60,7 @@ class RepHarmonizer(L.LightningModule):
         self.run_name = rep_config.get("run_name", "")
         self.multi_dm_pred = rep_config.get("multi_dm_pred", False)
         self.agg_task_feats = rep_config.get("agg_task_feats", False)
+        self.age_confound = rep_config.get("age_confound", False)
 
         self.learning_rate = rep_config["lr"]
         self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
@@ -234,9 +236,13 @@ class RepHarmonizer(L.LightningModule):
             domain_classifiers["phase_diff"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim)
             domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim)
             self.domain_classifiers = nn.ModuleDict(domain_classifiers)
+        elif self.age_confound:
+            self.domain_classifier = DomainClassifier(nodes=72, init_features=self.num_feats, batch_size=batch_dim) # nodes = number of datasets (I think)
         else:
             self.domain_classifier = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim) # nodes = number of datasets (I think)
         self.rep_config = rep_config
+        if self.age_confound:
+            self.domain_criterion = nn.KLDivLoss(reduction='batchmean')
         self.domain_criterion = nn.CrossEntropyLoss() 
         self.conf_criterion = ConfusionLoss()
 
@@ -632,9 +638,11 @@ class RepHarmonizer(L.LightningModule):
                     domain_preds.append(d_pred)
                     # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
                     
-
-                d_target = torch.full((subset,), idx).to(self.device)
-                domain_targets.append(d_target)                        
+                if self.age_confound:
+                    print(batch_i["info"], flush=True)
+                else:
+                    d_target = torch.full((subset,), idx).to(self.device)
+                    domain_targets.append(d_target)                        
 
                 if t_loss is not None:
                     task_loss += t_loss
