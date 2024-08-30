@@ -58,6 +58,7 @@ class RepHarmonizer(L.LightningModule):
         self.num_feats = rep_config.get("num_classifier_feats", rep_config["dataset_block"]["shared_dim"])
         self.run_name = rep_config.get("run_name", "")
         self.multi_dm_pred = rep_config.get("multi_dm_pred", False)
+        self.agg_task_feats = rep_config.get("agg_task_feats", False)
 
         self.learning_rate = rep_config["lr"]
         self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
@@ -432,7 +433,7 @@ class RepHarmonizer(L.LightningModule):
                 z_sequence, voiced_labels
             )
 
-        if self.multi_dm_pred:
+        if self.agg_task_feats:
             return features, return_values
         else:
             return features["backbone"], return_values
@@ -565,7 +566,7 @@ class RepHarmonizer(L.LightningModule):
             batch_size = 0
             subset = 0
             split_1 = 0
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_preds = {}
             else:
                 domain_preds = []
@@ -612,14 +613,20 @@ class RepHarmonizer(L.LightningModule):
                     intersect_batch = self._take_subset(intersect_batch, split_1)
                     features = self._encode(intersect_batch)
                 
-                if self.multi_dm_pred:
+                if self.agg_task_feats:
                     for key, feats in features.items():
                         # print(f"{key} feats is None = {feats is None}", flush=True)
                         pred_list = domain_preds.get(key)
-                        if pred_list is None:
-                            domain_preds[key] = [self.domain_classifiers[key](feats)] 
+                        if self.multi_dm_pred:
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifiers[key](feats)] 
+                            else:
+                                domain_preds[key].append(self.domain_classifiers[key](feats))
                         else:
-                            domain_preds[key].append(self.domain_classifiers[key](feats))
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifier(feats)] 
+                            else:
+                                domain_preds[key].append(self.domain_classifier(feats))
                 else:
                     d_pred = self.domain_classifier(features)
                     domain_preds.append(d_pred)
@@ -634,7 +641,7 @@ class RepHarmonizer(L.LightningModule):
                 
             
             domain_targets = torch.cat(domain_targets)
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
                     domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
@@ -818,7 +825,7 @@ class RepHarmonizer(L.LightningModule):
             # update just domain classifier
             dm_optim.zero_grad()
             domain_loss = 0
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_preds = {}
             else:
                 domain_preds = []
@@ -853,20 +860,26 @@ class RepHarmonizer(L.LightningModule):
                 # cloned_feats.append(feats.clone())
 
                 
-                if self.multi_dm_pred:
+                if self.agg_task_feats:
                     for key, feats in features.items():
                             pred_list = domain_preds.get(key)
-                            if pred_list is None:
-                                domain_preds[key] = [self.domain_classifiers[key](feats.detach())] 
+                            if self.multi_dm_pred:
+                                if pred_list is None:
+                                    domain_preds[key] = [self.domain_classifiers[key](feats.detach())] 
+                                else:
+                                    domain_preds[key].append(self.domain_classifiers[key](feats.detach()))
                             else:
-                                domain_preds[key].append(self.domain_classifiers[key](feats.detach()))
+                                if pred_list is None:
+                                    domain_preds[key] = [self.domain_classifier(feats.detach())] 
+                                else:
+                                    domain_preds[key].append(self.domain_classifier(feats.detach()))
                 else:
                     domain_preds.append(self.domain_classifier(features.detach()))
                 domain_targets.append(targets) # was targets.detach()
 
             
             domain_targets = torch.cat(domain_targets)
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
                     domain_loss += self.domain_criterion(torch.cat(pred_list), domain_targets)
@@ -920,7 +933,7 @@ class RepHarmonizer(L.LightningModule):
                 conf_optim.zero_grad()
             confusion_loss = 0
 
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_preds = {}
             else:
                 domain_preds = []
@@ -928,17 +941,27 @@ class RepHarmonizer(L.LightningModule):
 
             for features, targets in batch_vals:
             # for feats in cloned_feats:
-                if self.multi_dm_pred:
+                if self.agg_task_feats:
                     for key, feats in features.items():
                         pred_list = domain_preds.get(key)
-                        if pred_list is None:
-                            pred = self.domain_classifiers[key](feats)
-                            pred = torch.softmax(pred, dim=1)
-                            domain_preds[key] = [pred] 
+                        if self.multi_dm_pred:
+                            if pred_list is None:
+                                pred = self.domain_classifiers[key](feats)
+                                pred = torch.softmax(pred, dim=1)
+                                domain_preds[key] = [pred] 
+                            else:
+                                pred = self.domain_classifiers[key](feats)
+                                pred = torch.softmax(pred, dim=1)
+                                domain_preds[key].append(pred)
                         else:
-                            pred = self.domain_classifiers[key](feats)
-                            pred = torch.softmax(pred, dim=1)
-                            domain_preds[key].append(pred)
+                            if pred_list is None:
+                                pred = self.domain_classifier(feats)
+                                pred = torch.softmax(pred, dim=1)
+                                domain_preds[key] = [pred] 
+                            else:
+                                pred = self.domain_classifier(feats)
+                                pred = torch.softmax(pred, dim=1)
+                                domain_preds[key].append(pred)
                 else:
                     conf_preds = self.domain_classifier(features)
                     conf_preds = torch.softmax(conf_preds, dim=1)
@@ -948,7 +971,7 @@ class RepHarmonizer(L.LightningModule):
             
             
             # domain_targets = torch.cat(domain_targets)
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 confusion_loss = 0
                 for key, pred_list in domain_preds.items():
                     confusion_loss += self.conf_criterion(torch.cat(pred_list), domain_targets)
@@ -1109,7 +1132,7 @@ class RepHarmonizer(L.LightningModule):
             task_loss = 0
             domain_loss = 0
             batch_size = 0
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_preds = {}
             else:
                 domain_preds = []
@@ -1170,13 +1193,19 @@ class RepHarmonizer(L.LightningModule):
                 if save_activations:
                     activations.append(features.detach())
 
-                if self.multi_dm_pred:
+                if self.agg_task_feats:
                     for key, feats in features.items():
                         pred_list = domain_preds.get(key)
-                        if pred_list is None:
-                            domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
+                        if self.multi_dm_pred:
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
+                            else:
+                                domain_preds[key].append(self.domain_classifiers[key].forward(feats))
                         else:
-                            domain_preds[key].append(self.domain_classifiers[key].forward(feats))
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifier.forward(feats)] 
+                            else:
+                                domain_preds[key].append(self.domain_classifier.forward(feats))
                 else:
                     d_pred = self.domain_classifier.forward(features) 
                     domain_preds.append(d_pred)
@@ -1189,7 +1218,7 @@ class RepHarmonizer(L.LightningModule):
                 
             
             domain_targets = torch.cat(domain_targets)
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
                     pred_list = torch.cat(pred_list)
@@ -1202,7 +1231,7 @@ class RepHarmonizer(L.LightningModule):
 
             
             true_domains = domain_targets.detach().cpu().numpy()
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 accs = []
                 for key, pred_list in domain_preds.items():
                     pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
@@ -1272,7 +1301,7 @@ class RepHarmonizer(L.LightningModule):
                 save_activations = False
             task_loss = 0
             batch_size = 0
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 domain_preds = {}
             else:
                 domain_preds = []
@@ -1335,13 +1364,19 @@ class RepHarmonizer(L.LightningModule):
 
                 # explicitly call forward to avoid hooks
                  
-                if self.multi_dm_pred:
+                if self.agg_task_feats:
                     for key, feats in features.items():
                         pred_list = domain_preds.get(key)
-                        if pred_list is None:
-                            domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
+                        if self.multi_dm_pred:
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifiers[key].forward(feats)] 
+                            else:
+                                domain_preds[key].append(self.domain_classifiers[key].forward(feats))
                         else:
-                            domain_preds[key].append(self.domain_classifiers[key].forward(feats))
+                            if pred_list is None:
+                                domain_preds[key] = [self.domain_classifier.forward(feats)] 
+                            else:
+                                domain_preds[key].append(self.domain_classifier.forward(feats))
                 else:
                     d_pred = self.domain_classifier.forward(features)
                     domain_preds.append(d_pred)
@@ -1355,7 +1390,7 @@ class RepHarmonizer(L.LightningModule):
             
             domain_targets = torch.cat(domain_targets)
             true_domains = domain_targets.detach().cpu().numpy()
-            if self.multi_dm_pred:
+            if self.agg_task_feats:
                 accs = []
                 for key, pred_list in domain_preds.items():
                     pred_list = torch.cat(pred_list)
@@ -1547,7 +1582,10 @@ class RepHarmonizer(L.LightningModule):
         ## Pre-training
         task_loss = 0
         batch_size = 0
-        domain_preds = []
+        if self.agg_task_feats:
+            domain_preds = {}
+        else:
+            domain_preds = []
         domain_targets = []
         subset = 0
         split_1 = 0
@@ -1584,7 +1622,23 @@ class RepHarmonizer(L.LightningModule):
             #                                                 commit_loss=commit_loss, stage="test")
 
             # t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "test")
-            d_pred = self.domain_classifier(features)
+            # d_pred = self.domain_classifier(features)
+            if self.agg_task_feats:
+                for key, feats in features.items():
+                    pred_list = domain_preds.get(key)
+                    if self.multi_dm_pred:
+                        if pred_list is None:
+                            domain_preds[key] = [self.domain_classifiers[key](feats)] 
+                        else:
+                            domain_preds[key].append(self.domain_classifiers[key](feats))
+                    else:
+                        if pred_list is None:
+                            domain_preds[key] = [self.domain_classifier(feats)] 
+                        else:
+                            domain_preds[key].append(self.domain_classifier(feats))
+            else:
+                d_pred = self.domain_classifier(features)
+                domain_preds.append(d_pred)
             # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
             # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
 
@@ -1607,7 +1661,7 @@ class RepHarmonizer(L.LightningModule):
         # true_domains = domain_targets.cpu().numpy()
         # acc = accuracy_score(true_domains, pred_domains)
         true_domains = domain_targets.detach().cpu().numpy()
-        if self.multi_dm_pred:
+        if self.agg_task_feats:
             accs = []
             for key, pred_list in domain_preds.items():
                 pred_list = torch.cat(pred_list)

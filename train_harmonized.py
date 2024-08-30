@@ -64,6 +64,7 @@ parser.add_argument("--num_classifier_feats", help="Override num feats for class
 parser.add_argument("--alpha", help="Override alpha", type=float, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
 parser.add_argument("--multi_dm_pred", help="Use one classifier per task representation", action="store_true", default=False)
+parser.add_argument("--agg_task_feats", help="Harmonize over all final layer encoder outputs", action="store_true", default=False)
 parser.add_argument("--no_proj_encode", help="Group projector with predictor instead of encoder", action="store_true", default=False)
 args = parser.parse_args()
 
@@ -106,6 +107,10 @@ if args.get_tsne:
 
 if args.multi_dm_pred:
     config["rep_config"]["multi_dm_pred"] = True
+    config["rep_config"]["agg_task_feats"] = True
+
+if args.agg_task_feats:
+    config["rep_config"]["agg_task_feats"] = True
 
 if args.intersect_only:
     config["rep_config"]["intersect_only"] = True
