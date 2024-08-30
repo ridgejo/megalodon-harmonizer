@@ -2,6 +2,9 @@ from pathlib import Path
 import torch
 from torch.utils.data import WeightedRandomSampler, Sampler
 import math
+import warnings
+
+warnings.filterwarnings("ignore", message=".*To copy construct from a tensor, it is recommended.*")
 
 DATA_PATH = Path("/data/engs-pnpl/lina4368")
 
