@@ -1218,7 +1218,7 @@ class RepHarmonizer(L.LightningModule):
                     accs = []
                     for key, pred_list in domain_preds[confound].items():
                         pred_domains = np.argmax(pred_list.detach().cpu().numpy(), axis=1)
-                        if self.age_confound:
+                        if confound == "age":
                             pred_domains = pred_domains + 18
                         accs.append(accuracy_score(true_domains, pred_domains))
                     
