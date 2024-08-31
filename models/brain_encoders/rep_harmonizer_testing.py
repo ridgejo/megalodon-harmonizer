@@ -872,7 +872,7 @@ class RepHarmonizer(L.LightningModule):
                             preds = torch.argmax(preds, dim=1) + 18
                             preds = get_age_distribution_labels(preds).to(self.device)
                             preds = F.log_softmax(preds, dim=1)
-                        domain_loss += self.domain_criterions[confound](preds, domain_targets)
+                        domain_loss += self.domain_criterions[confound](preds, domain_targets[confound])
                 else:
                     domain_preds[confound] = torch.cat(domain_preds[confound])
                     if confound == "age":
