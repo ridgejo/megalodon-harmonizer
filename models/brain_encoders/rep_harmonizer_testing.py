@@ -797,7 +797,7 @@ class RepHarmonizer(L.LightningModule):
 
                 for confound in self.domain_classifiers.keys():
                     if batch_vals.get(confound) is None:
-                        batch_vals[confound] = {}
+                        batch_vals[confound] = []
 
                     if confound == "age":
                         # print(batch_i["info"], flush=True)
