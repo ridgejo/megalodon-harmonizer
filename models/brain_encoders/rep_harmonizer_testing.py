@@ -1151,7 +1151,7 @@ class RepHarmonizer(L.LightningModule):
                         else:
                             domain_preds[confound] = []
                     if domain_targets.get(confound) is None:
-                        domain_targets = []
+                        domain_targets[confound] = []
                     
                     if self.agg_task_feats:
                         for key, feats in features.items():
@@ -1360,7 +1360,7 @@ class RepHarmonizer(L.LightningModule):
                         else:
                             domain_preds[confound] = []
                     if domain_targets.get(confound) is None:
-                        domain_targets = []
+                        domain_targets[confound] = []
 
                     if self.agg_task_feats:
                         for key, feats in features.items():
