@@ -1753,12 +1753,13 @@ class RepHarmonizer(L.LightningModule):
     def configure_optimizers(self):
         encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
         predictor_params = list(filter(lambda p: p.requires_grad, self.predictor_models.parameters()))
-        if self.multi_dm_pred:
-            domain_classifier_params = []
-            for classifier in self.domain_classifiers.values():
-                domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
-        else:
-            domain_classifier_params = list(filter(lambda p: p.requires_grad, self.domain_classifier.parameters()))
+        domain_classifier_params = []
+        for confound in self.domain_classifiers.keys():
+            if self.multi_dm_pred:
+                for classifier in self.domain_classifiers[confound].values():
+                    domain_classifier_params.extend(filter(lambda p: p.requires_grad, classifier.parameters()))
+            else:
+                domain_classifier_params.extend((filter(lambda p: p.requires_grad, self.domain_classifiers[confound].parameters())))
 
         if self.finetune:
             return torch.optim.AdamW(
