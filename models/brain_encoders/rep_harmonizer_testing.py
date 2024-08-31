@@ -656,7 +656,7 @@ class RepHarmonizer(L.LightningModule):
                         for key, feats in features.items():
                             # print(f"{key} feats is None = {feats is None}", flush=True)
                             if self.multi_dm_pred:
-                                if domain_preds.get(key) is None:
+                                if domain_preds[confound].get(key) is None:
                                     domain_preds[confound][key] = [self.domain_classifiers[confound][key](feats)] 
                                 else:
                                     domain_preds[confound][key].append(self.domain_classifiers[confound][key](feats))
@@ -666,9 +666,8 @@ class RepHarmonizer(L.LightningModule):
                                 else:
                                     domain_preds[confound][key].append(self.domain_classifiers[confound](feats))
                     else:
-                        for confound in self.domain_classifiers.keys():
-                            d_pred = self.domain_classifiers[confound](features)
-                            domain_preds[confound].append(d_pred)
+                        d_pred = self.domain_classifiers[confound](features)
+                        domain_preds[confound].append(d_pred)
                     # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
 
                     if domain_targets.get(confound) is None:
@@ -849,16 +848,15 @@ class RepHarmonizer(L.LightningModule):
                         for key, feats in features.items():
                             # print(f"{key} feats is None = {feats is None}", flush=True)
                             if self.multi_dm_pred:
-                                if domain_preds.get(key) is None:
+                                if domain_preds[confound].get(key) is None:
                                     domain_preds[confound][key] = [self.domain_classifiers[confound][key](feats.detach())] 
                                 else:
                                     domain_preds[confound][key].append(self.domain_classifiers[confound][key](feats.detach()))
                             else:
-                                for confound in self.domain_classifiers.keys():
-                                    if domain_preds[confound].get(key) is None:
-                                        domain_preds[confound][key] = [self.domain_classifiers[confound](feats.detach())] 
-                                    else:
-                                        domain_preds[confound][key].append(self.domain_classifiers[confound](feats.detach()))
+                                if domain_preds[confound].get(key) is None:
+                                    domain_preds[confound][key] = [self.domain_classifiers[confound](feats.detach())] 
+                                else:
+                                    domain_preds[confound][key].append(self.domain_classifiers[confound](feats.detach()))
                     else:
                         domain_preds[confound].append(self.domain_classifiers[confound](features.detach()))
                     domain_targets[confound].append(targets)
