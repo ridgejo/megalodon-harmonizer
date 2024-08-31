@@ -238,11 +238,11 @@ class RepHarmonizer(L.LightningModule):
             domain_classifiers["amp_scale"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim)
             domain_classifiers = nn.ModuleDict(domain_classifiers)
             self.domain_classifiers = nn.ModuleDict({"dataset":domain_classifiers})
-        elif self.age_confound:
+        elif not rep_config.get("no_dataset", False):
+            domain_classifiers["dataset"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim) 
+        if self.age_confound:
             # 72 possible ages from youngest (18) to oldest (89 - from Cam-CAN datatset)
-            domain_classifiers["age"] = DomainClassifier(nodes=72, init_features=self.num_feats, batch_size=batch_dim) # nodes = number of datasets (I think)
-        else:
-            domain_classifiers["dataset"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim) # nodes = number of datasets (I think)
+            domain_classifiers["age"] = DomainClassifier(nodes=72, init_features=self.num_feats, batch_size=batch_dim) 
         self.domain_classifiers = nn.ModuleDict(domain_classifiers)
         domain_criterions = {}
         if self.age_confound:
