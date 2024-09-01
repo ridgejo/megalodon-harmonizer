@@ -675,9 +675,9 @@ class RepHarmonizer(L.LightningModule):
 
                     if confound == "age":
                         # print(batch_i["info"], flush=True)
-                        ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                        ages = get_age_distribution_labels(ages).to(self.device)
-                        d_target = F.softmax(ages, dim=1)
+                        d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                        # ages = get_age_distribution_labels(ages).to(self.device)
+                        # d_target = F.softmax(ages, dim=1)
                     else:
                         d_target = torch.full((subset,), idx).to(self.device)
                     domain_targets[confound].append(d_target)
@@ -688,6 +688,9 @@ class RepHarmonizer(L.LightningModule):
             domain_loss = 0
             for confound in self.domain_classifiers.keys():    
                 domain_targets[confound] = torch.cat(domain_targets[confound])
+                if confound == "age":
+                    domain_targets[confound] = get_age_distribution_labels(domain_targets[confound]).to(self.device)
+                    domain_targets[confound] = F.softmax(domain_targets[confound], dim=1)
                 if self.agg_task_feats:
                     for key, pred_list in domain_preds[confound].items():
                         preds = torch.cat(pred_list)
@@ -800,9 +803,9 @@ class RepHarmonizer(L.LightningModule):
 
                     if confound == "age":
                         # print(batch_i["info"], flush=True)
-                        ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                        ages = get_age_distribution_labels(ages).to(self.device)
-                        d_target = F.softmax(ages, dim=1)
+                        d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                        # ages = get_age_distribution_labels(ages).to(self.device)
+                        # d_target = F.softmax(ages, dim=1)
                     else:
                         d_target = torch.full((subset,), idx).to(self.device)
                     # d_target = torch.full((subset,), idx).to(self.device)
@@ -864,6 +867,9 @@ class RepHarmonizer(L.LightningModule):
             domain_loss = 0
             for confound in self.domain_classifiers.keys(): 
                 domain_targets[confound] = torch.cat(domain_targets[confound])
+                if confound == "age":
+                    domain_targets[confound] = get_age_distribution_labels(domain_targets[confound]).to(self.device)
+                    domain_targets[confound] = F.softmax(domain_targets[confound], dim=1)
                 if self.agg_task_feats:
                     for key, pred_list in domain_preds[confound].items():
                         preds = torch.cat(pred_list)
@@ -1170,10 +1176,10 @@ class RepHarmonizer(L.LightningModule):
 
                     if confound == "age":
                         # print(batch_i["info"], flush=True)
-                        ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                        acc_targets.append(ages.int())
-                        ages = get_age_distribution_labels(ages).to(self.device)
-                        d_target = F.softmax(ages, dim=1)
+                        d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                        acc_targets.append(d_target.int())
+                        # ages = get_age_distribution_labels(ages).to(self.device)
+                        # d_target = F.softmax(ages, dim=1)
                     else:
                         d_target = torch.full((subset,), idx).to(self.device)
                     # d_target = torch.full((subset,), idx).to(self.device)
@@ -1186,6 +1192,9 @@ class RepHarmonizer(L.LightningModule):
             acc = 0
             for confound in self.domain_classifiers.keys():
                 domain_targets[confound] = torch.cat(domain_targets[confound])
+                if confound == "ages":
+                    domain_targets[confound] = get_age_distribution_labels(domain_targets[confound]).to(self.device)
+                    domain_targets[confound] = F.softmax(domain_targets[confound], dim=1)
                 if self.agg_task_feats:
                     for key, pred_list in domain_preds[confound].items():
                         # pred_list = torch.cat(pred_list)
