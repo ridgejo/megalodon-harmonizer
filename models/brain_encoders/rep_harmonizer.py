@@ -664,9 +664,9 @@ class RepHarmonizer(L.LightningModule):
                     
                 if self.age_confound:
                     # print(batch_i["info"], flush=True)
-                    ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                    ages = get_age_distribution_labels(ages=ages, sigma=self.sigma).to(self.device)
-                    d_target = F.softmax(ages, dim=1)
+                    d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    # ages = get_age_distribution_labels(ages=ages, sigma=self.sigma).to(self.device)
+                    # d_target = F.softmax(ages, dim=1)
                 else:
                     d_target = torch.full((subset,), idx).to(self.device)
                 domain_targets.append(d_target)                        
@@ -676,6 +676,9 @@ class RepHarmonizer(L.LightningModule):
                 
             
             domain_targets = torch.cat(domain_targets)
+            if self.age_confound:
+                domain_targets = get_age_distribution_labels(ages=domain_targets, sigma=self.sigma).to(self.device)
+                domain_targets = F.softmax(domain_targets, dim=1)
             if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
@@ -823,9 +826,9 @@ class RepHarmonizer(L.LightningModule):
                 #                                             commit_loss=commit_loss, stage="train")
                 if self.age_confound:
                     # print(batch_i["info"], flush=True)
-                    ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                    ages = get_age_distribution_labels(ages=ages, sigma=self.sigma).to(self.device)
-                    d_target = F.softmax(ages, dim=1)
+                    d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    # ages = get_age_distribution_labels(ages=ages, sigma=self.sigma).to(self.device)
+                    # d_target = F.softmax(ages, dim=1)
                 else:
                     d_target = torch.full((subset,), idx).to(self.device)
                 # d_target = torch.full((subset,), idx).to(self.device)
@@ -932,6 +935,9 @@ class RepHarmonizer(L.LightningModule):
 
             
             domain_targets = torch.cat(domain_targets)
+            if self.age_confound:
+                domain_targets = get_age_distribution_labels(ages=domain_targets, sigma=self.sigma).to(self.device)
+                domain_targets = F.softmax(domain_targets, dim=1)
             if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
@@ -1290,9 +1296,10 @@ class RepHarmonizer(L.LightningModule):
                 if self.age_confound:
                     # print(batch_i["info"], flush=True)
                     ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                    d_target = ages
                     acc_targets.append(ages.int())
-                    ages = get_age_distribution_labels(ages=ages, sigma=self.sigma).to(self.device)
-                    d_target = F.softmax(ages, dim=1)
+                    # ages = get_age_distribution_labels(ages=ages, sigma=self.sigma).to(self.device)
+                    # d_target = F.softmax(ages, dim=1)
                 else:
                     d_target = torch.full((subset,), idx).to(self.device)
                 # d_target = torch.full((subset,), idx).to(self.device)
@@ -1303,6 +1310,9 @@ class RepHarmonizer(L.LightningModule):
                 
             
             domain_targets = torch.cat(domain_targets)
+            if self.age_confound:
+                domain_targets = get_age_distribution_labels(ages=domain_targets, sigma=self.sigma).to(self.device)
+                domain_targets = F.softmax(domain_targets, dim=1)
             if self.agg_task_feats:
                 domain_loss = 0
                 for key, pred_list in domain_preds.items():
@@ -1573,11 +1583,12 @@ class RepHarmonizer(L.LightningModule):
     def get_tsne(self, batch, name=None):
         # task_loss = 0
         batch_size = 0
-        domain_preds = []
+        if self.age_confound:
+            age_preds = []
+            age_targets = []
         domain_targets = []
         subset = 0
-        if self.tsne:
-            activations = []
+        activations = []
         for idx, batch_i in enumerate(batch):
             if len(batch) == 2:
                 if idx == 0:
@@ -1597,40 +1608,36 @@ class RepHarmonizer(L.LightningModule):
             batch_size += subset
 
             features = self._encode(batch_i)
-            # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-            #                                                 z_independent=z_independent, 
-            #                                                 commit_loss=commit_loss, stage="test")
+            activations.append(features.detach())
 
-            # t_loss, losses, metrics, features = self._shared_step(batch=batch_i, batch_idx=0, stage="val")
+            if self.age_confound:
+                pred_ages = self.domain_classifier.forward(features)
+                pred_ages = torch.softmax(pred_ages, dim=1)
+                pred_ages = torch.argmax(pred_ages, dim=1) + 18
+                age_preds.append(pred_ages)
 
-            if self.tsne:
-                activations.append(features.detach())
-
-            if not self.no_dm_control:
-
-                # explicitly call forward to avoid hooks
-                if self.multi_dm_pred:
-                    d_pred = self.domain_classifiers["backbone"].forward(features)
-                else:
-                    d_pred = self.domain_classifier.forward(features) 
-                domain_preds.append(d_pred)
+                true_ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                age_targets.append(true_ages)
 
             d_target = torch.full((subset,), idx).to(self.device)
             domain_targets.append(d_target)
-                # if t_loss is not None:
-                #     task_loss += t_loss
+
         domain_targets = torch.cat(domain_targets, 0)
         true_domains = domain_targets.cpu().numpy()
-        if not self.no_dm_control:
-            domain_preds = torch.cat(domain_preds, 0)
-            domain_preds = torch.softmax(domain_preds, dim=1)
-            pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-            print(f"Targets = {true_domains}", flush=True)
-            print(f"Preds = {pred_domains}", flush=True)
-            acc = accuracy_score(true_domains, pred_domains)
-
         activations = torch.cat(activations).to("cpu")
+
+        if self.age_confound:
+            age_preds = torch.cat(age_preds, 0)
+            age_preds = get_age_distribution_labels(ages=age_preds, sigma=self.sigma).to(self.device)
+            age_preds = F.softmax(age_preds, dim=1)
+
+            age_targets = torch.cat(age_targets, 0)
+            age_targets = get_age_distribution_labels(ages=age_targets, sigma=self.sigma).to(self.device)
+            age_targets = F.softmax(age_targets, dim=1)
+
+            pred_age_dist = age_preds.cpu().numpy()
+            true_age_dist = age_targets.cpu().numpy()
+
         label_mapping = {0: 'dataset_1', 1: 'dataset_2', 2: 'dataset_3'}
         # Convert numerical labels to class names
         label_names = [label_mapping[label.item()] for label in true_domains]
@@ -1638,15 +1645,19 @@ class RepHarmonizer(L.LightningModule):
         if name is not None:
             activs = f"{name}_activations.npy"
             labels = f"{name}_labels.npy"
+            if self.age_confound:
+                dist_preds = f"{name}_pred_ages.npy"
+                true_dist = f"{name}_true_ages.npy"
         else:
             activs = "activations.npy"
             labels = "labels.npy"
         np.save(save_path / activs, activations.numpy())
         np.save(save_path / labels, np.array(label_names))
-        if not self.no_dm_control:
-            print(f"Single batch accuracy: {acc}")
+        if self.age_confound:
+            np.save(save_path / dist_preds, pred_age_dist)
+            np.save(save_path / true_dist, true_age_dist)
         print("Saving activations...")
-        plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name=f"{name}_unlearned_tsne.png")
+        # plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name=f"{name}_unlearned_tsne.png")
 
     #TODO implement domain unlearning iterative training scheme
     def test_step(self, batch, batch_idx):
