@@ -63,6 +63,7 @@ parser.add_argument("--batch_dim", help="Override batch dim", type=int, default=
 parser.add_argument("--num_classifier_feats", help="Override num feats for classifier config", type=int, default=None)
 parser.add_argument("--sigma", help="Override variance for age confound buckets", type=int, default=None)
 parser.add_argument("--alpha", help="Override alpha", type=float, default=None)
+parser.add_argument("--beta", help="Override alpha", type=float, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
 parser.add_argument("--multi_dm_pred", help="Use one classifier per task representation", action="store_true", default=False)
 parser.add_argument("--agg_task_feats", help="Harmonize over all final layer encoder outputs", action="store_true", default=False)
@@ -100,6 +101,9 @@ if args.name is not None:
 
 if args.alpha is not None:
     config["rep_config"]["alpha"] = args.alpha
+
+if args.beta is not None:
+    config["rep_config"]["beta"] = args.beta
 
 if args.sigma is not None:
     config["rep_config"]["sigma"] = args.sigma
