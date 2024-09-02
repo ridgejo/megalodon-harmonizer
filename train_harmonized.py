@@ -56,6 +56,7 @@ parser.add_argument("--dset_num", help="Override num dataset domains", type=int,
 parser.add_argument("--intersect_only", help="Only harmonize on intersect of distributions", action="store_true", default=False)
 parser.add_argument("--lsvm", help="use LSVM for domain classifier", action="store_true", default=False)
 parser.add_argument("--harmonization_lr", help="Override lr for harmonization stage", type=float, default=None)
+parser.add_argument("--dm_lr", help="Override dm lr for harmonization stage", type=float, default=None)
 parser.add_argument("--epoch_stage_1", help="Epoch to begin harmonization at", type=int, default=None)
 parser.add_argument("--total_epochs", help="Override total epochs", type=int, default=None)
 parser.add_argument("--batch_size", help="Override batch side", type=int, default=None)
@@ -155,6 +156,9 @@ if args.harmonization_lr is not None:
     config["rep_config"]["dm_lr"] = args.harmonization_lr
     config["rep_config"]["conf_lr"] = args.harmonization_lr
     config["rep_config"]["task_lr"] = args.harmonization_lr
+
+if args.dm_lr is not None:
+    config["rep_config"]["dm_lr"] = args.dm_lr
 
 seed_everything(config["experiment"]["seed"], workers=True)
 
