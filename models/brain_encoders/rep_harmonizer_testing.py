@@ -945,19 +945,19 @@ class RepHarmonizer(L.LightningModule):
                 if self.agg_task_feats:
                     for key, pred_list in domain_preds[confound].items():
                         preds = torch.cat(pred_list)
-                        if confound == "age":
-                            # preds = torch.softmax(preds, dim=1)
-                            preds = torch.argmax(preds, dim=1) + 18
-                            preds = get_age_distribution_labels(preds).to(self.device)
-                            preds = F.softmax(preds, dim=1)
+                        # if confound == "age":
+                        #     # preds = torch.softmax(preds, dim=1)
+                        #     preds = torch.argmax(preds, dim=1) + 18
+                        #     preds = get_age_distribution_labels(preds).to(self.device)
+                        #     preds = F.softmax(preds, dim=1)
                         confusion_loss += self.conf_criterion(preds, domain_targets[confound])
                 else:
                     domain_preds[confound] = torch.cat(domain_preds[confound])
-                    if confound == "age":
-                        # domain_preds = torch.softmax(domain_preds, dim=1)
-                        domain_preds[confound] = torch.argmax(domain_preds[confound], dim=1) + 18
-                        domain_preds[confound] = get_age_distribution_labels(domain_preds[confound]).to(self.device)
-                        domain_preds[confound] = F.softmax(domain_preds[confound], dim=1)
+                    # if confound == "age":
+                    #     # domain_preds = torch.softmax(domain_preds, dim=1)
+                    #     domain_preds[confound] = torch.argmax(domain_preds[confound], dim=1) + 18
+                    #     domain_preds[confound] = get_age_distribution_labels(domain_preds[confound]).to(self.device)
+                    #     domain_preds[confound] = F.softmax(domain_preds[confound], dim=1)
                     confusion_loss += self.conf_criterion(domain_preds[confound], domain_targets[confound])
 
             confusion_loss = beta * confusion_loss

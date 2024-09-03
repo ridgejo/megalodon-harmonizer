@@ -101,7 +101,7 @@ class Oversampler(Sampler):
     def __len__(self):
         return self.total_samples
     
-def get_age_distribution_labels(ages, age_range=(18, 89), sigma=5):
+def get_age_distribution_labels(ages, age_range=(18, 89), sigma=10):
     """
     Get softmax outputs for a batch of ages, supporting float ages.
     
