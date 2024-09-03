@@ -1045,19 +1045,19 @@ class RepHarmonizer(L.LightningModule):
                 confusion_loss = 0
                 for key, pred_list in domain_preds.items():
                     preds = torch.cat(pred_list)
-                    if self.age_confound:
-                        # preds = torch.softmax(preds, dim=1)
-                        preds = torch.argmax(preds, dim=1) + 18
-                        preds = get_age_distribution_labels(ages=preds, sigma=self.sigma).to(self.device)
-                        preds = F.softmax(preds, dim=1)
+                    # if self.age_confound:
+                    #     # preds = torch.softmax(preds, dim=1)
+                    #     preds = torch.argmax(preds, dim=1) + 18
+                    #     preds = get_age_distribution_labels(ages=preds, sigma=self.sigma).to(self.device)
+                    #     preds = F.softmax(preds, dim=1)
                     confusion_loss += self.conf_criterion(preds, domain_targets)
             else:
                 domain_preds = torch.cat(domain_preds)
-                if self.age_confound:
-                    # domain_preds = torch.softmax(domain_preds, dim=1)
-                    domain_preds = torch.argmax(domain_preds, dim=1) + 18
-                    domain_preds = get_age_distribution_labels(ages=domain_preds, sigma=self.sigma).to(self.device)
-                    domain_preds = F.softmax(domain_preds, dim=1)
+                # if self.age_confound:
+                #     # domain_preds = torch.softmax(domain_preds, dim=1)
+                #     domain_preds = torch.argmax(domain_preds, dim=1) + 18
+                #     domain_preds = get_age_distribution_labels(ages=domain_preds, sigma=self.sigma).to(self.device)
+                #     domain_preds = F.softmax(domain_preds, dim=1)
                 confusion_loss = self.conf_criterion(domain_preds, domain_targets)
 
             confusion_loss = beta * confusion_loss
