@@ -63,6 +63,7 @@ parser.add_argument("--batch_dim", help="Override batch dim", type=int, default=
 parser.add_argument("--num_classifier_feats", help="Override num feats for classifier config", type=int, default=None)
 parser.add_argument("--alpha", help="Override alpha", type=float, default=None)
 parser.add_argument("--beta", help="Override alpha", type=float, default=None)
+parser.add_argument("--conf_lr", help="Override confusion lr for harmonization stage", type=float, default=None)
 parser.add_argument("--no_dm_control", help="Don't include domain classifier in step 1 optimizer", action="store_true", default=False)
 parser.add_argument("--multi_dm_pred", help="Use one classifier per task representation", action="store_true", default=False)
 parser.add_argument("--agg_task_feats", help="Harmonize over all final layer encoder outputs", action="store_true", default=False)
@@ -151,6 +152,9 @@ if args.harmonization_lr is not None:
     config["rep_config"]["dm_lr"] = args.harmonization_lr
     config["rep_config"]["conf_lr"] = args.harmonization_lr
     config["rep_config"]["task_lr"] = args.harmonization_lr
+
+if args.conf_lr is not None:
+    config["rep_config"]["conf_lr"] = args.conf_lr
 
 seed_everything(config["experiment"]["seed"], workers=True)
 
