@@ -1505,7 +1505,7 @@ class RepHarmonizer(L.LightningModule):
             activations.append(features.detach())
 
             if self.age_confound:
-                pred_ages = self.domain_classifier.forward(features)
+                pred_ages = self.domain_classifiers["age"].forward(features)
                 pred_ages = torch.softmax(pred_ages, dim=1)
                 pred_ages = torch.argmax(pred_ages, dim=1) + 18
                 age_preds.append(pred_ages)
