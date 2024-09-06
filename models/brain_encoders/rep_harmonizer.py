@@ -1778,7 +1778,7 @@ class RepHarmonizer(L.LightningModule):
 
             # d_target = d_target.int()
             # d_target.to(self.device)
-            domain_preds.append(d_pred)
+            # domain_preds.append(d_pred)
             domain_targets.append(d_target)
             if t_loss is not None:
                 task_loss += t_loss
