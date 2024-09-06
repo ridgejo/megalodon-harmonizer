@@ -1539,11 +1539,11 @@ class RepHarmonizer(L.LightningModule):
 
         if self.age_confound:
             age_preds = torch.cat(age_preds, 0)
-            age_preds = get_age_distribution_labels(ages=age_preds, sigma=self.sigma).to(self.device)
+            age_preds = get_age_distribution_labels(ages=age_preds).to(self.device)
             age_preds = F.softmax(age_preds, dim=1)
 
             age_targets = torch.cat(age_targets, 0)
-            age_targets = get_age_distribution_labels(ages=age_targets, sigma=self.sigma).to(self.device)
+            age_targets = get_age_distribution_labels(ages=age_targets).to(self.device)
             age_targets = F.softmax(age_targets, dim=1)
 
             pred_age_dist = age_preds.cpu().numpy()
