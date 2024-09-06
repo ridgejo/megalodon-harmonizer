@@ -1469,6 +1469,9 @@ class RepHarmonizer(L.LightningModule):
     def get_tsne(self, batch, name=None):
         # task_loss = 0
         batch_size = 0
+        if self.age_confound:
+            age_preds = []
+            age_targets = []
         domain_preds = []
         domain_targets = []
         subset = 0
@@ -1501,6 +1504,15 @@ class RepHarmonizer(L.LightningModule):
 
             activations.append(features.detach())
 
+            if self.age_confound:
+                pred_ages = self.domain_classifier.forward(features)
+                pred_ages = torch.softmax(pred_ages, dim=1)
+                pred_ages = torch.argmax(pred_ages, dim=1) + 18
+                age_preds.append(pred_ages)
+
+                true_ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
+                age_targets.append(true_ages)
+
             # if not self.no_dm_control:
 
             #     # explicitly call forward to avoid hooks
@@ -1525,6 +1537,18 @@ class RepHarmonizer(L.LightningModule):
         #     print(f"Preds = {pred_domains}", flush=True)
         #     acc = accuracy_score(true_domains, pred_domains)
 
+        if self.age_confound:
+            age_preds = torch.cat(age_preds, 0)
+            age_preds = get_age_distribution_labels(ages=age_preds, sigma=self.sigma).to(self.device)
+            age_preds = F.softmax(age_preds, dim=1)
+
+            age_targets = torch.cat(age_targets, 0)
+            age_targets = get_age_distribution_labels(ages=age_targets, sigma=self.sigma).to(self.device)
+            age_targets = F.softmax(age_targets, dim=1)
+
+            pred_age_dist = age_preds.cpu().numpy()
+            true_age_dist = age_targets.cpu().numpy()
+
         activations = torch.cat(activations).to("cpu")
         label_mapping = {0: 'dataset_1', 1: 'dataset_2', 2: 'dataset_3'}
         # Convert numerical labels to class names
@@ -1533,11 +1557,17 @@ class RepHarmonizer(L.LightningModule):
         if name is not None:
             activs = f"{name}_activations.npy"
             labels = f"{name}_labels.npy"
+            if self.age_confound:
+                dist_preds = f"{name}_pred_ages.npy"
+                true_dist = f"{name}_true_ages.npy"
         else:
             activs = "activations.npy"
             labels = "labels.npy"
         np.save(save_path / activs, activations.numpy())
         np.save(save_path / labels, np.array(label_names))
+        if self.age_confound:
+            np.save(save_path / dist_preds, pred_age_dist)
+            np.save(save_path / true_dist, true_age_dist)
         # if not self.no_dm_control:
         #     print(f"Single batch accuracy: {acc}")
         print("Saving activations...")
