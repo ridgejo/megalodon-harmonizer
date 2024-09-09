@@ -15,7 +15,7 @@ from lightning.pytorch.tuner import Tuner
 
 from dataloaders.data_module import HarmonizationDataModule, MEGDataModule
 from dataloaders.data_utils import DATA_PATH
-from models.brain_encoders.rep_harmonizer_testing import RepHarmonizer
+from models.brain_encoders.rep_harmonizer_multiConf import RepHarmonizer
 
 # Increase wandb waiting time to avoid timeouts
 os.environ["WANDB__SERVICE_WAIT"] = "300"
@@ -192,6 +192,9 @@ latest_checkpoint = ModelCheckpoint(
     save_top_k=1,
 )
 
+## If you want to save a checkpoint at the end of the warm-up phase / beginning of harmonization phase
+## make sure you monitor training and manually copy the checkpoint 
+## because it WILL be overwritten after the next "epoch_stage_1" epochs
 unlearning_checkpoint = ModelCheckpoint(
     dirpath = exp_path / "MEGalodon-rep-harmonization" / args.name,
     filename="{epoch}-UL-checkpoint",
@@ -207,18 +210,6 @@ if args.early_stop:
         patience=20 if config['rep_config'].get('patience') is None else config['rep_config']['patience'],          # number of epochs with no improvement after which training will be stopped
         mode='min'           # mode can be 'min' or 'max'
     )
-
-# # Custom callback to save checkpoint halfway through training
-# class HalfwayCheckpoint(Callback):
-#     def on_epoch_end(self, trainer, pl_module):
-#         if trainer.current_epoch == (trainer.max_epochs / 2) - 1:
-#             # Save checkpoint
-#             print("Saving Halfway Checkpoint...")
-#             checkpoint_path = os.path.join(trainer.checkpoint_callback.dirpath, f"epoch_{trainer.current_epoch}.ckpt")
-#             trainer.save_checkpoint(checkpoint_path)
-#             print(f"Checkpoint saved at {checkpoint_path}")
-
-# halfway_checkpoint = HalfwayCheckpoint()
 
 if "finetune" in config:
     datamodule = MEGDataModule(        
@@ -279,12 +270,6 @@ if args.checkpoint:
 
         if config["finetune"]["freeze_all"]:
             model.finetuning_mode()
-            # # Freeze all layers except any downstream classifiers that are already enabled
-            # model.freeze_except("classifier")
-            # # Remove other losses / predictors from the model
-            # model.disable_ssl()
-            # # warning: also removes any existing classifiers from pre-training stage
-            # model.disable_classifiers()
         else:
             model.disable_ssl()
             model.disable_classifiers()

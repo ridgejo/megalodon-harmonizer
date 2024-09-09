@@ -47,12 +47,14 @@ class LambdaModule(nn.Module):
 
 class RepHarmonizer(L.LightningModule):
     """
-    Representation learner with dataset unlearning.
+    Representation learner with adversarial harmonization, modified to support 
+    simultaneous harmonization of different confounds (e.g. participant age and dataset).
     """
 
     def __init__(self, rep_config):
         super().__init__()
         self.automatic_optimization = False
+        ## Load in special args from command line ##
         self.epoch_stage_1 = rep_config["epoch_stage_1"]
         self.max_epochs = rep_config["max_epochs"]
         self.batch_size = rep_config["batch_size"]
@@ -61,28 +63,26 @@ class RepHarmonizer(L.LightningModule):
         self.multi_dm_pred = rep_config.get("multi_dm_pred", False)
         self.agg_task_feats = rep_config.get("agg_task_feats", False)
         self.age_confound = rep_config.get("age_confound", False)
-
         self.learning_rate = rep_config["lr"]
         self.dm_learning_rate = rep_config.get("dm_lr", 0.0001)
         self.conf_learning_rate = rep_config.get("conf_lr", 0.0001)
         self.task_learning_rate = rep_config.get("task_lr", 0.0001)
         self.tsne = rep_config.get("tsne", False)
-        self.sdat = rep_config.get("sdat", False)
+        self.sdat = rep_config.get("sdat", False) ## buggy
         self.sgd = rep_config.get("sgd", False)
         self.full_run = rep_config.get("full_run", False)
         self.clear_optim = rep_config.get("clear_optim", False)
         self.clear_betas = rep_config.get("clear_betas", False)
         self.finetune = rep_config.get("finetune", False)
         self.no_dm_control = rep_config.get("no_dm_control", False)
-        self.intersect_only = rep_config.get("intersect_only", False)
-        self.no_proj_encode = rep_config.get("no_proj_encode", False)
+        self.intersect_only = rep_config.get("intersect_only", False) ## not currently supported with multi confound harmonization
+        self.no_proj_encode = rep_config.get("no_proj_encode", True)
+        
+        # Hacky fix to support loading checkpoints trained with different batch sizes
         batch_dim = rep_config.get("batch_dim")
-        # print(f"batch_dim = {batch_dim}", flush=True)
         if batch_dim is None:
             batch_dim = self.batch_size
-        # print(f"batch_dim = {batch_dim}", flush=True)
-        # print(f"batch_size = {self.batch_size}", flush=True)
-        # print(f"num classifier feats = {self.num_feats}", flush=True)
+        
         self.activations = None
         self.weightings = {}
 
@@ -241,6 +241,7 @@ class RepHarmonizer(L.LightningModule):
         elif not rep_config.get("no_dataset", False):
             domain_classifiers["dataset"] = DomainClassifier(nodes=rep_config.get("num_datasets", 2), init_features=self.num_feats, batch_size=batch_dim) 
         if self.age_confound:
+            # nodes (output dim) specific to MOUS + Cam-CAN)
             # 72 possible ages from youngest (18) to oldest (89 - from Cam-CAN datatset)
             domain_classifiers["age"] = DomainClassifier(nodes=72, init_features=self.num_feats, batch_size=batch_dim) 
         self.domain_classifiers = nn.ModuleDict(domain_classifiers)
@@ -263,37 +264,24 @@ class RepHarmonizer(L.LightningModule):
     # forward passes to avoid errors with backprop and multiple optimizers 
     # in a single training step. 
     # Set to 'encode' if you want to avoid this behavior, though without
-    # further changes training will fail on stage 2 training
-    def apply_encoder(self, z, dataset, subject, stage="task"):
-        # print(f"Initial version of z: {z._version}", flush=True)
-        
+    # further changes training will fail during adversarial harmonization
+    def apply_encoder(self, z, dataset, subject, stage="task"):        
         z = self.encoder_models["dataset_block"](z, dataset, stage=stage)
         z = self.encoder_models["encoder"](z, stage=stage)
         z = self.encoder_models["transformer"](z)
         z, _, commit_loss = self.encoder_models["quantize"](z)
 
-        # print(f"After quantize z: {z._version}", flush=True)
-
         # Generic subject embedding
         subject_embedding = self.encoder_models["subject_embedding"](dataset, subject)
-        # print(f"Initial version of subject_embedding: {subject_embedding._version}", flush=True)
-        # if stage == "task":
-        #     subject_embedding = subject_embedding.clone()
 
         # Subject block
         z = self.encoder_models["subject_block"](z, dataset, subject)
-        # print(f"After subject block subject_embedding: {subject_embedding._version}", flush=True)
-        # print(f"After subject block z: {z._version}", flush=True)
 
         # Subject FiLM conditioning
         z = self.encoder_models["subject_film_module"](z, subject_embedding, stage=stage)
-        # print(f"After FiLM subject_embedding: {subject_embedding._version}", flush=True)
-        # print(f"After FiLM z: {z._version}", flush=True)
 
         # Subject embedding concatentation
         z = self.encoder_models["attach_subject"](z, subject_embedding)
-        # print(f"After sub concat subject_embedding: {subject_embedding._version}", flush=True)
-        # print(f"After sub concat z: {z._version}", flush=True)
 
         # Max Pooling over the entire time dimension T
         maxpool = nn.MaxPool1d(kernel_size=z.shape[2])  # Pool across the time dimension
@@ -302,23 +290,13 @@ class RepHarmonizer(L.LightningModule):
         # Squeeze the last dimension to get [B, E]
         features = pooled_data.squeeze(-1)  # Shape [B, E]
 
-        # print(f"After squeeze pooled: {pooled_data._version}", flush=True)
-        # print(f"After squeeze features: {features._version}", flush=True)
-
         # Create two different views for sequence models and independent classifiers
         z_sequence = z.permute(0, 2, 1)  # [B, T, E]
-        # print(f"After permute z: {z._version}", flush=True)
-        # print(f"After permute z_seq: {z_sequence._version}", flush=True)
         z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
-        # print(f"After flatten z: {z._version}", flush=True)
-        # print(f"After flatten z_seq: {z_sequence._version}", flush=True)
-        # print(f"After flatten z_ind: {z_independent._version}", flush=True)
 
         # Apply SSL projector to z_sequence
         T, E = z_sequence.shape[1:]
-        # print(f"After shape z: {z._version}", flush=True)
-        # print(f"After shape z_seq: {z_sequence._version}", flush=True)
-        # print(f"After shape z_ind: {z_independent._version}", flush=True)
+
         if self.no_proj_encode:
             z_sequence = torch.unflatten(
                 self.predictor_models["projector"](
@@ -343,31 +321,11 @@ class RepHarmonizer(L.LightningModule):
                 dim=-1,
                 sizes=(T, E),
             )
-        # print(f"After projector z: {z._version}", flush=True)
-        # print(f"After projector z_seq: {z_sequence._version}", flush=True)
-        # print(f"After projector z_ind: {z_independent._version}", flush=True)
-
-        # # Create two different views for sequence models and independent classifiers
-        # z_sequence = z.permute(0, 2, 1)  # [B, T, E]
-        # z_independent = z_sequence.flatten(start_dim=0, end_dim=1)  # [B * T, E]
-
-        # # Apply SSL projector to z_sequence
-        # T, E = z_sequence.shape[1:]
-        # z_projected = self.encoder_models["projector"](
-        #     z_sequence.flatten(start_dim=1, end_dim=-1)
-        # )
-        # z_sequence = torch.unflatten(z_projected, dim=-1, sizes=(T, E))
-
-        # # The logits or final features output
-        # features = z_projected.view(z.size(0), -1)  # [batch_size, _]
 
         return features, z_sequence, z_independent, commit_loss
 
     def forward(self, inputs):
-        # print("Forward call", flush=True)
         x = inputs["data"]
-
-        # sensor_pos = inputs["sensor_pos"]
         sensor_pos = None
 
         dataset = inputs["info"]["dataset"][0]
@@ -378,10 +336,8 @@ class RepHarmonizer(L.LightningModule):
         backbone_feats, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
         return_values["quantization"] = {"commit_loss": commit_loss}
         features["backbone"] = backbone_feats
-                        #  "classifier features": features}
 
         if "band_predictor" in self.predictor_models:
-            # with torch.no_grad(): # other option is to only put these in place after stage 1
             x_filtered, band_label = self.predictor_models["band_predictor"].filter_band(
                 x, sample_rate=250
             )  # warning: hardcoded
@@ -392,7 +348,6 @@ class RepHarmonizer(L.LightningModule):
             features["band_predictor"] = filtered_feats
 
         if "phase_diff_predictor" in self.predictor_models:
-            # with torch.no_grad():
             x_shifted, phase_label = self.predictor_models[
                 "phase_diff_predictor"
             ].apply_random_phase_shift(x)
@@ -403,11 +358,9 @@ class RepHarmonizer(L.LightningModule):
             features["phase_diff"] = shifted_feats
 
         if "masked_channel_predictor" in self.predictor_models:
-            # with torch.no_grad():
             x_masked, mask_label = self.predictor_models[
                 "masked_channel_predictor"
             ].mask_input(x, sensor_pos)
-            # todo: do something with commit loss
             masked_feats, z_mask_sequence, _, _ = self.apply_encoder(x_masked, dataset, subject)
             return_values["masked_channel_pred"] = self.predictor_models[
                 "masked_channel_predictor"
@@ -415,7 +368,6 @@ class RepHarmonizer(L.LightningModule):
             features["masked_channel"] = masked_feats
 
         if "amp_scale_predictor" in self.predictor_models:
-            # with torch.no_grad():
             x_scaled, scale_label = self.predictor_models["amp_scale_predictor"].scale_amp(
                 x
             )
@@ -451,33 +403,23 @@ class RepHarmonizer(L.LightningModule):
             return features["backbone"], return_values
     
     def _encode(self, batch):
-        # print("Encode call", flush=True)
         x = batch["data"]
-
-        # sensor_pos = inputs["sensor_pos"]
-        # sensor_pos = None
-
         dataset = batch["info"]["dataset"][0]
         subject = batch["info"]["subject_id"]
 
-        # features, z_sequence, z_independent, commit_loss = self.apply_encoder(x, dataset, subject)
         features, _, _, _ = self.apply_encoder(x, dataset, subject)
 
-        # return features, z_sequence, z_independent, commit_loss
         return features
 
     def _shared_step(self, batch, stage="train"):
-        # print("Shared call", flush=True)
         loss = 0.0
         losses = {}
         metrics = {}
 
         data_key = get_key_from_batch_identifier(batch["info"])
         dataset = batch["info"]["dataset"][0]
-        # subject = batch["info"]["subject_id"]
 
         features, return_values = self(batch)
-        # features = return_values.pop("classifier features")
 
         # Compute losses over this data batch
         for key, val in return_values.items():
@@ -501,6 +443,8 @@ class RepHarmonizer(L.LightningModule):
 
         return features, loss, losses, metrics
 
+    ## helper function for age confound harmonization
+    ## NOTE specific to MOUS and schoffelen datasets
     def get_age_targets(self, subjects, dataset):
         if dataset == "shafto2014":
             age_dict = CAMCAN_AGES
@@ -516,24 +460,21 @@ class RepHarmonizer(L.LightningModule):
         # convert ages to a tensor
         age_tensor = torch.tensor(ages).to(self.device)
 
-        # get indices of the input subject IDs
+        # get indices of input subject IDs
         subject_indices = torch.tensor([id_to_index[id] for id in subjects]).to(self.device)
 
-        # gather ages from the age tensor
+        # gather ages from age tensor
         age_targets = age_tensor[subject_indices]
 
         return age_targets
 
     # NOTE each batch in training_step is a tuple of batches from each of the dataloaders 
     def training_step(self, batch, batch_idx):
+        ## Fine-tuning Mode ##
         if self.finetune:
             ft_optim = self.optimizers()
             ft_optim.zero_grad()
             features, loss, losses, metrics = self._shared_step(batch=batch, stage="train")
-            # features, z_sequence, z_independent, commit_loss = self._encode(batch)
-            # loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
-            #                                                     z_independent=z_independent, 
-            #                                                     commit_loss=commit_loss, stage="train")
             self.manual_backward(loss)
             ft_optim.step()
 
@@ -584,17 +525,9 @@ class RepHarmonizer(L.LightningModule):
             intersect_batch = batch[-1]
             batch = batch[:-1]
         
-        # print(intersect_batch["info"])
-        # print(batch[0]["info"])
-
-        ## train main encoder
-        if self.current_epoch < self.epoch_stage_1:
-            # print("Warm-Up Phase", flush=True)
-            #TODO investigate implementing normalized total batch size across all 3 dataloaders to 32
-            # skipping for now to get the framework up and running
-            # Using MEGalodon loss instead of regressor loss criterion
-
-            # with torch.autograd.detect_anomaly():
+        ## Train main encoder ##
+        # Warm-up Phase #
+        if self.current_epoch < self.epoch_stage_1: 
             step1_optim.zero_grad()
             task_loss = 0
             domain_loss = 0
@@ -608,7 +541,6 @@ class RepHarmonizer(L.LightningModule):
                     print(f"Train dataset {idx} batch is less than batch_size", flush=True)
                 if len(batch) == 2:
                     if idx == 0:
-                        # subset = np.random.randint(1, self.batch_size - 1)
                         subset = np.random.randint(1, len(batch_i["data"]) - 1)
                         while subset >= len(batch[1]["data"]): ## hacky fix for abnormal batch sizes
                             subset = np.random.randint(1, len(batch_i["data"]) - 1)
@@ -616,7 +548,6 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                     elif idx == 1:
                         subset = len(batch_i["data"]) - subset
-                        # subset = self.batch_size - subset
                         batch_i = self._take_subset(batch_i, subset)
                 elif len(batch) == 3:
                     if idx == 0:
@@ -635,26 +566,21 @@ class RepHarmonizer(L.LightningModule):
                         batch_i = self._take_subset(batch_i, subset)
                 
                 batch_size += subset
-                # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                #                                             z_independent=z_independent, 
-                #                                             commit_loss=commit_loss, stage="train")
                 features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="train")
                 if self.intersect_only and idx == 0:
-                    # d_pred = self.domain_classifier(features.detach())
                     intersect_batch = self._take_subset(intersect_batch, split_1)
                     features = self._encode(intersect_batch)
                 
-                for confound in self.domain_classifiers.keys():
+                # collect preds and targets for all counfounds
+                for confound in self.domain_classifiers.keys(): 
                     if domain_preds.get(confound) is None:
                         if self.agg_task_feats:
                             domain_preds[confound] = {}
                         else:
                             domain_preds[confound] = []
 
-                    if self.agg_task_feats:
+                    if self.agg_task_feats: 
                         for key, feats in features.items():
-                            # print(f"{key} feats is None = {feats is None}", flush=True)
                             if self.multi_dm_pred:
                                 if domain_preds[confound].get(key) is None:
                                     domain_preds[confound][key] = [self.domain_classifiers[confound][key](feats)] 
@@ -668,16 +594,12 @@ class RepHarmonizer(L.LightningModule):
                     else:
                         d_pred = self.domain_classifiers[confound](features)
                         domain_preds[confound].append(d_pred)
-                    # print(f"len {key} pred_list = {len(domain_preds[key])}", flush=True)
 
                     if domain_targets.get(confound) is None:
                         domain_targets[confound] = []
 
                     if confound == "age":
-                        # print(batch_i["info"], flush=True)
                         d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                        # ages = get_age_distribution_labels(ages).to(self.device)
-                        # d_target = F.softmax(ages, dim=1)
                     else:
                         d_target = torch.full((subset,), idx).to(self.device)
                     domain_targets[confound].append(d_target)
@@ -726,7 +648,6 @@ class RepHarmonizer(L.LightningModule):
                 batch_size=batch_size,
                 sync_dist=True,
             )
-            #TODO maybye only start logging this during second stage
             self.log(
                 "domain_train_loss",
                 domain_loss,
@@ -738,19 +659,15 @@ class RepHarmonizer(L.LightningModule):
                 sync_dist=True,
             )
 
+            # clear mem just in case
             del loss, task_loss, domain_loss, domain_preds, domain_targets
             torch.cuda.empty_cache()
 
             return 
 
-        ## begin unlearning
+        ## Harmonization Phase ##
         else:
-            # if self.current_epoch == self.epoch_stage_1 and batch_idx == 0:
-            #     if not self.clear_optim and not self.sdat: # make sure optim state wasn't already cleared on checkpoint load
-            #         self.reset_optims() 
-
-            # with torch.autograd.detect_anomaly(): #TODO remove anomaly detection
-            # update encoder / task heads
+            # update encoder + task heads #
             optim.zero_grad()
             task_loss = 0
             batch_vals = {}
@@ -802,13 +719,9 @@ class RepHarmonizer(L.LightningModule):
                         batch_vals[confound] = []
 
                     if confound == "age":
-                        # print(batch_i["info"], flush=True)
                         d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
-                        # ages = get_age_distribution_labels(ages).to(self.device)
-                        # d_target = F.softmax(ages, dim=1)
                     else:
                         d_target = torch.full((subset,), idx).to(self.device)
-                    # d_target = torch.full((subset,), idx).to(self.device)
                     batch_vals[confound].append((features, d_target))
                 if t_loss is not None:
                     task_loss += t_loss
@@ -820,20 +733,18 @@ class RepHarmonizer(L.LightningModule):
             else:
                 optim.step()   
 
-            # update just domain classifier
+            # update just domain classifier #
             dm_optim.zero_grad()
             domain_loss = 0
             domain_preds = {}
             domain_targets = {}
 
             if self.intersect_only:
-                # print("Intersect Only Called", flush=True)
                 if len(intersect_batch["data"]) < self.batch_size:
                     print(f"Intersect batch is less than batch_size", flush=True)
                 # relies heavily on assumption that Shafto is first
                 intersect_batch = self._take_subset(intersect_batch, split_1)
                 features = self._encode(intersect_batch)
-                # _, _, _, feats = self._shared_step(intersect_batch, batch_idx, "train")
                 targets = torch.full((split_1,), 0).to(self.device)
                 batch_vals[0] = (features, targets)
 
@@ -849,7 +760,6 @@ class RepHarmonizer(L.LightningModule):
                 for features, targets in batch_vals[confound]:
                     if self.agg_task_feats:
                         for key, feats in features.items():
-                            # print(f"{key} feats is None = {feats is None}", flush=True)
                             if self.multi_dm_pred:
                                 if domain_preds[confound].get(key) is None:
                                     domain_preds[confound][key] = [self.domain_classifiers[confound][key](feats.detach())] 
@@ -893,7 +803,7 @@ class RepHarmonizer(L.LightningModule):
 
             dm_optim.step()
 
-            # update just encoder using domain loss
+            # update just encoder using domain loss #
             if not self.sdat:
                 conf_optim.zero_grad()
             confusion_loss = 0
@@ -901,7 +811,6 @@ class RepHarmonizer(L.LightningModule):
 
             domain_preds = {}
             domain_preds = {}
-            # domain_targets = []
 
             for confound in self.domain_classifiers.keys():
                 if domain_preds.get(confound) is None:
@@ -911,7 +820,6 @@ class RepHarmonizer(L.LightningModule):
                         domain_preds[confound] = []
 
                 for features, targets in batch_vals[confound]:
-                # for feats in cloned_feats:
                     if self.agg_task_feats:
                         for key, feats in features.items():
                             pred_list = domain_preds[confound].get(key)
@@ -937,27 +845,15 @@ class RepHarmonizer(L.LightningModule):
                         conf_preds = self.domain_classifiers[confound](features)
                         conf_preds = torch.softmax(conf_preds, dim=1)
                         domain_preds.append(conf_preds)
-                        # domain_targets.append(targets)
             
-            # domain_targets = torch.cat(domain_targets)
             confusion_loss = 0
             for confound in self.domain_classifiers.keys():
                 if self.agg_task_feats:
                     for key, pred_list in domain_preds[confound].items():
                         preds = torch.cat(pred_list)
-                        # if confound == "age":
-                        #     # preds = torch.softmax(preds, dim=1)
-                        #     preds = torch.argmax(preds, dim=1) + 18
-                        #     preds = get_age_distribution_labels(preds).to(self.device)
-                        #     preds = F.softmax(preds, dim=1)
                         confusion_loss += self.conf_criterion(preds, domain_targets[confound])
                 else:
                     domain_preds[confound] = torch.cat(domain_preds[confound])
-                    # if confound == "age":
-                    #     # domain_preds = torch.softmax(domain_preds, dim=1)
-                    #     domain_preds[confound] = torch.argmax(domain_preds[confound], dim=1) + 18
-                    #     domain_preds[confound] = get_age_distribution_labels(domain_preds[confound]).to(self.device)
-                    #     domain_preds[confound] = F.softmax(domain_preds[confound], dim=1)
                     confusion_loss += self.conf_criterion(domain_preds[confound], domain_targets[confound])
 
             confusion_loss = beta * confusion_loss
@@ -968,16 +864,13 @@ class RepHarmonizer(L.LightningModule):
             if torch.isinf(confusion_loss).any():
                 raise ValueError("Inf detected in confusion_loss before backward call ")
             
-            # print("Third backward", flush=True)
-            # print(f"Version of film linear weight before third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
             self.manual_backward(confusion_loss, retain_graph=False) 
-            # print(f"Version of film linear weight after third backward: {self.encoder_models["subject_film_module"].lin.weight._version}")
+            
             if self.sdat:
                 optim.second_step(zero_grad=True)
             else:
                 conf_optim.step()  
 
-            
             self.log(
                 "train_loss",
                 task_loss,
@@ -1014,6 +907,7 @@ class RepHarmonizer(L.LightningModule):
 
             return 
 
+    ## Helper function taking batch slices ##
     def _take_subset(self, batch, subset):
         for key, value in batch.items():
             if key == "info":
@@ -1032,17 +926,9 @@ class RepHarmonizer(L.LightningModule):
         return batch
 
     def validation_step(self, batch, batch_idx):
-        #TODO investigate implement normalized total batch size across all 3 dataloaders to 32
-        # skipping for now to get the framework up and running
-        # Using MEGalodon loss instead of regressor loss criterion
-
+        # Fine-tuning Mode #
         if self.finetune:
             features, loss, losses, metrics = self._shared_step(batch=batch, stage="val")
-            # features, z_sequence, z_independent, commit_loss = self._encode(batch)
-            # loss, losses, metrics = self._shared_step(batch=batch, z_sequence=z_sequence, 
-            #                                           z_independent=z_independent, 
-            #                                           commit_loss=commit_loss, stage="val")
-
             batch_size = len(batch["data"])
 
             if loss is not None:
@@ -1083,7 +969,7 @@ class RepHarmonizer(L.LightningModule):
             intersect_batch = batch[-1]
             batch = batch[:-1]
 
-        ## Pre-training
+        ## Warm-up Phase ##
         if self.current_epoch < self.epoch_stage_1: 
             if self.full_run and self.current_epoch == self.epoch_stage_1 - 1 and batch_idx == 0:
                 save_activations = True
@@ -1096,7 +982,6 @@ class RepHarmonizer(L.LightningModule):
             domain_targets = {}
             if self.age_confound: 
                 acc_targets = []
-            # domain_targets = []
             subset = 0
             split_1 = 0
             if save_activations:
@@ -1175,14 +1060,10 @@ class RepHarmonizer(L.LightningModule):
                         domain_preds[confound].append(d_pred)
 
                     if confound == "age":
-                        # print(batch_i["info"], flush=True)
                         d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
                         acc_targets.append(d_target.int())
-                        # ages = get_age_distribution_labels(ages).to(self.device)
-                        # d_target = F.softmax(ages, dim=1)
                     else:
                         d_target = torch.full((subset,), idx).to(self.device)
-                    # d_target = torch.full((subset,), idx).to(self.device)
                     domain_targets[confound].append(d_target)
 
                 if t_loss is not None:
@@ -1197,7 +1078,6 @@ class RepHarmonizer(L.LightningModule):
                     domain_targets[confound] = F.softmax(domain_targets[confound], dim=1)
                 if self.agg_task_feats:
                     for key, pred_list in domain_preds[confound].items():
-                        # pred_list = torch.cat(pred_list)
                         preds = torch.cat(pred_list)
                         if confound == "age":
                             loss_preds = torch.softmax(preds, dim=1)
@@ -1236,11 +1116,7 @@ class RepHarmonizer(L.LightningModule):
                     pred_domains = np.argmax(domain_preds[confound].detach().cpu().numpy(), axis=1)
                     if confound == "age":
                         pred_domains = pred_domains + 18
-                    # print(f"True domains = {true_domains}", flush=True)
-                    # print(f"Pred domains = {pred_domains}", flush=True)
                     acc += accuracy_score(true_domains, pred_domains)
-
-            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
 
             #TODO fix - if not multi then acc needs to be moved below, if is multi then needs overhaul
             if save_activations:
@@ -1255,7 +1131,6 @@ class RepHarmonizer(L.LightningModule):
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, 
                           file_name=f"{self.run_name}_task_tsne.png")
 
-        
             self.log(
                 "val_loss",
                 task_loss,
@@ -1292,6 +1167,7 @@ class RepHarmonizer(L.LightningModule):
 
             return 
         
+        ## Harmonization Phase ##
         else:
             if self.full_run and self.current_epoch == self.max_epochs - 1 and batch_idx == 0:
                 save_activations = True
@@ -1346,16 +1222,11 @@ class RepHarmonizer(L.LightningModule):
                 batch_size += subset
 
                 features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="val")
-                # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-                # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-                #                                             z_independent=z_independent, 
-                #                                             commit_loss=commit_loss, stage="val")
 
                 if save_activations:
                     activations.append(features.detach())
 
                 if self.intersect_only and idx == 0:
-                    # d_pred = self.domain_classifier(features.detach())
                     intersect_batch = self._take_subset(intersect_batch, split_1)
                     features = self._encode(intersect_batch)
 
@@ -1385,7 +1256,6 @@ class RepHarmonizer(L.LightningModule):
                     else:
                         d_pred = self.domain_classifiers[confound].forward(features)
                         domain_preds[confound].append(d_pred)
-                    # print(f"d_pred len = {len(d_pred)}")
 
                     if confound == "age":
                         d_target = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0]).int()
@@ -1417,15 +1287,6 @@ class RepHarmonizer(L.LightningModule):
                     if confound == "age":
                         pred_domains = pred_domains + 18
                     acc += accuracy_score(true_domains, pred_domains)
-            # print(f"domain preds len = {len(domain_preds)}")
-
-            
-            # print(f"domain preds len after softmax = {len(domain_preds)}")
-            # 
-
-            # print(f"domain preds len after argmax = {len(pred_domains)}")
-            # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-            # true_domains = domain_targets.detach().cpu().numpy()
 
             if save_activations:
                 activations = torch.cat(activations).to("cpu")
@@ -1439,7 +1300,6 @@ class RepHarmonizer(L.LightningModule):
                 plot_tsne(activations=activations, labels=label_names, save_dir=save_path, 
                           file_name=f"{self.run_name}_unlearned_tsne.png")
 
-        
             self.log(
                 "val_loss",
                 task_loss,
@@ -1466,8 +1326,9 @@ class RepHarmonizer(L.LightningModule):
 
             return
 
+    ## Runs single batch through model to generate and save ##
+    ## the activations produced by the final layer of the encoder ##
     def get_tsne(self, batch, name=None):
-        # task_loss = 0
         batch_size = 0
         if self.age_confound:
             age_preds = []
@@ -1496,12 +1357,6 @@ class RepHarmonizer(L.LightningModule):
             batch_size += subset
 
             features = self._encode(batch_i)
-            # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-            #                                                 z_independent=z_independent, 
-            #                                                 commit_loss=commit_loss, stage="test")
-
-            # t_loss, losses, metrics, features = self._shared_step(batch=batch_i, batch_idx=0, stage="val")
-
             activations.append(features.detach())
 
             if self.age_confound:
@@ -1513,29 +1368,11 @@ class RepHarmonizer(L.LightningModule):
                 true_ages = self.get_age_targets(batch_i["info"]["subject"], batch_i["info"]["dataset"][0])
                 age_targets.append(true_ages)
 
-            # if not self.no_dm_control:
-
-            #     # explicitly call forward to avoid hooks
-            #     if self.multi_dm_pred:
-            #         d_pred = self.domain_classifiers["backbone"].forward(features)
-            #     else:
-            #         d_pred = self.domain_classifier.forward(features) 
-            #     domain_preds.append(d_pred)
-
             d_target = torch.full((subset,), idx).to(self.device)
             domain_targets.append(d_target)
-                # if t_loss is not None:
-                #     task_loss += t_loss
+
         domain_targets = torch.cat(domain_targets, 0)
         true_domains = domain_targets.cpu().numpy()
-        # if not self.no_dm_control:
-        #     domain_preds = torch.cat(domain_preds, 0)
-        #     domain_preds = torch.softmax(domain_preds, dim=1)
-        #     pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-        #     # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-        #     print(f"Targets = {true_domains}", flush=True)
-        #     print(f"Preds = {pred_domains}", flush=True)
-        #     acc = accuracy_score(true_domains, pred_domains)
 
         if self.age_confound:
             age_preds = torch.cat(age_preds, 0)
@@ -1568,26 +1405,13 @@ class RepHarmonizer(L.LightningModule):
         if self.age_confound:
             np.save(save_path / dist_preds, pred_age_dist)
             np.save(save_path / true_dist, true_age_dist)
-        # if not self.no_dm_control:
-        #     print(f"Single batch accuracy: {acc}")
         print("Saving activations...")
         # plot_tsne(activations=activations, labels=label_names, save_dir=save_path, file_name=f"{name}_unlearned_tsne.png")
 
-    #TODO implement domain unlearning iterative training scheme
-    def test_step(self, batch, batch_idx):
-        #TODO implement normalizing total batch size across all 3 dataloaders to 32
-        # skipping for now to get the framework up and running
-        # also using MEGalodon loss instead of regressor loss criterion
-
+    def test_step(self, batch, batch_idx): # function not critical for training #
+        ## Fine-tuning Mode ##
         if self.finetune:
             features, loss, losses, metrics = self._shared_step(batch=batch, stage="test")
-            # features, z_sequence, z_independent, commit_loss = self._encode(batch)
-            # loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-            #                                                 z_independent=z_independent, 
-            #                                                 commit_loss=commit_loss, stage="test")
-
-            # loss, losses, metrics, features = self._shared_step(batch, batch_idx, "test")
-
             batch_size = len(batch["data"])
 
             if loss is not None:
@@ -1622,7 +1446,7 @@ class RepHarmonizer(L.LightningModule):
 
             return loss
 
-        ## Pre-training
+        ## Pre-training ##
         task_loss = 0
         batch_size = 0
         if self.agg_task_feats:
@@ -1659,13 +1483,7 @@ class RepHarmonizer(L.LightningModule):
                     batch_i = self._take_subset(batch_i, subset)
             batch_size += subset
             features, t_loss, losses, metrics = self._shared_step(batch=batch_i, stage="test")
-            # features, z_sequence, z_independent, commit_loss = self._encode(batch_i)
-            # t_loss, losses, metrics = self._shared_step(batch=batch_i, z_sequence=z_sequence, 
-            #                                                 z_independent=z_independent, 
-            #                                                 commit_loss=commit_loss, stage="test")
 
-            # t_loss, losses, metrics, features = self._shared_step(batch_i, batch_idx, "test")
-            # d_pred = self.domain_classifier(features)
             if self.agg_task_feats:
                 for key, feats in features.items():
                     pred_list = domain_preds.get(key)
@@ -1682,28 +1500,16 @@ class RepHarmonizer(L.LightningModule):
             else:
                 d_pred = self.domain_classifier(features)
                 domain_preds.append(d_pred)
-            # d_target = torch.full_like(batch_i["data"], get_dset_encoding(batch_i["info"]["dataset"][0])).to(self.device)
-            # d_target = torch.ones((len(batch_i["data"]), 1)) * get_dset_encoding(batch_i["info"]["dataset"][0])
-
-            # d_target = torch.zeros((subset, len(batch))).to(self.device)
-            # d_target[:, idx] = 1
 
             d_target = torch.full((subset,), idx).to(self.device)
-
-            # d_target = d_target.int()
-            # d_target.to(self.device)
             domain_preds.append(d_pred)
             domain_targets.append(d_target)
             if t_loss is not None:
                 task_loss += t_loss
-        # domain_preds = torch.cat(domain_preds, 0)
-        domain_targets = torch.cat(domain_targets, 0)
 
-        # pred_domains = np.argmax(domain_preds.detach().cpu().numpy(), axis=1)
-        # true_domains = np.argmax(domain_targets.detach().cpu().numpy(), axis=1)
-        # true_domains = domain_targets.cpu().numpy()
-        # acc = accuracy_score(true_domains, pred_domains)
+        domain_targets = torch.cat(domain_targets, 0)
         true_domains = domain_targets.detach().cpu().numpy()
+
         if self.agg_task_feats:
             accs = []
             for key, pred_list in domain_preds.items():
@@ -1744,8 +1550,7 @@ class RepHarmonizer(L.LightningModule):
 
         return 
     
-    
-    
+    # Needed if loading a checkpoint trained with a different optimizer
     def on_load_checkpoint(self, checkpoint):
         if self.clear_optim: # assumes checkpoint was pretrained with adam
             print("CLEARED CHECKPOINT OPTIMS")
@@ -1757,13 +1562,10 @@ class RepHarmonizer(L.LightningModule):
                 if 'weight_decay' in param_group:
                     del param_group['weight_decay']
 
+    # Needed if loading a checkpoint trained with a different optimizer
     def reset_optims(self):
         print("WORKING")
-        # if self.current_epoch == self.epoch_stage_1 - 1:
         for idx, optimizer in enumerate(self.trainer.optimizers):
-            # print(f"{optimizer} state keys: {optimizer.state.keys()}")
-            # optimizer.state = {}
-            # optimizer.state = {param: {} for param in optimizer.state.keys()}
             for param_group in optimizer.param_groups:
                 if idx == 1:
                     param_group["lr"] = self.task_learning_rate
@@ -1777,14 +1579,6 @@ class RepHarmonizer(L.LightningModule):
                     param_group['dampening'] = 0
                     param_group['nesterov'] = True
                     param_group['weight_decay'] = 1e-3
-
-    ## to be used in the potential case that checkpoint is trained with adam but you don't want to begin unlearning immediately
-    ## currently not called anywhere
-    def reset_optimizer_states(self):
-        # Function to reset optimizer states
-        for optimizer in self.trainer.optimizers:
-            optimizer.state = {}
-        self.configure_optimizers()
 
     def configure_optimizers(self):
         encoder_params = list(filter(lambda p: p.requires_grad, self.encoder_models.parameters()))
@@ -1810,25 +1604,14 @@ class RepHarmonizer(L.LightningModule):
                 lr=self.learning_rate
             )
 
-            # step1_optim = SAM(encoder_params + predictor_params + domain_classifier_params, base_optim,
-            #                   rho=0.05, adaptive=False, lr=self.learning_rate, momentum=0.9,
-            #                   weight_decay=1e-3, nesterov=True)
-
             optim = SAM(encoder_params + predictor_params, base_optim,
                               rho=0.05, adaptive=False, lr=self.task_learning_rate, momentum=0.9,
                               weight_decay=1e-3, nesterov=True)
-            # conf_optim = SAM(encoder_params, base_optim,
-            #                   rho=0.05, adaptive=False, lr=self.conf_learning_rate, momentum=0.9,
-            #                   weight_decay=1e-3, nesterov=True)
             dm_optim = SGD(domain_classifier_params, lr=self.dm_learning_rate, 
                                        momentum=0.9, weight_decay=1e-3, nesterov=True)
             
-            # step1_scheduler = LambdaLR(step1_optim, lambda x: self.learning_rate *
-            #                 (1. + 0.001 * float(x)) ** (-0.75))
             optim_scheduler = LambdaLR(optim, lambda x: self.task_learning_rate *
                             (1. + 0.001 * float(x)) ** (-0.75))
-            # conf_scheduler = LambdaLR(conf_optim, lambda x: self.conf_learning_rate *
-            #                 (1. + 0.001 * float(x)) ** (-0.75))
             dm_scheduler = LambdaLR(
                  dm_optim, lambda x: self.dm_learning_rate * (1. + 0.001 * float(x)) ** (-0.75))
             

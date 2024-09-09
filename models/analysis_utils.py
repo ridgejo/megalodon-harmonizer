@@ -13,10 +13,6 @@ def plot_tsne(activations, labels, save_dir, file_name, perplexity=30, lr=1000.0
     colors = {label: idx for idx, label in enumerate(unique_labels)}
     scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=[colors[label] for label in labels], cmap='viridis', alpha=0.5)
     
-    # # Create a colorbar with the unique class names
-    # cbar = plt.colorbar(scatter, ticks=range(len(unique_labels)))
-    # cbar.ax.set_yticklabels(unique_labels)
-
     # Create custom legend
     legend_handles = [mpatches.Patch(color=scatter.cmap(scatter.norm(colors[label])), label=label) for label in unique_labels]
     plt.legend(handles=legend_handles, title="Datasets")
@@ -25,13 +21,13 @@ def plot_tsne(activations, labels, save_dir, file_name, perplexity=30, lr=1000.0
     plt.xlabel('t-SNE Dimension 1')
     plt.ylabel('t-SNE Dimension 2')
     
-    # Ensure the directory exists
+    # check dir exists
     os.makedirs(save_dir, exist_ok=True)
     
-    # Save the plot
+    # Save plot
     file_path = os.path.join(save_dir, file_name)
     plt.savefig(file_path)
-    plt.close()  # Close the figure to free memory
+    plt.close()  # Close figure to free memory
 
     print(f"t-SNE plot saved to {file_path}")
 

@@ -129,7 +129,7 @@ if args.intersect_only:
 if args.no_dm_control:
     config["rep_config"]["no_dm_control"] = True
 
-if args.sdat:
+if args.sdat: ## buggy, don't use
     config["rep_config"]["sdat"] = True
 
 if args.age_confound:
@@ -200,10 +200,12 @@ latest_checkpoint = ModelCheckpoint(
     save_top_k=1,
 )
 
+## If you want to save a checkpoint at the end of the warm-up phase / beginning of harmonization phase
+## make sure you monitor training and manually copy the checkpoint 
+## because it WILL be overwritten after the next "epoch_stage_1" epochs
 unlearning_checkpoint = ModelCheckpoint(
     dirpath = exp_path / "MEGalodon-rep-harmonization" / args.name,
     filename="{epoch}-UL-checkpoint",
-    # every_n_epochs=config['rep_config']['epoch_stage_1'] - 1, #TODO val doesn't exists for FT conf
     every_n_epochs=100 if args.no_dm_control else config["rep_config"]["epoch_stage_1"],
     save_top_k=1,
     # enable_version_counter=True
@@ -212,21 +214,9 @@ unlearning_checkpoint = ModelCheckpoint(
 if args.early_stop:
     early_stopping = EarlyStopping(
         monitor='val_loss',  # metric to monitor
-        patience=20 if config['rep_config'].get('patience') is None else config['rep_config']['patience'],          # number of epochs with no improvement after which training will be stopped
+        patience=20 if config['rep_config'].get('patience') is None else config['rep_config']['patience'], # number of epochs with no improvement after which training will be stopped
         mode='min'           # mode can be 'min' or 'max'
     )
-
-# # Custom callback to save checkpoint halfway through training
-# class HalfwayCheckpoint(Callback):
-#     def on_epoch_end(self, trainer, pl_module):
-#         if trainer.current_epoch == (trainer.max_epochs / 2) - 1:
-#             # Save checkpoint
-#             print("Saving Halfway Checkpoint...")
-#             checkpoint_path = os.path.join(trainer.checkpoint_callback.dirpath, f"epoch_{trainer.current_epoch}.ckpt")
-#             trainer.save_checkpoint(checkpoint_path)
-#             print(f"Checkpoint saved at {checkpoint_path}")
-
-# halfway_checkpoint = HalfwayCheckpoint()
 
 if "finetune" in config:
     datamodule = MEGDataModule(        
@@ -287,12 +277,6 @@ if args.checkpoint:
 
         if config["finetune"]["freeze_all"]:
             model.finetuning_mode()
-            # # Freeze all layers except any downstream classifiers that are already enabled
-            # model.freeze_except("classifier")
-            # # Remove other losses / predictors from the model
-            # model.disable_ssl()
-            # # warning: also removes any existing classifiers from pre-training stage
-            # model.disable_classifiers()
         else:
             model.disable_ssl()
             model.disable_classifiers()
@@ -341,6 +325,7 @@ wandb_logger.watch(model)
 epochs = config["experiment"]["epochs"] if "epochs" in config["experiment"] else 1000
 epochs = 10 if args.profile else epochs
 
+# specify callbacks
 if args.early_stop:
     callbacks = [latest_checkpoint, val_checkpoint, unlearning_checkpoint, early_stopping]
 elif "finetune" in config:

@@ -32,6 +32,7 @@ def get_dset_encoding(dataset):
     else:
         raise ValueError("Dataset not supported")
     
+## custom dataloader to enable mixed batches for harmonization ##
 class ComboLoader:
     def __init__(self, dataloaders):
         self.dataloaders = dataloaders
@@ -61,8 +62,9 @@ class ComboLoader:
     def __len__(self):
         return self.num_batches
     
+## Helper for oversampling ##
 def get_oversampler(dataset, target_size):
-    # Calculate the number of samples needed to match the target size
+    # Calculate number of samples needed to match target size
     num_samples = len(dataset)
     oversample_factor = target_size // num_samples + 1
 
@@ -76,6 +78,7 @@ def get_oversampler(dataset, target_size):
     sampler = WeightedRandomSampler(indices, len(indices), replacement=True)
     return sampler
 
+## Helper for intersect only harmonization ##
 class Oversampler(Sampler):
     def __init__(self, data_source, batch_size):
         self.data_source = data_source
@@ -90,10 +93,6 @@ class Oversampler(Sampler):
         # Generate indices with replacement if necessary
         indices = torch.randint(0, self.num_samples, (self.total_samples,))
         
-        # # Yield batches of indices
-        # for i in range(0, len(indices), self.batch_size):
-        #     yield indices[i:i + self.batch_size].tolist()
-
         # Yield one index at a time
         for i in range(0, len(indices)):
             yield indices[i].item()
@@ -101,29 +100,27 @@ class Oversampler(Sampler):
     def __len__(self):
         return self.total_samples
     
+## Helper for harmonizing age confound ##
 def get_age_distribution_labels(ages, age_range=(18, 89), sigma=10):
     """
-    Get softmax outputs for a batch of ages, supporting float ages.
+    Get gaussian dist of avg softmax outputs converted for a batch of ages, supports float ages.
     
-    Parameters:
+    Params:
     ages (list or Tensor): List or Tensor of true ages (can be floats).
     age_range (tuple): The minimum and maximum age for the age bins.
     sigma (float): The standard deviation for the normal distribution.
     
     Returns:
-    Tensor: A tensor containing the softmax outputs for each age in the batch.
+    A tensor containing the softmax outputs for each age in the batch.
     """
     
-    # Define the age bins based on the age range, keeping them as floats
+    # Define age bins based on the age range, keeping them as floats
     age_bins = torch.arange(age_range[0], age_range[1] + 1, step=1).float().requires_grad_(True).to("cpu")
     
-    # Convert the list of ages to a tensor
+    # Convert list of ages to tensor
     ages = torch.tensor(ages).float().view(-1, 1).requires_grad_(True).to("cpu")
     
-    # Calculate the normal distribution (Gaussian) values for each age in the batch
+    # Calculate normal distribution (Gaussian) values for each age in the batch
     gaussian_outputs = torch.exp(-((age_bins - ages)**2) / (2 * sigma**2))
-    
-    # # Normalize the Gaussian outputs into a softmax distribution
-    # softmax_outputs = F.softmax(gaussian_outputs, dim=1)
-    
+        
     return gaussian_outputs

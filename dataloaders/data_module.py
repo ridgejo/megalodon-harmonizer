@@ -147,24 +147,12 @@ class HarmonizationDataModule(L.LightningModule):
                 generator=torch.Generator().manual_seed(self.seed),
             )
             splits[dataset] = (train, val, test)
-        # print(f"len train = {len(splits['shafto2014'][0])}")
-        # print(f"len train data = {len(splits['shafto2014'][0]["data"])}")
-        # print(splits["shafto2014"][0])
-
-        # max_train_size = max([len(splits[dataset][0]) for dataset, _ in self.dataset_preproc_configs.items()])
-        # max_val_size = max([len(splits[dataset][1]) for dataset, _ in self.dataset_preproc_configs.items()])
-        # target_train_size = ((max_train_size + self.batch_size - 1) // self.batch_size) * self.batch_size
-        # target_val_size = ((max_val_size + self.batch_size - 1) // self.batch_size) * self.batch_size
 
         for dataset, split in splits.items():
             train, val, test = split
             if dataset == "shaftoIntersection":
-                # train_sampler = get_oversampler(train, target_train_size)
-                # train_sampler = RandomSampler(train, replacement=True)
                 train_sampler = Oversampler(train, batch_size=self.batch_size)
                 val_sampler = Oversampler(val, batch_size=self.batch_size)
-                # val_sampler = get_oversampler(val, target_val_size)
-                # val_sampler = RandomSampler(val, replacement=True)
 
                 if self.dataloader_configs.get("use_workers", False):
                     train_loaders.append(
@@ -261,10 +249,6 @@ class HarmonizationDataModule(L.LightningModule):
         self.val_loaders = val_loaders
         self.test_loaders = test_loaders
 
-    # def _combo_loader(self, loaders):
-    #     for batches in zip(*loaders):
-    #         yield tuple(batches)
-
     def on_after_batch_transfer(self, batch, dataloader_idx):
         # Standard scale the batch before training
         batches = list(batch)
@@ -278,19 +262,15 @@ class HarmonizationDataModule(L.LightningModule):
         return tuple(batches)
 
     def train_dataloader(self):
-        # return self._combo_loader(self.train_loaders)
         return ComboLoader(self.train_loaders)
 
     def val_dataloader(self):
-        # return self._combo_loader(self.val_loaders)
         return ComboLoader(self.val_loaders)
     
     def test_dataloader(self):
-        # return self._combo_loader(self.test_loaders)
         return ComboLoader(self.test_loaders)
 
     def predict_dataloader(self):
-        # return self._combo_loader(self.test_loaders)
         return ComboLoader(self.test_loaders)
 
 

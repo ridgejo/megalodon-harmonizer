@@ -41,11 +41,3 @@ class Projector(nn.Module):
             out = self.act_fn(out)
             out = nn.functional.linear(out, self.lin2.weight.clone(), self.lin2.bias)
             return out
-
-
-
-# y1 = torch.nn.functional.linear (x, self.lin1.weight.clone(), self.lin1.bias)
-
-# vs
-
-# y1 = self.lin1 (x)
