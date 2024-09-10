@@ -1,6 +1,5 @@
 #! /bin/bash
-#SBATCH --mail-type=BEGIN,END
-#SBATCH --mail-user=jeremiah.ridge@wolfson.ox.ac.uk
+
 #SBATCH --nodes=1
 #SBATCH --qos=system
 #SBATCH --mem-per-cpu=32G
